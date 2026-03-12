@@ -1,4 +1,4 @@
-/* Version 1.6 | 12 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/* Version 1.6.1 | 12 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /* ═══════════════════════════════════════════
    SPG Finance Module — styles_fin.css
    Desktop-first · System Font · MYOB Purple
@@ -419,12 +419,12 @@ body.sd-collapsed .stg-btn {
 .tbl thead { position: sticky; top: 0; z-index: 5; }
 .tbl th {
   text-align: left;
-  font-size: var(--fs-sm);
-  font-weight: 600;
+  font-size: var(--fs-body);
+  font-weight: 700;
   color: var(--t1);
-  padding: 8px;
+  padding: 10px 8px;
   background: var(--bg);
-  border-bottom: 1px solid var(--bd);
+  border-bottom: 2px solid var(--bd);
   cursor: pointer;
   white-space: nowrap;
 }

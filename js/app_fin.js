@@ -1,4 +1,4 @@
-/** Version 1.9.5 | 13 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 1.9.6 | 13 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — app_fin.js
@@ -6,8 +6,8 @@
  * ═══════════════════════════════════════════
  *
  * FUNCTION MAP (P1):
- *   App.init()            — entry point, build shell, start router
- *   App.go(route)         — navigate to a screen
+ *   App.init()            — entry point, call API.init, build shell, start router
+ *   App.go(route)         — navigate to a screen (with lazy load)
  *   App.esc(str)          — HTML escape
  *   App.formatMoney(n)    — format number as $x,xxx.xx
  *   App.formatDate(str)   — format ISO date to DD/MM
@@ -21,6 +21,8 @@
  *   _buildSidebar()       — render full sidebar nav
  *   _toggleSidebar()      — collapse/expand sidebar
  *   _highlightNav(route)  — highlight active sidebar item
+ *   _loadScript(src)      — lazy load a JS file (once)
+ *   _resolveRoute(route)  — load script for route if needed, then render
  * ═══════════════════════════════════════════
  */
 
@@ -31,26 +33,23 @@ const App = (() => {
     token: null,
     session: null,
     route: '',
-    // Data caches (populated when we connect DB later)
-    bills: [],
+    // Master data (populated by API.initBundle)
+    brands: [],
+    channels: [],
+    bankAccounts: [],
+    taxCodes: [],
+    // Detail data (populated by API.initMaster in background)
     vendors: [],
     categories: [],
-    bankAccounts: [],
-    taxCodes: [
-      { code: 'FRE', name: 'GST Free', rate: 0 },
-      { code: 'GST', name: 'Goods & Services Tax', rate: 10 },
-      { code: 'CAP', name: 'Capital Acquisitions', rate: 10 },
-      { code: 'GNR', name: 'GST Non-Registered', rate: 0 },
-      { code: 'N-T', name: 'Not Reportable', rate: 0 },
-    ],
-  };
-
-  // ── MOCK SESSION ──
-  const MOCK_SESSION = {
-    user_id: 'USR-001',
-    display_name: 'Khun Or',
-    avatar: 'AO',
-    tier_level: 1,
+    vendorRules: [],
+    _masterReady: false,
+    // Screen memory (populated when user visits screens)
+    _bills: null,
+    _billDetail: null,
+    _tx_log: null,
+    _tx_sale: null,
+    _tx_return: null,
+    _sdPending: null,
   };
 
   // ── ROUTE MAP ──
@@ -149,12 +148,47 @@ const App = (() => {
   });
 
   // ═══════════════════════════
+  // LAZY LOADER — load screen JS files on demand
+  // ═══════════════════════════
+  const _loadedScripts = {};
+
+  function _loadScript(src) {
+    if (_loadedScripts[src]) return _loadedScripts[src];
+    _loadedScripts[src] = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = src;
+      s.onload = resolve;
+      s.onerror = () => { _loadedScripts[src] = null; reject(new Error('Failed to load: ' + src)); };
+      document.head.appendChild(s);
+    });
+    return _loadedScripts[src];
+  }
+
+  // Route → script file mapping
+  const ROUTE_FILE = {
+    // Create screens
+    cr_sale: 'js/scr_input_fin.js', cr_bill: 'js/scr_input_fin.js',
+    cr_transfer: 'js/scr_input_fin.js', cr_debit: 'js/scr_input_fin.js',
+    cr_recurring: 'js/scr_input_fin.js', cr_upload: 'js/scr_input_fin.js',
+    cr_import: 'js/scr_input_fin.js',
+    // Transaction screens
+    tx_log: 'js/scr_tx_fin.js', tx_sale: 'js/scr_tx_fin.js',
+    tx_bill: 'js/scr_tx_fin.js', tx_return: 'js/scr_tx_fin.js',
+    tx_bill_detail: 'js/scr_tx_fin.js', tx_sd: 'js/scr_tx_fin.js',
+    tx_find: 'js/scr_tx_fin.js',
+  };
+
+  // ═══════════════════════════
   // INIT
   // ═══════════════════════════
-  function init() {
-    S.session = MOCK_SESSION;
+  async function init() {
+    // Phase 1: API init — session + small master data
+    await API.init();
+
+    // Build shell immediately (session ready)
     _buildTopbar();
     _buildSidebar();
+
     // Register built-in routes
     registerRoutes({
       dashboard: {
@@ -164,9 +198,11 @@ const App = (() => {
         }),
       },
     });
+
     // Route from hash or default
     const hash = location.hash.replace('#', '') || 'dashboard';
     go(hash);
+
     // Listen hash changes
     window.addEventListener('hashchange', () => {
       const h = location.hash.replace('#', '') || 'dashboard';
@@ -184,7 +220,21 @@ const App = (() => {
   // ═══════════════════════════
   // NAVIGATION
   // ═══════════════════════════
-  function go(route) {
+  async function go(route) {
+    // Lazy load script if needed
+    const scriptFile = ROUTE_FILE[route];
+    if (scriptFile && !_loadedScripts[scriptFile]) {
+      // Show loading state while script loads
+      const ct = document.getElementById('content');
+      if (ct) ct.innerHTML = '<div class="empty" style="padding:40px"><div class="fin-spinner" style="margin:0 auto 8px"></div>Loading...</div>';
+      try {
+        await _loadScript(scriptFile);
+      } catch (e) {
+        if (ct) ct.innerHTML = '<div class="empty" style="padding:40px;color:var(--r)">Failed to load. Please refresh.</div>';
+        return;
+      }
+    }
+
     const r = ROUTES[route];
     if (!r) {
       // Show "coming soon" for unregistered routes
@@ -220,7 +270,7 @@ const App = (() => {
   function _buildTopbar() {
     const el = document.getElementById('topbar');
     if (!el) return;
-    const s = S.session || MOCK_SESSION;
+    const s = S.session || {};
     el.innerHTML = `
       <div class="gt-logo" onclick="App.go('dashboard')">SPG Finance</div>
       <div class="gt-r">
@@ -279,7 +329,7 @@ const App = (() => {
 
     // Footer
     html += `<div class="sf">
-      <div style="font-size:9px;color:var(--t4);padding:2px 0;margin-bottom:4px">v1.9.5 | 13 Mar 2026 02:00 AEDT</div>
+      <div style="font-size:9px;color:var(--t4);padding:2px 0;margin-bottom:4px">v1.9.6 | 13 Mar 2026 AEDT</div>
       <a href="https://onspider-spg.github.io/spg-home/#dashboard"><span style="font-size:12px">←</span><span class="sit"> Back to Home</span></a>
       <a href="https://onspider-spg.github.io/spg-home/#logout" class="danger"><span style="font-size:12px">→</span><span class="sit"> Log out</span></a>
     </div>`;
@@ -474,11 +524,9 @@ const App = (() => {
     return `<span class="sts ${cls}">${esc(label)}</span>`;
   }
 
-  /** API stub — will connect to Supabase Edge Function later */
+  /** API call — delegates to API module */
   async function api(action, body = {}) {
-    // For now return mock data
-    console.log('[API mock]', action, body);
-    return { success: true, data: null };
+    return API.call ? API.call(action, body) : { success: true, data: null };
   }
 
   // ═══════════════════════════

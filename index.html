@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- Version 1.0.1 | 12 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 -->
+<!-- Version 1.0.2 | 13 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#ffffff">
@@ -43,8 +43,11 @@
     </div>
   </div>
 
+  <!-- Core scripts — always loaded -->
+  <script src="js/api_fin.js" defer></script>
   <script src="js/app_fin.js" defer></script>
-  <script src="js/scr_input_fin.js" defer></script>
-  <script src="js/scr_tx_fin.js" defer></script>
+  <!-- Screen scripts — lazy loaded by app_fin.js when needed -->
+  <!-- js/scr_input_fin.js — loaded on first Create screen visit -->
+  <!-- js/scr_tx_fin.js — loaded on first Transaction screen visit -->
 </body>
 </html>

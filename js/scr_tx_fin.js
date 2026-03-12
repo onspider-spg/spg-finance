@@ -1,4 +1,4 @@
-/** Version 1.1 | 12 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 1.1.1 | 12 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_tx_fin.js
@@ -245,13 +245,270 @@
   }
 
   // ══════════════════════════════════════════
+  // 5. BILL DETAIL — 3 allocation views
+  // ══════════════════════════════════════════
+  let _bdView = 'self';
+
+  function renderTxBillDetail() {
+    _bdView = 'self';
+    return {
+      tb: `<div class="tb"><button class="bg" onclick="App.go('tx_bill')">← Bills</button><div class="tb-t">Bill Detail</div><div style="font-size:var(--fs-xs);color:var(--t3);margin-left:8px">Allocation ตอน Create กำหนดว่า Bill Detail จะแสดงแบบไหน</div></div>`,
+      ct: _buildBillDetailContent(),
+    };
+  }
+
+  function _buildBillDetailContent() {
+    return `<div style="max-width:1060px;margin:0 auto">
+      <div style="background:var(--acc2);border:1px solid rgba(124,58,237,.15);border-radius:var(--rd);padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;gap:8px">
+        <span style="font-size:14px">ℹ</span>
+        <div>
+          <div style="font-size:var(--fs-sm);font-weight:600;color:var(--acc)">Bill Detail แสดงต่างกันขึ้นอยู่กับ Allocation ที่เลือกตอน Create Bill</div>
+          <div style="font-size:var(--fs-xs);color:var(--t2)">กดดูตัวอย่างแต่ละแบบ — ระบบจริงจะแสดงตาม allocation ที่บันทึกไว้โดยอัตโนมัติ</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:4px;margin-bottom:12px" id="bd_tabs">
+        <button class="btn bo" style="padding:6px 14px;font-size:var(--fs-sm);background:var(--t1);color:#fff;border-color:var(--t1)" onclick="ScrTx._switchBdView('self',this)">Self (FIN-0048)</button>
+        <button class="btn bo" style="padding:6px 14px;font-size:var(--fs-sm)" onclick="ScrTx._switchBdView('ob',this)">On Behalf (FIN-0050)</button>
+        <button class="btn bo" style="padding:6px 14px;font-size:var(--fs-sm)" onclick="ScrTx._switchBdView('split',this)">Split (FIN-0052)</button>
+      </div>
+      <div id="bd_content">${_bdSelfView()}</div>
+    </div>`;
+  }
+
+  function _switchBdView(view, btnEl) {
+    _bdView = view;
+    // Update tab buttons
+    document.querySelectorAll('#bd_tabs button').forEach(b => {
+      b.style.background = '#fff'; b.style.color = 'var(--t2)'; b.style.borderColor = 'var(--bd)';
+    });
+    if (btnEl) { btnEl.style.background = 'var(--t1)'; btnEl.style.color = '#fff'; btnEl.style.borderColor = 'var(--t1)'; }
+    // Update content
+    const ct = document.getElementById('bd_content');
+    if (!ct) return;
+    if (view === 'self') ct.innerHTML = _bdSelfView();
+    else if (view === 'ob') ct.innerHTML = _bdOnBehalfView();
+    else ct.innerHTML = _bdSplitView();
+  }
+
+  // ── Shared bill detail components ──
+  function _bdPaymentSection(status) {
+    const isPaid = status === 'paid';
+    return `<div style="margin-top:10px;border:1px solid var(--bd);border-radius:var(--rd);overflow:hidden">
+      <div style="background:#333;color:#fff;padding:6px 10px;font-size:var(--fs-sm);font-weight:600;display:flex;justify-content:space-between">Payment <span style="font-size:9px;padding:1px 8px;border-radius:8px;background:${isPaid ? 'var(--gbg)' : 'var(--obg)'};color:${isPaid ? 'var(--g)' : 'var(--o)'}">${isPaid ? 'Paid' : 'Unpaid'}</span></div>
+      <div style="padding:8px;font-size:var(--fs-sm);text-align:center;color:var(--t3)">${isPaid ? 'Paid in full on 10/03/2026' : 'No payment recorded · <a class="lk" style="font-size:var(--fs-sm)">Record Payment →</a>'}</div>
+    </div>`;
+  }
+
+  function _bdAttachments(files) {
+    const fileList = files.map(f => `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;padding:4px 8px;background:var(--bg3);border-radius:4px;font-size:var(--fs-sm)"><span>📄</span><span style="flex:1">${esc(f)}</span><a class="lk" style="font-size:var(--fs-xs)">View</a><a class="lk" style="font-size:var(--fs-xs);color:var(--r)">Remove</a></div>`).join('');
+    return `<div style="margin-top:8px;border:1.5px dashed #ddd;border-radius:8px;padding:10px">
+      <div style="background:#333;color:#fff;padding:5px 10px;border-radius:5px 5px 0 0;font-size:var(--fs-sm);font-weight:600">Attachments (${files.length})</div>
+      <div style="border:1.5px dashed #ddd;border-top:none;border-radius:0 0 5px 5px;padding:10px">${fileList}<div style="text-align:center;font-size:var(--fs-sm);color:var(--t3)">Drag files here, or <a style="color:var(--acc);font-weight:600;cursor:pointer">browse</a></div></div>
+    </div>`;
+  }
+
+  function _bdSourceDoc(linked) {
+    if (linked) {
+      return `<div class="card" style="margin:0;min-height:300px;background:var(--bg3)">
+        <div style="display:flex;justify-content:space-between;margin-bottom:10px"><b style="font-size:var(--fs-sm)">Source document</b><div style="display:flex;gap:8px"><a class="lk" style="font-size:var(--fs-xs)">Close split view</a><a class="lk" style="font-size:var(--fs-xs);color:var(--r)">Unlink</a></div></div>
+        <div style="background:#fff;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.1);padding:24px 20px;min-height:320px">
+          <div style="border-bottom:2px solid #333;padding-bottom:10px;margin-bottom:10px;display:flex;justify-content:space-between">
+            <div><div style="font-size:16px;font-weight:800">PRO BROS</div><div style="font-size:8px;color:var(--t3)">PROVIDORE PTY LTD</div></div>
+            <div style="text-align:right"><div style="font-size:14px;font-weight:700">TAX INVOICE</div><div style="font-size:8px;color:var(--t3)">INV1050790</div></div>
+          </div>
+          <div style="font-size:8px;color:var(--t2);margin-bottom:8px">To: Mango Coco Pty Ltd · Date: 01/03/2026 · Due: 15/03/2026</div>
+          <table style="width:100%;border-collapse:collapse;font-size:8px"><tbody>
+            <tr style="border-bottom:1px solid var(--bd2)"><td>Chicken breast 5kg ×4</td><td style="text-align:right">$180.00</td></tr>
+            <tr style="border-bottom:1px solid var(--bd2)"><td>Salmon fillet 2kg ×3</td><td style="text-align:right">$205.50</td></tr>
+            <tr style="border-bottom:1px solid var(--bd2)"><td>Mixed vegetables ×6</td><td style="text-align:right">$192.00</td></tr>
+            <tr style="border-bottom:1px solid var(--bd2)"><td>Milk 2L×12 ×3</td><td style="text-align:right">$140.55</td></tr>
+            <tr><td>Rice 10kg ×2 + Oil 5L ×2</td><td style="text-align:right">$172.50</td></tr>
+          </tbody></table>
+          <div style="text-align:right;font-size:10px;font-weight:700;margin-top:6px;border-top:1px solid #333;padding-top:4px">TOTAL: $890.55</div>
+        </div>
+        <div style="display:flex;gap:6px;justify-content:center;margin-top:8px">
+          <button class="btn bo" style="font-size:var(--fs-sm);padding:3px 6px">🔍 Zoom</button>
+          <button class="btn bo" style="font-size:var(--fs-sm);padding:3px 6px">⬇ Download</button>
+          <button class="btn bo" style="font-size:var(--fs-sm);padding:3px 6px">🖨 Print</button>
+        </div>
+      </div>`;
+    }
+    return `<div class="card" style="margin:0;min-height:300px;background:var(--bg3)">
+      <div style="display:flex;justify-content:space-between;margin-bottom:10px"><b style="font-size:var(--fs-sm)">Source document</b><a class="lk" style="font-size:var(--fs-xs)">Close split view</a></div>
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:280px;text-align:center">
+        <div style="width:60px;height:60px;border-radius:50%;background:var(--bd2);display:flex;align-items:center;justify-content:center;font-size:24px;color:var(--t4);margin-bottom:10px">📄</div>
+        <div style="font-size:var(--fs-body);font-weight:600;color:var(--t3);margin-bottom:4px">No document linked</div>
+        <div style="font-size:var(--fs-xs);color:var(--t4);margin-bottom:12px">Upload or link an existing document from Uploads</div>
+        <div style="display:flex;gap:6px"><button class="bs" style="font-size:var(--fs-sm);padding:6px 14px">Upload new</button><button class="btn bo" style="font-size:var(--fs-sm);padding:6px 14px">Link from Uploads</button></div>
+      </div>
+    </div>`;
+  }
+
+  // ── View 1: Self ──
+  function _bdSelfView() {
+    return `<div style="display:grid;grid-template-columns:1.1fr 1fr;gap:16px">
+      ${_bdSourceDoc(true)}
+      <div class="card" style="margin:0">
+        <div style="margin-bottom:8px"><span style="font-size:var(--fs-xs);font-weight:600;padding:2px 8px;border-radius:4px;background:var(--gbg);color:var(--g)">● Self — Mango Coco</span></div>
+        <div class="fg"><label class="lb">Transaction Type</label><div style="font-size:var(--fs-body);font-weight:600">Expense / Bill</div></div>
+        <div class="fr"><div class="fg"><label class="lb">Supplier</label><div style="font-size:var(--fs-body);font-weight:600">Pro Bros Providore</div></div><div class="fg"><label class="lb">Bill Number</label><div style="font-size:var(--fs-body)">FIN-0048</div></div></div>
+        <div class="fr"><div class="fg"><label class="lb">Supplier Inv No</label><div style="font-size:var(--fs-body)">INV1050790</div></div><div class="fg"><label class="lb">Issue Date</label><div style="font-size:var(--fs-body)">01/03/2026</div></div></div>
+        <div class="fr"><div class="fg"><label class="lb">Due Date</label><div style="font-size:var(--fs-body)">15/03/2026</div></div><div class="fg"><label class="lb">Accrual Month</label><div style="font-size:var(--fs-body)">Mar 2026</div></div></div>
+        <div style="margin-top:8px;border:1px solid var(--bd);border-radius:var(--rd);overflow:hidden"><table class="tbl"><thead><tr><th>Description</th><th>Category</th><th style="text-align:right">Amount</th><th style="text-align:right">GST</th><th>Tax</th></tr></thead><tbody>
+          <tr><td>Food supplies</td><td style="font-size:var(--fs-sm)">27002 Purchases-GST Free</td><td style="text-align:right">$750.00</td><td style="text-align:right">$0.00</td><td>FRE</td></tr>
+          <tr><td>Beverage supplies</td><td style="font-size:var(--fs-sm)">27002 Purchases-GST Free</td><td style="text-align:right">$140.55</td><td style="text-align:right">$0.00</td><td>FRE</td></tr>
+        </tbody></table></div>
+        <div style="text-align:right;font-size:var(--fs-body);margin:8px 0"><div style="padding:2px 0">Subtotal <b>$890.55</b></div><div style="padding:2px 0;color:var(--t3)">Tax $0.00</div><div style="padding:2px 0;font-weight:700;font-size:14px">Total $890.55</div><div style="padding:2px 0">Amount paid <b>$0.00</b></div><div style="padding:3px 0;font-weight:700;font-size:14px;color:var(--r)">Balance due $890.55</div></div>
+        <div style="background:var(--bg2);border-radius:var(--rd);padding:8px;font-size:var(--fs-sm)"><div style="font-weight:600;margin-bottom:3px">P&L Impact</div><div style="display:flex;justify-content:space-between"><span>Mango Coco → COGs → Food</span><b>$890.55</b></div></div>
+        ${_bdPaymentSection('unpaid')}
+        ${_bdAttachments(['inv_probros_mar.pdf · 0.45 MB'])}
+      </div>
+    </div>`;
+  }
+
+  // ── View 2: On Behalf ──
+  function _bdOnBehalfView() {
+    return `<div style="display:grid;grid-template-columns:1.1fr 1fr;gap:16px">
+      ${_bdSourceDoc(true)}
+      <div class="card" style="margin:0">
+        <div style="margin-bottom:8px"><span style="font-size:var(--fs-xs);font-weight:600;padding:2px 8px;border-radius:4px;background:var(--obg);color:var(--o)">● On Behalf — Mango pays for Flying</span></div>
+        <div class="fg"><label class="lb">Transaction Type</label><div style="font-size:var(--fs-body);font-weight:600">Expense / Bill</div></div>
+        <div class="fr"><div class="fg"><label class="lb">Supplier</label><div style="font-size:var(--fs-body);font-weight:600">Attakor Trading</div></div><div class="fg"><label class="lb">Bill Number</label><div style="font-size:var(--fs-body)">FIN-0050</div></div></div>
+        <div class="fr"><div class="fg"><label class="lb">Supplier Inv No</label><div style="font-size:var(--fs-body)">ATK-2026-088</div></div><div class="fg"><label class="lb">Issue Date</label><div style="font-size:var(--fs-body)">10/03/2026</div></div></div>
+        <div style="margin-top:8px;border:1px solid var(--bd);border-radius:var(--rd);overflow:hidden"><table class="tbl"><thead><tr><th style="color:var(--acc)">Cost Owner</th><th>Description</th><th>Category</th><th style="text-align:right">Amount</th><th>Tax</th></tr></thead><tbody>
+          <tr style="border-left:3px solid var(--o)"><td style="font-weight:600;font-size:var(--fs-sm)">Flying Tigress</td><td>Kitchen equipment</td><td style="font-size:var(--fs-sm)">46000 Equipment</td><td style="text-align:right">$200.00</td><td>GST</td></tr>
+        </tbody></table></div>
+        <div style="text-align:right;font-size:var(--fs-body);margin:8px 0"><div style="padding:2px 0">Subtotal <b>$200.00</b></div><div style="padding:2px 0;color:var(--t3)">Tax $20.00</div><div style="padding:2px 0;font-weight:700;font-size:14px">Total $220.00</div></div>
+        <div style="background:var(--bg2);border-radius:var(--rd);padding:8px;font-size:var(--fs-sm);margin-bottom:4px"><div style="font-weight:600;margin-bottom:3px">P&L Impact</div><div style="display:flex;justify-content:space-between"><span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--o);margin-right:3px"></span>Flying → Equipment</span><b>$200</b></div></div>
+        <div style="background:var(--bbg);border-radius:var(--rd);padding:8px;font-size:var(--fs-sm)"><div style="font-weight:600;margin-bottom:3px;color:var(--b)">Intercompany Loan (auto)</div><div style="display:flex;justify-content:space-between"><span>Flying owes Mango</span><b>$220</b></div></div>
+        ${_bdPaymentSection('paid')}
+        ${_bdAttachments(['atk_invoice_088.pdf · 0.32 MB'])}
+      </div>
+    </div>`;
+  }
+
+  // ── View 3: Split ──
+  function _bdSplitView() {
+    return `<div style="display:grid;grid-template-columns:1.1fr 1fr;gap:16px">
+      ${_bdSourceDoc(false)}
+      <div class="card" style="margin:0">
+        <div style="margin-bottom:8px;padding:8px 10px;background:var(--acc2);border:1px solid rgba(124,58,237,.15);border-radius:var(--rd)">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="font-size:var(--fs-xs);font-weight:600;padding:2px 8px;border-radius:4px;background:var(--acc);color:#fff">Split</span><span style="font-size:var(--fs-sm);font-weight:600">ค่าไฟ office แบ่ง 3 brands</span></div>
+          <div style="display:flex;gap:6px;font-size:var(--fs-xs)">
+            <div style="flex:1;padding:3px 6px;background:#fff;border-radius:4px;text-align:center"><div style="font-weight:700">Mango</div><div style="color:var(--acc);font-weight:600">$550 (50%)</div></div>
+            <div style="flex:1;padding:3px 6px;background:#fff;border-radius:4px;text-align:center"><div style="font-weight:700">Flying</div><div style="color:var(--acc);font-weight:600">$330 (30%)</div></div>
+            <div style="flex:1;padding:3px 6px;background:#fff;border-radius:4px;text-align:center"><div style="font-weight:700">Issho</div><div style="color:var(--acc);font-weight:600">$220 (20%)</div></div>
+          </div>
+        </div>
+        <div class="fg"><label class="lb">Transaction Type</label><div style="font-size:var(--fs-body);font-weight:600">Expense / Bill</div></div>
+        <div class="fr"><div class="fg"><label class="lb">Supplier</label><div style="font-size:var(--fs-body);font-weight:600">AGL Energy</div></div><div class="fg"><label class="lb">Bill Number</label><div style="font-size:var(--fs-body)">FIN-0052</div></div></div>
+        <div class="fr"><div class="fg"><label class="lb">Supplier Inv No</label><div style="font-size:var(--fs-body)">AGL-MAR-2026</div></div><div class="fg"><label class="lb">Issue Date</label><div style="font-size:var(--fs-body)">10/03/2026</div></div></div>
+        <div style="margin-top:8px;border:1px solid var(--bd);border-radius:var(--rd);overflow:hidden"><table class="tbl"><thead><tr><th style="color:var(--acc)">Cost Owner</th><th>Description</th><th>Category</th><th style="text-align:right">Amount</th><th>Tax</th></tr></thead><tbody>
+          <tr style="border-left:3px solid var(--g)"><td style="font-weight:600;font-size:var(--fs-sm)">Mango Coco</td><td>Electricity 50%</td><td style="font-size:var(--fs-sm)">43000 Utilities</td><td style="text-align:right">$550.00</td><td>GST</td></tr>
+          <tr style="border-left:3px solid var(--o)"><td style="font-weight:600;font-size:var(--fs-sm)">Flying Tigress</td><td>Electricity 30%</td><td style="font-size:var(--fs-sm)">43000 Utilities</td><td style="text-align:right">$330.00</td><td>GST</td></tr>
+          <tr style="border-left:3px solid var(--b)"><td style="font-weight:600;font-size:var(--fs-sm)">Issho Cafe</td><td>Electricity 20%</td><td style="font-size:var(--fs-sm)">43000 Utilities</td><td style="text-align:right">$220.00</td><td>GST</td></tr>
+        </tbody></table></div>
+        <div style="text-align:right;font-size:var(--fs-body);margin:8px 0"><div style="padding:2px 0">Subtotal <b>$1,000.00</b></div><div style="padding:2px 0;color:var(--t3)">Tax $100.00</div><div style="padding:2px 0;font-weight:700;font-size:14px">Total $1,100.00</div><div style="padding:2px 0">Amount paid <b>$0.00</b></div><div style="padding:3px 0;font-weight:700;font-size:14px;color:var(--r)">Balance due $1,100.00</div></div>
+        <div style="background:var(--bg2);border-radius:var(--rd);padding:8px;font-size:var(--fs-sm);margin-bottom:4px"><div style="font-weight:600;margin-bottom:3px">P&L Impact (by brand)</div>
+          <div style="display:flex;justify-content:space-between;padding:1px 0"><span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--g);margin-right:3px"></span>Mango → Utilities</span><b>$550</b></div>
+          <div style="display:flex;justify-content:space-between;padding:1px 0"><span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--o);margin-right:3px"></span>Flying → Utilities</span><b>$330</b></div>
+          <div style="display:flex;justify-content:space-between;padding:1px 0"><span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--b);margin-right:3px"></span>Issho → Utilities</span><b>$220</b></div>
+        </div>
+        <div style="background:var(--bbg);border-radius:var(--rd);padding:8px;font-size:var(--fs-sm);margin-bottom:8px"><div style="font-weight:600;margin-bottom:3px;color:var(--b)">Intercompany Loan (auto)</div><div style="font-size:var(--fs-xs);color:var(--t3);margin-bottom:3px">Mango จ่าย $1,100 — brands อื่นติดหนี้:</div>
+          <div style="display:flex;justify-content:space-between;padding:1px 0"><span>Flying owes Mango</span><b>$330</b></div>
+          <div style="display:flex;justify-content:space-between;padding:1px 0"><span>Issho owes Mango</span><b>$220</b></div>
+        </div>
+        ${_bdPaymentSection('unpaid')}
+        ${_bdAttachments(['agl_mar2026.pdf · 0.52 MB', 'split_approval.pdf · 0.18 MB'])}
+      </div>
+    </div>`;
+  }
+
+  // ══════════════════════════════════════════
+  // 6. SD BRIDGE
+  // ══════════════════════════════════════════
+  function renderTxSdBridge() {
+    return {
+      tb: '<div class="tb"><div class="tb-t">SD Bridge</div></div>',
+      ct: `
+        <div class="card" style="max-width:1000px;margin:0 auto">
+          <div class="tabs">
+            <div class="tab a">Revenue Sync</div>
+            <div class="tab">Expense Sync</div>
+            <div class="tab">Cash Collection</div>
+            <div class="tab">Synced History</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-c"><div class="kpi-v" style="color:var(--g)">${fm(12450)}</div><div class="kpi-l">SD Revenue (today)</div></div>
+            <div class="kpi-c"><div class="kpi-v" style="color:var(--r)">${fm(3280)}</div><div class="kpi-l">SD Expenses (today)</div></div>
+            <div class="kpi-c"><div class="kpi-v">5</div><div class="kpi-l">Pending sync</div></div>
+          </div>
+          <table class="tbl">
+            <thead><tr><th>Date</th><th>Store</th><th>Channel</th><th style="text-align:right">Revenue</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td>12/03</td><td>Mango Coco Mac</td><td>In-store</td><td style="text-align:right">2,340.50</td><td>${sb('pending')}</td></tr>
+              <tr><td>12/03</td><td>Mango Coco Mac</td><td>UberEats</td><td style="text-align:right">890.20</td><td>${sb('pending')}</td></tr>
+              <tr><td>11/03</td><td>Flying Tigress</td><td>In-store</td><td style="text-align:right">1,560.00</td><td>${sb('closed')}</td></tr>
+            </tbody>
+          </table>
+          <div style="margin-top:10px"><button class="bs">Sync Selected</button></div>
+        </div>`,
+    };
+  }
+
+  // ══════════════════════════════════════════
+  // 7. FIND TRANSACTIONS
+  // ══════════════════════════════════════════
+  function renderTxFind() {
+    const dr = dateRange();
+    return {
+      tb: '<div class="tb"><div class="tb-t">Find Transactions</div></div>',
+      ct: `
+        <div class="card" style="max-width:1000px;margin:0 auto">
+          <div class="tabs">
+            <div class="tab">Debits and credits</div>
+            <div class="tab a">Transactions</div>
+            <div class="tab">Find and replace</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px">
+            <div><div class="fl-l">Period</div><select class="fl"><option>This month</option><option>Last month</option><option>This quarter</option></select></div>
+            <div><div class="fl-l">Date from *</div><input class="fl" type="date" value="${dr.from}" style="width:130px"></div>
+            <div><div class="fl-l">Date to *</div><input class="fl" type="date" value="${dr.to}" style="width:130px"></div>
+            <div><div class="fl-l">Transaction type</div><select class="fl" style="width:110px"><option>Select type</option><option>Bill</option><option>Bill payment</option><option>Pay run</option><option>Invoice</option></select></div>
+            <div><div class="fl-l">Contact</div><select class="fl" style="width:100px"><option>All</option></select></div>
+            <div><div class="fl-l">Category</div><select class="fl" style="width:80px"><option>All</option></select></div>
+            <div><div class="fl-l">Search</div><input class="fl" placeholder="" style="width:100px"></div>
+            <div style="flex:1"></div>
+            <button class="bg" style="color:var(--acc)">Reset</button>
+          </div>
+          <table class="tbl">
+            <thead><tr><th>Date <span class="s">▼</span></th><th>Reference no</th><th>Type</th><th>Description</th><th>Contact</th><th style="text-align:right">Amount ($)</th></tr></thead>
+            <tbody>
+              <tr><td>11/03</td><td><a class="lk">1277</a></td><td>Pay run</td><td>Wage Mar W2</td><td>Watcharapol D.</td><td style="text-align:right">609.00</td></tr>
+              <tr><td>11/03</td><td><a class="lk">1284</a></td><td>Bill payment</td><td>Mind.RBuakl</td><td>Mind.RBuakl xx_M...</td><td style="text-align:right">582.82</td></tr>
+              <tr><td>11/03</td><td><a class="lk">1282</a></td><td>Bill payment</td><td>Rental Mar 2026</td><td>Dencal Pty Ltd</td><td style="text-align:right">23,558.32</td></tr>
+            </tbody>
+          </table>
+        </div>`,
+    };
+  }
+
+  // ══════════════════════════════════════════
   // REGISTER ROUTES
   // ══════════════════════════════════════════
   App.registerRoutes({
-    tx_log:    { render: renderTxLog },
-    tx_sale:   { render: renderTxSale },
-    tx_bill:   { render: renderTxBill },
-    tx_return: { render: renderTxReturn },
+    tx_log:         { render: renderTxLog },
+    tx_sale:        { render: renderTxSale },
+    tx_bill:        { render: renderTxBill },
+    tx_return:      { render: renderTxReturn },
+    tx_bill_detail: { render: renderTxBillDetail },
+    tx_sd:          { render: renderTxSdBridge },
+    tx_find:        { render: renderTxFind },
   });
 
-})();
+  // ══════════════════════════════════════════
+  // PUBLIC API — functions called from onclick
+  // ══════════════════════════════════════════
+  window.ScrTx = {
+    _switchBdView,
+  };

@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#ffffff">
-<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="SPG Finance">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -43,9 +43,9 @@
     </div>
   </div>
 
-  <!-- Core scripts — always loaded -->
-  <script src="js/api_fin.js" defer></script>
+  <!-- Core scripts — app_fin first (defines App.S), then api_fin (reads App.S) -->
   <script src="js/app_fin.js" defer></script>
+  <script src="js/api_fin.js" defer></script>
   <!-- Screen scripts — lazy loaded by app_fin.js when needed -->
   <!-- js/scr_input_fin.js — loaded on first Create screen visit -->
   <!-- js/scr_tx_fin.js — loaded on first Transaction screen visit -->

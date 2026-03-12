@@ -7,8 +7,8 @@
  *
  * LAYERS:
  *   1. Master Data  — initBundle → S.xxx (small, load once)
- *   2. Detail Data   — initMaster → S.vendors, S.categories (load in background)
- *   3. Screen Data  — S._bills, S._txLog etc (per-screen, memory-first)
+ *   2. Detail Data   — initMaster → _S().vendors, _S().categories (load in background)
+ *   3. Screen Data  — _S()._bills, S._txLog etc (per-screen, memory-first)
  *   4. CRUD         — save → wait DB → update memory
  *   5. Silent Refresh — check if newer data exists → update memory if so
  *
@@ -40,7 +40,9 @@
 
 const API = (() => {
 
-  const S = App.S; // shared state reference
+  // Lazy reference — App.S ยังไม่มีตอน script โหลด
+  // ใช้ _S() เรียกตอน runtime แทน
+  function _S() { return App.S; }
 
   // ── In-flight guards ──
   const _loading = {};
@@ -153,11 +155,11 @@ const API = (() => {
         taxCodes: _MOCK_MASTER.taxCodes,
       };
 
-      S.session = res.session;
-      S.brands = res.brands;
-      S.channels = res.channels;
-      S.bankAccounts = res.bankAccounts;
-      S.taxCodes = res.taxCodes;
+      _S().session = res.session;
+      _S().brands = res.brands;
+      _S().channels = res.channels;
+      _S().bankAccounts = res.bankAccounts;
+      _S().taxCodes = res.taxCodes;
 
       return res;
     } finally {
@@ -168,7 +170,7 @@ const API = (() => {
   /** Phase 2: Background — vendors, categories, vendorRules */
   async function initMaster() {
     if (_loading.master) return;
-    if (S.vendors && S.vendors.length > 0) return; // already loaded
+    if (_S().vendors && _S().vendors.length > 0) return; // already loaded
     _loading.master = true;
     try {
       // MOCK — replace with: const res = await _call('fin_init_master', {});
@@ -178,10 +180,10 @@ const API = (() => {
         vendorRules: _MOCK_DETAIL.vendorRules,
       };
 
-      S.vendors = res.vendors;
-      S.categories = res.categories;
-      S.vendorRules = res.vendorRules;
-      S._masterReady = true;
+      _S().vendors = res.vendors;
+      _S().categories = res.categories;
+      _S().vendorRules = res.vendorRules;
+      _S()._masterReady = true;
 
       return res;
     } finally {
@@ -197,22 +199,22 @@ const API = (() => {
 
   /** Get current session */
   function getSession() {
-    return S.session;
+    return _S().session;
   }
 
   /** Check if master data is ready */
   function isMasterReady() {
-    return S._masterReady === true;
+    return _S()._masterReady === true;
   }
 
   /** Wait for master data (use in screens that need vendors/categories) */
   async function waitMaster() {
-    if (S._masterReady) return;
+    if (_S()._masterReady) return;
     // Poll every 50ms until ready (max 5s)
     return new Promise((resolve) => {
       let tries = 0;
       const check = () => {
-        if (S._masterReady || tries > 100) { resolve(); return; }
+        if (_S()._masterReady || tries > 100) { resolve(); return; }
         tries++;
         setTimeout(check, 50);
       };
@@ -230,7 +232,7 @@ const API = (() => {
     // const url = 'https://ahvzblrfzhtrjhvbzdhg.supabase.co/functions/v1/finance';
     // const res = await fetch(url, {
     //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${S.token}` },
+    //   headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${_S().token}` },
     //   body: JSON.stringify({ action, ...body }),
     // });
     // if (!res.ok) throw new Error('API error: ' + res.status);
@@ -246,7 +248,7 @@ const API = (() => {
 
   /** Get bills — paginated, filter, sort */
   async function getBills(filters = {}) {
-    if (_loading.bills) return { rows: S._bills || [], hasMore: false, summary: _billSummary() };
+    if (_loading.bills) return { rows: _S()._bills || [], hasMore: false, summary: _billSummary() };
     _loading.bills = true;
     try {
       // MOCK — replace with: const res = await _call('fin_get_bills', filters);
@@ -257,19 +259,19 @@ const API = (() => {
       const hasMore = start + perPage < _MOCK_BILLS.length;
 
       if (page === 1) {
-        S._bills = rows;
+        _S()._bills = rows;
       } else {
-        S._bills = (S._bills || []).concat(rows);
+        _S()._bills = (_S()._bills || []).concat(rows);
       }
 
-      return { rows: S._bills, hasMore, summary: _billSummary() };
+      return { rows: _S()._bills, hasMore, summary: _billSummary() };
     } finally {
       _loading.bills = false;
     }
   }
 
   function _billSummary() {
-    const bills = S._bills || [];
+    const bills = _S()._bills || [];
     return {
       totalAmount: bills.reduce((s, r) => s + Math.abs(r.amount), 0),
       balanceDue: bills.reduce((s, r) => s + r.balance, 0),
@@ -280,8 +282,8 @@ const API = (() => {
   /** Get bill detail */
   async function getBillDetail(billId) {
     // Check memory first
-    if (S._billDetail && S._billDetail.bill && S._billDetail.bill.id === billId) {
-      return S._billDetail;
+    if (_S()._billDetail && _S()._billDetail.bill && _S()._billDetail.bill.id === billId) {
+      return _S()._billDetail;
     }
     // MOCK — replace with: const res = await _call('fin_get_bill_detail', { bill_id: billId });
     const bill = _MOCK_BILLS.find(b => b.id === billId || b.bill_no === billId);
@@ -299,7 +301,7 @@ const API = (() => {
       allocation: 'self',
     };
 
-    S._billDetail = detail;
+    _S()._billDetail = detail;
     return detail;
   }
 
@@ -343,19 +345,19 @@ const API = (() => {
 
   /** Get SD pending records */
   async function getSdPending(filters = {}) {
-    if (_loading.sd) return { rows: S._sdPending || [], kpi: _sdKpi() };
+    if (_loading.sd) return { rows: _S()._sdPending || [], kpi: _sdKpi() };
     _loading.sd = true;
     try {
       // MOCK — replace with: const res = await _call('fin_get_sd_pending', filters);
-      S._sdPending = _MOCK_SD_PENDING;
-      return { rows: S._sdPending, kpi: _sdKpi() };
+      _S()._sdPending = _MOCK_SD_PENDING;
+      return { rows: _S()._sdPending, kpi: _sdKpi() };
     } finally {
       _loading.sd = false;
     }
   }
 
   function _sdKpi() {
-    const rows = S._sdPending || [];
+    const rows = _S()._sdPending || [];
     return {
       revenue: rows.filter(r => r.type === 'revenue').reduce((s, r) => s + r.amount, 0),
       expenses: rows.filter(r => r.type === 'expense').reduce((s, r) => s + r.amount, 0),
@@ -367,9 +369,9 @@ const API = (() => {
   async function syncSd(ids) {
     // MOCK — replace with: return await _call('fin_sync_sd', { ids });
     // Update memory: mark synced
-    if (S._sdPending) {
+    if (_S()._sdPending) {
       ids.forEach(id => {
-        const r = S._sdPending.find(x => x.id === id);
+        const r = _S()._sdPending.find(x => x.id === id);
         if (r) r.status = 'synced';
       });
     }
@@ -420,8 +422,8 @@ const API = (() => {
     };
 
     // Update memory — prepend to bills list
-    if (S._bills) {
-      S._bills.unshift(newBill);
+    if (_S()._bills) {
+      _S()._bills.unshift(newBill);
     }
     _MOCK_BILLS.unshift(newBill);
 
@@ -449,7 +451,7 @@ const API = (() => {
       status: 'Received',
       updated_at: new Date().toISOString(),
     };
-    if (S._tx_sale) S._tx_sale.unshift(newSale);
+    if (_S()._tx_sale) _S()._tx_sale.unshift(newSale);
     _MOCK_SALES.unshift(newSale);
     return newSale;
   }
@@ -469,7 +471,7 @@ const API = (() => {
       recon: '',
       updated_at: new Date().toISOString(),
     };
-    if (S._tx_log) S._tx_log.unshift(newTx);
+    if (_S()._tx_log) _S()._tx_log.unshift(newTx);
     _MOCK_TX_LOG.unshift(newTx);
     return newTx;
   }
@@ -491,7 +493,7 @@ const API = (() => {
       status: 'Debit',
       updated_at: new Date().toISOString(),
     };
-    if (S._bills) S._bills.unshift(newDebit);
+    if (_S()._bills) _S()._bills.unshift(newDebit);
     _MOCK_BILLS.unshift(newDebit);
     return newDebit;
   }

@@ -1,4 +1,4 @@
-/** Version 1.2 | 12 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 1.3 | 12 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_input_fin.js
@@ -696,13 +696,295 @@
   }
 
   // ══════════════════════════════════════════
+  // 5. CREATE RECURRING TRANSACTION
+  // ══════════════════════════════════════════
+  function renderCreateRecurring() {
+    const catOpts = MOCK_CATS.map(c => `<option>${esc(c)}</option>`).join('');
+    const tcOpts = (App.S.taxCodes || []).map(tc => `<option>${esc(tc.code)}</option>`).join('');
+
+    return {
+      tb: '<div class="tb"><div class="tb-t">Create Recurring Transaction</div></div>',
+      ct: `
+        <div style="max-width:800px;margin:0 auto">
+          <!-- Schedule Details card -->
+          <div class="card">
+            <div style="font-size:var(--fs-body);font-weight:700;margin-bottom:10px">Schedule Details</div>
+            <div class="fg">
+              <label class="lb">Transaction Type *</label>
+              <select class="inp" style="max-width:280px">
+                <option>Bill</option><option>Invoice</option><option>Receive money</option>
+                <option>Spend money</option><option>General Journal</option>
+              </select>
+            </div>
+            <div class="fg">
+              <label class="lb">Schedule Name *</label>
+              <input class="inp" placeholder="e.g. Rent — Macquarie" style="max-width:280px">
+            </div>
+            <div class="fg">
+              <label class="lb">Frequency *</label>
+              <select class="inp" style="max-width:280px">
+                <option>Never</option><option>Daily</option><option>Weekly</option>
+                <option>Fortnightly</option><option>Monthly</option><option>Quarterly</option><option>Yearly</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Transaction Details card -->
+          <div class="card">
+            <div style="font-size:var(--fs-body);font-weight:700;margin-bottom:10px">Create a transaction with this information</div>
+            <div class="fr">
+              <div class="fg" style="flex:2">
+                <label class="lb">Supplier *</label>
+                <select class="inp">${opts(MOCK.suppliers)}</select>
+              </div>
+              <div class="fg">
+                <label class="lb">Payment *</label>
+                <div style="padding:5px 10px;background:var(--acc2);color:var(--acc);border-radius:var(--rd);font-size:var(--fs-sm);font-weight:600;text-align:center">In a given no. of days</div>
+              </div>
+            </div>
+
+            <div style="display:flex;gap:12px;margin:8px 0;font-size:var(--fs-sm)">
+              <label><input type="checkbox"> Report to ATO via TPAR</label>
+              <div style="flex:1"></div>
+              <span>Amounts are</span>
+              <label style="margin-left:6px"><input type="radio" name="taxinc" checked style="accent-color:var(--acc)"> Tax inclusive</label>
+              <label style="margin-left:6px"><input type="radio" name="taxinc" style="accent-color:var(--acc)"> Tax exclusive</label>
+            </div>
+
+            <!-- Allocation divider -->
+            <div style="position:relative;margin:8px 0">
+              <div style="display:flex;align-items:center">
+                <hr style="border:none;border-top:1px solid #eee;flex:1">
+                <div style="padding:0 8px"><button class="bg" style="font-size:16px;color:var(--acc)">⚙</button></div>
+              </div>
+            </div>
+
+            <!-- Simple line items (no dynamic add/remove for recurring) -->
+            <table style="width:100%;border-collapse:collapse;font-size:var(--fs-body);margin-top:6px">
+              <thead><tr>
+                <th style="text-align:left;padding:8px;font-weight:600;font-size:var(--fs-sm);width:35%">Description</th>
+                <th style="text-align:left;padding:8px;font-weight:600;font-size:var(--fs-sm);width:30%">Category *</th>
+                <th style="text-align:left;padding:8px;font-weight:600;font-size:var(--fs-sm);width:15%">Amount ($) *</th>
+                <th style="text-align:left;padding:8px;font-weight:600;font-size:var(--fs-sm);width:6%">Job</th>
+                <th style="text-align:left;padding:8px;font-weight:600;font-size:var(--fs-sm);width:14%">Tax code *</th>
+              </tr></thead>
+              <tbody>
+                <tr>
+                  <td style="padding:0;border:1px solid #e5e7eb"><div contenteditable style="padding:8px 10px;min-height:34px;outline:none;font-size:var(--fs-body)"></div></td>
+                  <td style="padding:0;border:1px solid #e5e7eb"><select style="width:100%;padding:8px;border:none;font-size:var(--fs-sm);font-family:inherit">${catOpts}</select></td>
+                  <td style="padding:0;border:1px solid #e5e7eb"><input style="width:100%;padding:8px;border:none;text-align:right;font-size:var(--fs-body)"></td>
+                  <td style="padding:0;border:1px solid #e5e7eb"><select style="width:100%;padding:8px;border:none;font-size:var(--fs-sm)"><option></option></select></td>
+                  <td style="padding:0;border:1px solid #e5e7eb"><select style="width:100%;padding:8px;border:none;font-size:var(--fs-sm)"><option></option>${tcOpts}</select></td>
+                </tr>
+                <tr>
+                  <td style="padding:0;border:1px solid #e5e7eb"><div contenteditable style="padding:8px 10px;min-height:34px;outline:none;font-size:var(--fs-body)"></div></td>
+                  <td style="padding:0;border:1px solid #e5e7eb"><select style="width:100%;padding:8px;border:none;font-size:var(--fs-sm);font-family:inherit">${catOpts}</select></td>
+                  <td style="padding:0;border:1px solid #e5e7eb"><input style="width:100%;padding:8px;border:none;text-align:right;font-size:var(--fs-body)"></td>
+                  <td style="padding:0;border:1px solid #e5e7eb"><select style="width:100%;padding:8px;border:none;font-size:var(--fs-sm)"><option></option></select></td>
+                  <td style="padding:0;border:1px solid #e5e7eb"><select style="width:100%;padding:8px;border:none;font-size:var(--fs-sm)"><option></option>${tcOpts}</select></td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div class="fg" style="margin-top:10px">
+              <label class="lb">Notes</label>
+              <textarea class="inp" style="min-height:50px;resize:vertical"></textarea>
+            </div>
+
+            <div style="text-align:right;font-size:var(--fs-body);margin:8px 0">
+              <div>Subtotal <b>$0.00</b></div>
+              <div>Tax <b>$0.00</b></div>
+              <div>Total <b>$0.00</b></div>
+              <div style="font-weight:700;margin-top:4px">Balance due <b>$0.00</b></div>
+            </div>
+
+            <div style="display:flex;gap:6px;justify-content:flex-end">
+              <button class="btn bo" onclick="App.go('dashboard')">Cancel</button>
+              <button class="bs" onclick="ScrInput._saveRecurring(this)">Save</button>
+            </div>
+          </div>
+        </div>`,
+    };
+  }
+
+  function _saveRecurring(btnEl) {
+    guardedSave(btnEl, () => {
+      App.toast('Recurring transaction saved');
+      App.go('rv_recurring');
+    });
+  }
+
+  // ══════════════════════════════════════════
+  // 6. CREATE FROM UPLOAD (Scan→Create split view)
+  // ══════════════════════════════════════════
+  function renderCreateUpload() {
+    const catOpts = MOCK_CATS.map(c => `<option>${esc(c)}</option>`).join('');
+    const tcOpts = (App.S.taxCodes || []).map(tc => `<option>${esc(tc.code)}</option>`).join('');
+
+    return {
+      tb: '<div class="tb"><button class="bg" onclick="App.go(\'tx_bill\')">← Bills</button><div class="tb-t">Create from Upload</div></div>',
+      ct: `
+        <div class="card" style="max-width:1100px;margin:0 auto;padding:0;overflow:hidden">
+          <div style="display:grid;grid-template-columns:1fr 1.2fr;min-height:600px">
+            <!-- Left: Document preview -->
+            <div style="background:var(--bg3);border-right:1px solid var(--bd2);padding:16px">
+              <div style="border:2px dashed var(--bd);border-radius:10px;padding:20px;text-align:center;margin-bottom:12px;background:#fff">
+                <div style="font-size:22px;color:var(--t4)">☁️</div>
+                <div style="font-size:var(--fs-sm);color:var(--t3)">Drag invoice here, or <a style="color:var(--acc);font-weight:600;cursor:pointer">browse</a></div>
+              </div>
+              <div style="background:#fff;border-radius:8px;box-shadow:var(--sh);padding:16px;text-align:center">
+                <div style="font-size:28px;margin-bottom:6px">📄</div>
+                <div style="font-weight:600">TAX INVOICE</div>
+                <div style="font-size:var(--fs-xs);color:var(--t3)">Pro Bros · INV1052323</div>
+                <div style="font-size:16px;font-weight:700;margin-top:6px">$303.20</div>
+                <div style="display:flex;gap:6px;justify-content:center;margin-top:10px">
+                  <button class="bg" style="font-size:16px">🔍</button>
+                  <button class="bg" style="font-size:16px">↻</button>
+                  <button class="bg" style="font-size:16px">⬇</button>
+                  <button class="bg" style="font-size:16px">🖨</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right: AI-filled form -->
+            <div style="padding:16px;overflow-y:auto">
+              <div style="background:var(--acc2);border-radius:var(--rd);padding:6px 8px;font-size:var(--fs-xs);color:var(--acc);margin-bottom:10px">
+                AI filled fields highlighted in purple. Check & confirm.
+              </div>
+
+              <div class="fg">
+                <label class="lb">Supplier</label>
+                <input class="inp" value="Pro Bros Providore" style="background:var(--acc2);border-color:var(--acc)">
+              </div>
+              <div class="fa">✓ Vendor Rule: COGs → Food · Mango Coco · Self · 14 days</div>
+
+              <div class="fr">
+                <div class="fg"><label class="lb">Supplier Inv No</label><input class="inp" value="INV1052323" style="background:var(--acc2);border-color:var(--acc)"></div>
+                <div class="fg"><label class="lb">Bill Number *</label><input class="inp" value="${esc(MOCK.nextBillNo)}" readonly style="background:var(--bg3);color:var(--t3)"></div>
+              </div>
+              <div class="fr">
+                <div class="fg"><label class="lb">Issue Date *</label><input class="inp" type="date" value="2026-03-10"></div>
+                <div class="fg"><label class="lb">Due Date *</label><input class="inp" type="date" value="2026-03-24"></div>
+              </div>
+              <div class="fr">
+                <div class="fg"><label class="lb">Accrual Month</label><input class="inp" type="month" value="2026-03"></div>
+                <div class="fg"><label class="lb">Transaction Type</label><select class="inp"><option>Expense / Bill</option><option>Asset Purchase</option></select></div>
+              </div>
+
+              <!-- Allocation divider -->
+              <div style="display:flex;align-items:center;margin:8px 0">
+                <hr style="border:none;border-top:1px solid #eee;flex:1">
+                <div style="padding:0 6px;font-size:var(--fs-xs);color:var(--t4)">Allocation Layout</div>
+                <button class="bg" style="font-size:14px;color:var(--acc)">⚙</button>
+              </div>
+
+              <!-- Single line item -->
+              <table style="width:100%;border-collapse:collapse;font-size:var(--fs-sm);margin-top:4px">
+                <thead><tr>
+                  <th style="text-align:left;padding:6px;font-weight:600;font-size:var(--fs-xs)">Description</th>
+                  <th style="text-align:left;padding:6px;font-weight:600;font-size:var(--fs-xs)">Category *</th>
+                  <th style="text-align:left;padding:6px;font-weight:600;font-size:var(--fs-xs)">Amount *</th>
+                  <th style="text-align:left;padding:6px;font-weight:600;font-size:var(--fs-xs)">GST</th>
+                  <th style="text-align:left;padding:6px;font-weight:600;font-size:var(--fs-xs)">Tax code</th>
+                </tr></thead>
+                <tbody><tr>
+                  <td style="padding:0;border:1px solid #e5e7eb"><div contenteditable style="padding:6px 8px;min-height:30px;font-size:var(--fs-sm);outline:none"></div></td>
+                  <td style="padding:0;border:1px solid #e5e7eb"><select style="width:100%;padding:6px;border:none;font-size:var(--fs-xs)">${catOpts}</select></td>
+                  <td style="padding:0;border:1px solid #e5e7eb"><input style="width:100%;padding:6px;border:none;text-align:right;font-size:var(--fs-sm);font-weight:600;background:var(--acc2)" value="303.20"></td>
+                  <td style="padding:0;border:1px solid #e5e7eb;background:#fafafa"><input readonly style="width:100%;padding:6px;border:none;text-align:right;font-size:var(--fs-sm);background:#fafafa;color:var(--t3)" value="0.00"></td>
+                  <td style="padding:0;border:1px solid #e5e7eb"><select style="width:100%;padding:6px;border:none;font-size:var(--fs-xs)"><option>FRE</option>${tcOpts}</select></td>
+                </tr></tbody>
+              </table>
+
+              <div class="fg" style="margin-top:8px"><label class="lb">Notes</label><textarea class="inp" style="min-height:40px;resize:vertical;font-size:var(--fs-sm)"></textarea></div>
+
+              <div style="text-align:right;font-size:var(--fs-body);margin:6px 0">
+                <div>Subtotal <b>$303.20</b></div>
+                <div>Tax <b>$0.00</b></div>
+                <div style="font-weight:700;margin-top:4px">Total <b>$303.20</b></div>
+              </div>
+
+              <div style="display:flex;gap:6px;margin-top:8px">
+                <button class="btn bo" onclick="App.go('tx_bill')">Cancel</button>
+                <button class="btn bo">Save and... ▾</button>
+                <button class="bs" onclick="ScrInput._saveUploadBill(this)">Save</button>
+              </div>
+            </div>
+          </div>
+        </div>`,
+    };
+  }
+
+  function _saveUploadBill(btnEl) {
+    guardedSave(btnEl, () => {
+      App.toast('Bill created from upload');
+      App.go('tx_bill');
+    });
+  }
+
+  // ══════════════════════════════════════════
+  // 7. IMPORT
+  // ══════════════════════════════════════════
+  function renderImport() {
+    return {
+      tb: '<div class="tb"><div class="tb-t">Import</div></div>',
+      ct: `
+        <div class="card" style="max-width:720px;margin:0 auto">
+          <div style="display:flex;gap:6px;margin-bottom:10px">
+            <select class="fl" style="padding:6px 10px">
+              <option>Invoices / Bills</option><option>Bank Statement</option>
+              <option>MYOB Export</option><option>Payroll CSV</option>
+            </select>
+            <button class="btn bo">Download template</button>
+          </div>
+          <div style="border:2px dashed var(--bd);border-radius:10px;padding:16px;text-align:center">
+            <div style="font-size:18px;color:var(--t4)">📋</div>
+            <div style="font-size:var(--fs-sm);color:var(--t3)">Drop CSV/Excel here, or <a style="color:var(--acc);font-weight:600;cursor:pointer">browse</a></div>
+          </div>
+        </div>
+
+        <!-- Preview table (mock data) -->
+        <div class="card" style="max-width:720px;margin:0 auto;padding:0;overflow:hidden">
+          <div style="display:flex;justify-content:space-between;padding:6px 10px;background:var(--bg2);border-bottom:1px solid var(--bd2);font-size:var(--fs-xs)">
+            <b>invoices_mar.csv</b>
+            <div>
+              <span style="color:var(--g);font-weight:600">✓43</span>
+              <span style="color:var(--o);font-weight:600">⚠2</span>
+              <span style="color:var(--r);font-weight:600">✗3</span>
+            </div>
+          </div>
+          <table class="tbl" style="margin:0">
+            <thead><tr><th></th><th>Date</th><th>Supplier</th><th>Invoice</th><th style="text-align:right">Amount</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td style="color:var(--g)">✓</td><td>09/03</td><td>Pro Bros</td><td>INV1050790</td><td style="text-align:right">190.55</td><td><span class="sts sts-c" style="font-size:9px">Ready</span></td></tr>
+              <tr><td style="color:var(--o)">⚠</td><td>08/03</td><td>Unknown Vendor</td><td>INV9999</td><td style="text-align:right">55.00</td><td><span class="sts sts-p" style="font-size:9px">Warning</span></td></tr>
+              <tr><td style="color:var(--r)">✗</td><td></td><td></td><td></td><td style="text-align:right"></td><td><span class="sts sts-r" style="font-size:9px">Error</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="text-align:right;margin:8px auto;max-width:720px">
+          <button class="bs" onclick="ScrInput._saveImport(this)">Import 45 transactions</button>
+        </div>`,
+    };
+  }
+
+  function _saveImport(btnEl) {
+    guardedSave(btnEl, () => {
+      App.toast('45 transactions imported');
+    });
+  }
+
+  // ══════════════════════════════════════════
   // REGISTER ROUTES
   // ══════════════════════════════════════════
   App.registerRoutes({
-    cr_sale:     { render: renderCreateSale },
-    cr_transfer: { render: renderCreateTransfer },
-    cr_debit:    { render: renderCreateDebit },
-    cr_bill:     { render: renderCreateBill },
+    cr_sale:      { render: renderCreateSale },
+    cr_transfer:  { render: renderCreateTransfer },
+    cr_debit:     { render: renderCreateDebit },
+    cr_bill:      { render: renderCreateBill },
+    cr_recurring: { render: renderCreateRecurring },
+    cr_upload:    { render: renderCreateUpload },
+    cr_import:    { render: renderImport },
   });
 
   // ══════════════════════════════════════════
@@ -721,13 +1003,17 @@
     _pickTaxCode,
     _toggleAllocPopup,
     _setAllocMode,
-    // P2b — bill specific
+    // P2b — bill
     _addBillRow,
     _removeBillRow,
     _recalcBillRow,
     _recalcBillBalance,
     _toggleSaveDD,
     _saveBill,
+    // P2c
+    _saveRecurring,
+    _saveUploadBill,
+    _saveImport,
   };
 
 })();

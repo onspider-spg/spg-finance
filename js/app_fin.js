@@ -1,4 +1,4 @@
-/** Version 1.7 | 12 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 1.8 | 12 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — app_fin.js
@@ -279,7 +279,7 @@ const App = (() => {
 
     // Footer
     html += `<div class="sf">
-      <div style="font-size:9px;color:var(--t4);padding:2px 0;margin-bottom:4px">v1.7 | 12 Mar 2026 22:00 AEDT</div>
+      <div style="font-size:9px;color:var(--t4);padding:2px 0;margin-bottom:4px">v1.8 | 12 Mar 2026 22:30 AEDT</div>
       <a href="https://onspider-spg.github.io/spg-home/#dashboard"><span style="font-size:12px">←</span><span class="sit"> Back to Home</span></a>
       <a href="https://onspider-spg.github.io/spg-home/#logout" class="danger"><span style="font-size:12px">→</span><span class="sit"> Log out</span></a>
     </div>`;

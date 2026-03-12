@@ -1,4 +1,4 @@
-/* Version 1.5 | 12 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/* Version 1.6 | 12 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /* ═══════════════════════════════════════════
    SPG Finance Module — styles_fin.css
    Desktop-first · System Font · MYOB Purple
@@ -693,7 +693,25 @@ body.sd-collapsed .stg-btn {
 .text-center { text-align: center; }
 .font-bold { font-weight: 700; }
 
-/* ═══ 21. RESPONSIVE ═══ */
+/* ═══ 21. RADIO CARD (Transfer Type etc.) ═══ */
+.cr-radio-card {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-sm);
+  padding: 6px 12px;
+  border: 1.5px solid var(--bd);
+  border-radius: var(--rd);
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.cr-radio-card:hover { border-color: var(--acc); }
+.cr-radio-card.active {
+  border-color: var(--acc);
+  background: var(--acc2);
+}
+
+/* ═══ 22. RESPONSIVE ═══ */
 @media (max-width: 900px) {
   .sd { width: var(--sidebar-w-cl); min-width: var(--sidebar-w-cl); }
   .sd .sg-head span:not(.sg-ico) { display: none; }

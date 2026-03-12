@@ -1,4 +1,4 @@
-/** Version 1.1 | 12 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 1.2 | 12 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — app_fin.js
@@ -95,7 +95,6 @@ const App = (() => {
       { id: 'py_history', label: 'Payment History' },
       { id: 'py_remit', label: 'Remittance Advice' },
     ]},
-    '_spacer',
     { id: 'payroll', icon: '₿', label: 'Payroll', type: 'group', items: [
       { id: 'pr_runs', label: 'Pay Runs' },
       { id: 'pr_emp', label: 'Employees' },
@@ -133,8 +132,8 @@ const App = (() => {
       { id: 'fp_rev', label: 'Revenue Analysis' },
       { id: 'fp_exp', label: 'Expense Trend' },
     ]},
-    '_spacer',
     { id: 'contacts', icon: '⊕', label: 'Contacts', type: 'item' },
+    '_spacer_double',
     { id: 'upload', icon: '↑', label: 'Upload', type: 'item' },
   ];
 
@@ -246,6 +245,10 @@ const App = (() => {
     NAV.forEach(n => {
       if (n === '_spacer') {
         html += '<div style="height:12px"></div>';
+        return;
+      }
+      if (n === '_spacer_double') {
+        html += '<div style="height:20px"></div>';
         return;
       }
       if (n.type === 'item') {

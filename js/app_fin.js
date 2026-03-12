@@ -1,4 +1,4 @@
-/** Version 1.2 | 12 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 1.3 | 12 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — app_fin.js
@@ -61,6 +61,7 @@ const App = (() => {
   // ── NAV STRUCTURE (from wireframe Part 1 + Part 2) ──
   const NAV = [
     { id: 'dashboard', icon: '◇', label: 'Dashboard', type: 'item' },
+    '_spacer_30',
     { id: 'create', icon: '＋', label: 'Create', type: 'group', items: [
       { id: 'cr_sale', label: 'Sale' },
       { id: 'cr_bill', label: 'Bill / Invoice' },
@@ -71,6 +72,7 @@ const App = (() => {
       { id: 'cr_upload', label: 'Upload Create' },
       { id: 'cr_import', label: 'Import' },
     ]},
+    '_spacer',
     { id: 'transactions', icon: '☰', label: 'Transactions', type: 'group', items: [
       { id: 'tx_log', label: 'Transaction Log' },
       { id: 'tx_sale', label: 'Sale' },
@@ -244,27 +246,31 @@ const App = (() => {
 
     NAV.forEach(n => {
       if (n === '_spacer') {
-        html += '<div style="height:12px"></div>';
+        html += '<div style="height:20px"></div>';
         return;
       }
       if (n === '_spacer_double') {
         html += '<div style="height:20px"></div>';
         return;
       }
+      if (n === '_spacer_30') {
+        html += '<div style="height:30px"></div>';
+        return;
+      }
       if (n.type === 'item') {
-        const extra = n.id === 'dashboard' ? ' style="margin-bottom:12px"' : '';
+        const extra = '';
         html += `<div class="si" data-route="${n.id}" onclick="App.go('${n.id}')"${extra}>`
               + `<span class="sg-ico">${n.icon}</span>`
               + `<span class="sit">${esc(n.label)}</span></div>`;
       } else if (n.type === 'group') {
         html += `<div class="sg" data-group="${n.id}">`
-              + `<div class="sg-head" data-group="${n.id}" onclick="App._toggleSubmenu(this)"><span class="sg-ico">${n.icon}</span><span class="sit">${esc(n.label)}</span><span class="sg-arr">›</span></div>`
+              + `<div class="sg-head" data-group="${n.id}"><span class="sg-ico">${n.icon}</span><span class="sit">${esc(n.label)}</span><span class="sg-arr">›</span></div>`
               + `<div class="sg-sub">`;
         n.items.forEach(it => {
           if (it === '_div') {
             html += '<div class="sg-div"></div>';
           } else {
-            html += `<div class="sg-item" data-route="${it.id}" onclick="App._closeAllSubmenus();App.go('${it.id}')">${esc(it.label)}</div>`;
+            html += `<div class="sg-item" data-route="${it.id}" onclick="App.go('${it.id}')">${esc(it.label)}</div>`;
           }
         });
         html += '</div></div>';
@@ -434,28 +440,6 @@ const App = (() => {
   }
 
   // ═══════════════════════════
-  // SUBMENU TOGGLE (click-based)
-  // ═══════════════════════════
-  function _toggleSubmenu(headEl) {
-    const sub = headEl.nextElementSibling;
-    if (!sub) return;
-    const isOpen = sub.classList.contains('show');
-    // Close all other submenus first
-    _closeAllSubmenus();
-    // Toggle this one
-    if (!isOpen) sub.classList.add('show');
-  }
-
-  function _closeAllSubmenus() {
-    document.querySelectorAll('.sg-sub.show').forEach(s => s.classList.remove('show'));
-  }
-
-  // Close submenus when clicking outside sidebar
-  document.addEventListener('click', (e) => {
-    if (!e.target.closest('.sg')) _closeAllSubmenus();
-  });
-
-  // ═══════════════════════════
   // BOOT
   // ═══════════════════════════
   document.addEventListener('DOMContentLoaded', init);
@@ -477,8 +461,6 @@ const App = (() => {
     api,
     registerRoutes,
     _toggleSidebar,
-    _toggleSubmenu,
-    _closeAllSubmenus,
     NAV,
   };
 

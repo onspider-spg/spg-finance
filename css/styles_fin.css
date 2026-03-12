@@ -1,4 +1,4 @@
-/* Version 1.1 | 12 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/* Version 1.2 | 12 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /* ═══════════════════════════════════════════
    SPG Finance Module — styles_fin.css
    Desktop-first · System Font · MYOB Purple
@@ -183,7 +183,7 @@ html, body {
 /* Toggle button — purple circle */
 .stg {
   position: absolute;
-  top: 42px;
+  top: 72px;
   right: -11px;
   z-index: 60;
 }
@@ -283,6 +283,7 @@ html, body {
   padding: 4px 0;
   z-index: 70;
 }
+.sg:hover .sg-sub,
 .sg-sub.show { display: block; }
 
 .sg-item {
@@ -337,6 +338,8 @@ html, body {
   flex-direction: column;
   overflow: hidden;
   background: var(--ct-bg);
+  position: relative;
+  z-index: 1;
 }
 
 /* Toolbar (per-page action bar) */

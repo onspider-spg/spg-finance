@@ -1,4 +1,4 @@
-/** Version 1.0 | 12 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 1.0.1 | 12 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — app_fin.js
@@ -95,6 +95,7 @@ const App = (() => {
       { id: 'py_history', label: 'Payment History' },
       { id: 'py_remit', label: 'Remittance Advice' },
     ]},
+    '_spacer',
     { id: 'payroll', icon: '₿', label: 'Payroll', type: 'group', items: [
       { id: 'pr_runs', label: 'Pay Runs' },
       { id: 'pr_emp', label: 'Employees' },
@@ -132,6 +133,7 @@ const App = (() => {
       { id: 'fp_rev', label: 'Revenue Analysis' },
       { id: 'fp_exp', label: 'Expense Trend' },
     ]},
+    '_spacer',
     { id: 'contacts', icon: '⊕', label: 'Contacts', type: 'item' },
     { id: 'upload', icon: '↑', label: 'Upload', type: 'item' },
   ];
@@ -139,6 +141,7 @@ const App = (() => {
   // Map route → parent group for highlighting
   const ROUTE_GROUP = {};
   NAV.forEach(n => {
+    if (typeof n === 'string') return;
     if (n.type === 'group' && n.items) {
       n.items.forEach(it => { if (it !== '_div') ROUTE_GROUP[it.id] = n.id; });
     }
@@ -155,7 +158,7 @@ const App = (() => {
     registerRoutes({
       dashboard: {
         render: () => ({
-          tb: '<div class="tb"><div class="tb-t">Dashboard</div></div>',
+          tb: '<div class="tb"><div class="tb-t">Dashboard</div><select class="fl" style="width:110px"><option>Mar 2026</option><option>Feb 2026</option><option>Jan 2026</option></select><select class="fl" style="width:130px"><option>All Brands</option><option>Mango Coco</option><option>Flying Tigress</option><option>Issho Cafe</option></select></div>',
           ct: '<div class="empty" style="padding:60px"><div style="font-size:28px;margin-bottom:8px">◇</div><div style="font-size:15px;font-weight:600;margin-bottom:4px">Dashboard</div><div>Data will appear here once connected</div></div>',
         }),
       },
@@ -241,6 +244,10 @@ const App = (() => {
     let html = '<div class="stg"><button onclick="App._toggleSidebar()" id="stg-b">◂</button></div>';
 
     NAV.forEach(n => {
+      if (n === '_spacer') {
+        html += '<div style="height:12px"></div>';
+        return;
+      }
       if (n.type === 'item') {
         const extra = n.id === 'dashboard' ? ' style="margin-bottom:12px"' : '';
         html += `<div class="si" data-route="${n.id}" onclick="App.go('${n.id}')"${extra}>`

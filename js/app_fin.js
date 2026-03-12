@@ -1,4 +1,4 @@
-/** Version 1.5 | 12 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 1.5.1 | 12 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — app_fin.js
@@ -242,7 +242,7 @@ const App = (() => {
     const el = document.getElementById('sidebar');
     if (!el) return;
 
-    let html = '<div class="stg"><button onclick="App._toggleSidebar()" id="stg-b">◂</button></div>';
+    let html = '';
 
     NAV.forEach(n => {
       if (n === '_spacer') {
@@ -279,7 +279,7 @@ const App = (() => {
 
     // Footer
     html += `<div class="sf">
-      <div style="font-size:9px;color:var(--t4);padding:2px 0;margin-bottom:4px">v1.5 | 12 Mar 2026 20:45 AEDT</div>
+      <div style="font-size:9px;color:var(--t4);padding:2px 0;margin-bottom:4px">v1.5.1 | 12 Mar 2026 21:15 AEDT</div>
       <a href="https://onspider-spg.github.io/spg-home/#dashboard"><span style="font-size:12px">←</span><span class="sit"> Back to Home</span></a>
       <a href="https://onspider-spg.github.io/spg-home/#logout" class="danger"><span style="font-size:12px">→</span><span class="sit"> Log out</span></a>
     </div>`;
@@ -288,7 +288,6 @@ const App = (() => {
 
     // ── Setup flyout hover events (fixed position submenu) ──
     _setupFlyoutHover();
-    _positionToggleBtn();
   }
 
   /** Position submenu as fixed overlay when hovering group */
@@ -331,31 +330,13 @@ const App = (() => {
     });
   }
 
-  /** Position toggle button as fixed overlay at sidebar edge */
-  function _positionToggleBtn() {
-    const sd = document.getElementById('sidebar');
-    const stg = document.querySelector('.stg');
-    if (!sd || !stg) return;
-
-    function updatePos() {
-      const rect = sd.getBoundingClientRect();
-      // Position: right edge of sidebar, vertically between Dashboard and Create
-      stg.style.top = (rect.top + 72) + 'px';
-      stg.style.left = (rect.right - 11) + 'px';
-    }
-    updatePos();
-    // Update on sidebar toggle
-    const observer = new MutationObserver(updatePos);
-    observer.observe(sd, { attributes: true, attributeFilter: ['class'] });
-    window.addEventListener('resize', updatePos);
-  }
-
   function _toggleSidebar() {
     const sd = document.getElementById('sidebar');
     const btn = document.getElementById('stg-b');
     if (!sd) return;
     _sidebarCollapsed = !_sidebarCollapsed;
     sd.classList.toggle('cl', _sidebarCollapsed);
+    document.body.classList.toggle('sd-collapsed', _sidebarCollapsed);
     if (btn) btn.textContent = _sidebarCollapsed ? '▸' : '◂';
   }
 

@@ -512,3 +512,5 @@
   window.ScrTx = {
     _switchBdView,
   };
+
+})();

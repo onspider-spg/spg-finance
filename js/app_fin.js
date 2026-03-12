@@ -1,4 +1,4 @@
-/** Version 1.4 | 12 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 1.5 | 12 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — app_fin.js
@@ -279,16 +279,76 @@ const App = (() => {
 
     // Footer
     html += `<div class="sf">
-      <div style="font-size:9px;color:var(--t4);padding:2px 0;margin-bottom:4px">v1.4 | 12 Mar 2026 20:15 AEDT</div>
+      <div style="font-size:9px;color:var(--t4);padding:2px 0;margin-bottom:4px">v1.5 | 12 Mar 2026 20:45 AEDT</div>
       <a href="https://onspider-spg.github.io/spg-home/#dashboard"><span style="font-size:12px">←</span><span class="sit"> Back to Home</span></a>
       <a href="https://onspider-spg.github.io/spg-home/#logout" class="danger"><span style="font-size:12px">→</span><span class="sit"> Log out</span></a>
     </div>`;
 
     el.innerHTML = html;
+
+    // ── Setup flyout hover events (fixed position submenu) ──
+    _setupFlyoutHover();
+    _positionToggleBtn();
   }
 
-  // Fix: rebuild dashboard item with margin
-  // (simpler approach — just use CSS for first .si)
+  /** Position submenu as fixed overlay when hovering group */
+  function _setupFlyoutHover() {
+    document.querySelectorAll('.sg').forEach(sg => {
+      const head = sg.querySelector('.sg-head');
+      const sub = sg.querySelector('.sg-sub');
+      if (!head || !sub) return;
+
+      let hoverTimeout = null;
+
+      sg.addEventListener('mouseenter', () => {
+        clearTimeout(hoverTimeout);
+        // Close other open submenus
+        document.querySelectorAll('.sg-sub.show').forEach(s => {
+          if (s !== sub) s.classList.remove('show');
+        });
+        // Calculate position from group head
+        const rect = head.getBoundingClientRect();
+        sub.style.top = rect.top + 'px';
+        sub.style.left = rect.right + 'px';
+        sub.classList.add('show');
+      });
+
+      sg.addEventListener('mouseleave', () => {
+        hoverTimeout = setTimeout(() => {
+          sub.classList.remove('show');
+        }, 100);
+      });
+
+      // Keep submenu open when hovering on it
+      sub.addEventListener('mouseenter', () => {
+        clearTimeout(hoverTimeout);
+      });
+      sub.addEventListener('mouseleave', () => {
+        hoverTimeout = setTimeout(() => {
+          sub.classList.remove('show');
+        }, 100);
+      });
+    });
+  }
+
+  /** Position toggle button as fixed overlay at sidebar edge */
+  function _positionToggleBtn() {
+    const sd = document.getElementById('sidebar');
+    const stg = document.querySelector('.stg');
+    if (!sd || !stg) return;
+
+    function updatePos() {
+      const rect = sd.getBoundingClientRect();
+      // Position: right edge of sidebar, vertically between Dashboard and Create
+      stg.style.top = (rect.top + 72) + 'px';
+      stg.style.left = (rect.right - 11) + 'px';
+    }
+    updatePos();
+    // Update on sidebar toggle
+    const observer = new MutationObserver(updatePos);
+    observer.observe(sd, { attributes: true, attributeFilter: ['class'] });
+    window.addEventListener('resize', updatePos);
+  }
 
   function _toggleSidebar() {
     const sd = document.getElementById('sidebar');

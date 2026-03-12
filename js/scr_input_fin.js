@@ -1,4 +1,4 @@
-/** Version 1.1 | 12 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 1.2 | 12 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_input_fin.js
@@ -338,24 +338,396 @@
   }
 
   // ══════════════════════════════════════════
+  // SHARED: TAX CODE DROPDOWN (used by Bill, Recurring, Upload)
+  // ══════════════════════════════════════════
+  function taxCodeDropdownHTML(rowIdx) {
+    const codes = App.S.taxCodes || [];
+    const rows = codes.map(tc =>
+      `<div class="tc-row" onclick="ScrInput._pickTaxCode(this,'tcw_${rowIdx}')">`
+      + `<span class="tc-code">${esc(tc.code)}</span>`
+      + `<span class="tc-name">${esc(tc.name)}</span>`
+      + `<span class="tc-rate">${tc.rate}%</span></div>`
+    ).join('');
+    return `<div class="tc-wrap" id="tcw_${rowIdx}">`
+      + `<input class="tc-val" readonly onclick="ScrInput._toggleTaxDD('tcw_${rowIdx}')" value="" data-rate="0">`
+      + `<span class="tc-arr">▾</span>`
+      + `<div class="tc-dd">${rows}</div></div>`;
+  }
+
+  function _toggleTaxDD(wrapId) {
+    const w = document.getElementById(wrapId);
+    if (!w) return;
+    // Close others first
+    document.querySelectorAll('.tc-wrap.open').forEach(x => { if (x.id !== wrapId) x.classList.remove('open'); });
+    w.classList.toggle('open');
+  }
+
+  function _pickTaxCode(rowEl, wrapId) {
+    const w = document.getElementById(wrapId);
+    if (!w) return;
+    const code = rowEl.querySelector('.tc-code').textContent;
+    const rate = rowEl.querySelector('.tc-rate').textContent.replace('%', '');
+    const inp = w.querySelector('.tc-val');
+    if (inp) { inp.value = code; inp.dataset.rate = rate; }
+    w.classList.remove('open');
+    // Recalculate GST for this row
+    _recalcBillRow(wrapId);
+  }
+
+  // Close tax dropdowns on outside click
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.tc-wrap')) {
+      document.querySelectorAll('.tc-wrap.open').forEach(x => x.classList.remove('open'));
+    }
+  });
+
+  // ══════════════════════════════════════════
+  // SHARED: CATEGORIES (used by Bill, Recurring, Upload)
+  // ══════════════════════════════════════════
+  const MOCK_CATS = ['', '27002 Purchases-GST Free', '27010 Packaging', '42700 Rent', '43000 Utilities', '46000 Wages'];
+
+  // ══════════════════════════════════════════
+  // SHARED: ALLOCATION LAYOUT POPUP
+  // ══════════════════════════════════════════
+  let _billAllocMode = 'self'; // 'self' or 'ob'
+
+  function _toggleAllocPopup() {
+    const p = document.getElementById('al_pop');
+    if (p) p.style.display = p.style.display === 'none' ? 'block' : 'none';
+  }
+
+  function _setAllocMode(mode) {
+    _billAllocMode = mode;
+    const p = document.getElementById('al_pop');
+    if (p) p.style.display = 'none';
+    _rebuildLineItems();
+  }
+
+  // ══════════════════════════════════════════
+  // 4. CREATE BILL — Full form with line items
+  // ══════════════════════════════════════════
+  let _billRows = 2; // start with 2 empty rows
+
+  function renderCreateBill() {
+    _billAllocMode = 'self';
+    _billRows = 2;
+
+    return {
+      tb: '<div class="tb"><div class="tb-t">Create Bill</div></div>',
+      ct: `
+        <div style="max-width:860px;margin:0 auto">
+          <!-- Prefill card -->
+          <div class="card" style="padding:10px 16px">
+            <div style="display:flex;gap:16px">
+              <div style="font-size:var(--fs-body);color:var(--acc);cursor:pointer">📄 Prefill from a source document</div>
+              <div style="font-size:var(--fs-body);color:var(--acc);cursor:pointer">↻ Prefill from recurring</div>
+            </div>
+          </div>
+
+          <!-- Main form card -->
+          <div class="card">
+            <!-- 2-column header fields -->
+            <div style="display:flex;gap:30px">
+              <!-- Left column -->
+              <div style="width:300px">
+                <div class="fg">
+                  <label class="lb">Transaction Type</label>
+                  <select class="inp" id="cb_type" style="width:280px">
+                    <option>Expense / Bill</option>
+                    <option>Asset Purchase</option>
+                  </select>
+                </div>
+                <div class="fg">
+                  <label class="lb">Supplier *</label>
+                  <select class="inp" id="cb_supplier" style="width:280px">${opts(MOCK.suppliers)}</select>
+                </div>
+                <div class="fg">
+                  <label class="lb">Supplier Invoice Number</label>
+                  <input class="inp" id="cb_inv_no" style="width:280px" placeholder="e.g. INV1052323">
+                </div>
+              </div>
+
+              <!-- Right column -->
+              <div style="flex:1">
+                <div style="display:flex;align-items:flex-start;margin-bottom:10px;justify-content:flex-end;gap:10px">
+                  <span class="lb" style="padding-top:8px;margin:0">Bill Number *</span>
+                  <div style="width:180px">
+                    <input class="inp" value="${esc(MOCK.nextBillNo)}" readonly style="background:var(--bg3);color:var(--t3)">
+                    <div style="font-size:var(--fs-xxs);color:var(--t4)">Auto sequential</div>
+                  </div>
+                </div>
+                <div style="display:flex;align-items:center;margin-bottom:10px;justify-content:flex-end;gap:10px">
+                  <span class="lb" style="margin:0">Issue Date *</span>
+                  <input class="inp" id="cb_issue_date" type="date" value="${today()}" style="width:180px">
+                </div>
+                <div style="display:flex;align-items:center;margin-bottom:10px;justify-content:flex-end;gap:10px">
+                  <span class="lb" style="margin:0">Due Date *</span>
+                  <input class="inp" id="cb_due_date" type="date" style="width:180px">
+                </div>
+                <div style="display:flex;align-items:center;margin-bottom:10px;justify-content:flex-end;gap:10px">
+                  <span class="lb" style="margin:0">Accrual Month</span>
+                  <input class="inp" id="cb_accrual" type="month" value="${today().substring(0,7)}" style="width:180px">
+                </div>
+              </div>
+            </div>
+
+            <!-- Allocation Layout divider -->
+            <div style="position:relative;margin:12px 0 0">
+              <div style="display:flex;align-items:center;gap:0">
+                <hr style="border:none;border-top:1px solid #eee;flex:1;margin:0">
+                <div style="padding:0 8px;display:flex;align-items:center;gap:4px;flex-shrink:0">
+                  <span style="font-size:var(--fs-xs);color:var(--t4)">Allocation Layout</span>
+                  <button class="bg" style="font-size:16px;color:var(--acc);padding:2px" onclick="ScrInput._toggleAllocPopup()">⚙</button>
+                  <div id="al_pop" style="display:none;position:absolute;right:0;top:28px;background:#fff;border:1px solid var(--bd);border-radius:8px;box-shadow:var(--sh2);padding:10px 14px;z-index:20;min-width:180px">
+                    <div style="font-size:var(--fs-xs);font-weight:600;margin-bottom:4px">Allocation Layout</div>
+                    <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-sm);padding:2px 0;cursor:pointer">
+                      <input type="radio" name="al_bill" checked style="accent-color:var(--acc)" onchange="ScrInput._setAllocMode('self')"> Self
+                    </label>
+                    <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-sm);padding:2px 0;cursor:pointer">
+                      <input type="radio" name="al_bill" style="accent-color:var(--acc)" onchange="ScrInput._setAllocMode('ob')"> On Behalf / Split
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Line Items Table -->
+            <div id="cb_lines">${_buildLineItemsHTML()}</div>
+
+            <!-- Add row button -->
+            <div style="margin-top:4px">
+              <button class="bg" style="color:var(--acc);font-size:var(--fs-sm)" onclick="ScrInput._addBillRow()">+ Add line</button>
+            </div>
+
+            <!-- Notes + Totals -->
+            <div style="display:flex;gap:16px;margin-top:12px">
+              <div style="flex:1">
+                <div style="font-size:var(--fs-xs);color:var(--t3);margin-bottom:2px">Notes</div>
+                <textarea id="cb_notes" style="width:100%;padding:8px;border:1px solid var(--bd);border-radius:var(--rd);font-size:var(--fs-body);font-family:inherit;min-height:60px;resize:vertical"></textarea>
+              </div>
+              <div style="width:240px;text-align:right;font-size:var(--fs-body)" id="cb_totals">
+                ${_buildTotalsHTML(0, 0)}
+              </div>
+            </div>
+          </div>
+
+          <!-- Action buttons -->
+          <div style="display:flex;align-items:center;gap:6px;padding:8px 0">
+            <button class="btn bo">View PDF</button>
+            <button class="btn bo" onclick="App.go('cr_recurring')">Save as recurring</button>
+            <div style="flex:1"></div>
+            <button class="btn bo" onclick="App.go('dashboard')">Cancel</button>
+            <!-- Save and... dropdown -->
+            <div style="position:relative;display:inline-block">
+              <button class="btn bo" onclick="ScrInput._toggleSaveDD()">Save and... ▾</button>
+              <div id="cb_save_dd" style="display:none;position:absolute;bottom:100%;right:0;background:#fff;border:1px solid var(--bd);border-radius:8px;box-shadow:var(--sh2);padding:4px 0;min-width:160px;z-index:20">
+                <div class="sg-item" onclick="ScrInput._saveBill('new')">Save and Create new</div>
+                <div class="sg-item" onclick="ScrInput._saveBill('dup')">Save and Duplicate</div>
+              </div>
+            </div>
+            <button class="bs" onclick="ScrInput._saveBill('close',this)">Save</button>
+          </div>
+
+          <!-- Attachments -->
+          <div style="border:1.5px dashed #ddd;border-radius:10px;padding:16px;margin-top:6px">
+            <div style="font-size:var(--fs-body);font-weight:600;margin-bottom:8px">More information</div>
+            <div style="background:#333;color:#fff;padding:8px 10px;border-radius:8px 8px 0 0;font-size:var(--fs-body);font-weight:600">Attachments</div>
+            <div style="border:1.5px dashed #ddd;border-top:none;border-radius:0 0 8px 8px;padding:16px;text-align:center">
+              <div style="font-size:var(--fs-sm);color:var(--t3)">Drag files here, or <a style="color:var(--acc);font-weight:600;cursor:pointer">browse</a></div>
+            </div>
+          </div>
+        </div>`,
+    };
+  }
+
+  // ── Line Items HTML builder ──
+  function _buildLineItemsHTML() {
+    const isOB = _billAllocMode === 'ob';
+    let cols;
+    if (isOB) {
+      cols = '<tr><th style="text-align:left;padding:8px;font-weight:600;font-size:var(--fs-sm);width:14%">Cost Owner</th>'
+        + '<th style="text-align:left;padding:8px;font-weight:600;font-size:var(--fs-sm);width:22%">Description</th>'
+        + '<th style="text-align:left;padding:8px;font-weight:600;font-size:var(--fs-sm);width:22%">Category *</th>'
+        + '<th style="text-align:left;padding:8px;font-weight:600;font-size:var(--fs-sm);width:16%">Amount ($) *</th>'
+        + '<th style="text-align:left;padding:8px;font-weight:600;font-size:var(--fs-sm);width:10%">GST</th>'
+        + '<th style="text-align:left;padding:8px;font-weight:600;font-size:var(--fs-sm);width:14%">Tax code *</th>'
+        + '<th style="width:2%"></th></tr>';
+    } else {
+      cols = '<tr><th style="text-align:left;padding:8px;font-weight:600;font-size:var(--fs-sm);width:30%">Description</th>'
+        + '<th style="text-align:left;padding:8px;font-weight:600;font-size:var(--fs-sm);width:26%">Category *</th>'
+        + '<th style="text-align:left;padding:8px;font-weight:600;font-size:var(--fs-sm);width:18%">Amount ($) *</th>'
+        + '<th style="text-align:left;padding:8px;font-weight:600;font-size:var(--fs-sm);width:10%">GST</th>'
+        + '<th style="text-align:left;padding:8px;font-weight:600;font-size:var(--fs-sm);width:14%">Tax code *</th>'
+        + '<th style="width:2%"></th></tr>';
+    }
+
+    let rows = '';
+    for (let i = 0; i < _billRows; i++) {
+      rows += _buildOneRow(i, isOB);
+    }
+
+    return `<table style="width:100%;border-collapse:collapse;font-size:var(--fs-body);margin-top:10px"><thead>${cols}</thead><tbody id="cb_tbody">${rows}</tbody></table>`;
+  }
+
+  function _buildOneRow(idx, isOB) {
+    const C = 'padding:0;border:1px solid #e5e7eb';
+    const S = 'width:100%;padding:8px 10px;border:none;font-size:var(--fs-body);font-family:inherit';
+    const catOpts = MOCK_CATS.map(c => `<option>${esc(c)}</option>`).join('');
+    const brandOpts = MOCK.brands.map(b => `<option>${esc(b)}</option>`).join('');
+
+    let ownerCol = '';
+    if (isOB) {
+      ownerCol = `<td style="${C}"><select style="${S}"><option></option>${brandOpts}</select></td>`;
+    }
+
+    return `<tr data-row="${idx}">`
+      + ownerCol
+      + `<td style="${C}"><div contenteditable style="padding:8px 10px;min-height:36px;outline:none;font-size:var(--fs-body)"></div></td>`
+      + `<td style="${C}"><select style="${S}">${catOpts}</select></td>`
+      + `<td style="${C}"><input id="cb_amt_${idx}" style="width:100%;padding:8px 10px;border:none;text-align:right;font-size:var(--fs-body)" oninput="ScrInput._recalcBillRow('tcw_${idx}')"></td>`
+      + `<td style="${C};background:#fafafa"><input id="cb_gst_${idx}" readonly style="width:100%;padding:8px 10px;border:none;text-align:right;background:#fafafa;color:var(--t3);font-size:var(--fs-body)"></td>`
+      + `<td style="${C}">${taxCodeDropdownHTML(idx)}</td>`
+      + `<td style="${C};text-align:center;cursor:pointer;color:var(--t4)" onclick="ScrInput._removeBillRow(${idx})">×</td>`
+      + '</tr>';
+  }
+
+  function _rebuildLineItems() {
+    const el = document.getElementById('cb_lines');
+    if (el) el.innerHTML = _buildLineItemsHTML();
+  }
+
+  function _addBillRow() {
+    _billRows++;
+    _rebuildLineItems();
+  }
+
+  function _removeBillRow(idx) {
+    if (_billRows <= 1) return; // keep at least 1 row
+    const row = document.querySelector(`tr[data-row="${idx}"]`);
+    if (row) row.remove();
+    _billRows--;
+    _recalcBillTotals();
+  }
+
+  // ── GST + Totals calculation ──
+  function _recalcBillRow(wrapId) {
+    // Extract row index from wrapId (format: tcw_0, tcw_1, ...)
+    const idx = wrapId.replace('tcw_', '');
+    const amtEl = document.getElementById('cb_amt_' + idx);
+    const gstEl = document.getElementById('cb_gst_' + idx);
+    const tcWrap = document.getElementById(wrapId);
+    if (!amtEl || !gstEl || !tcWrap) return;
+
+    const amount = parseFloat(amtEl.value.replace(/,/g, '')) || 0;
+    const tcInput = tcWrap.querySelector('.tc-val');
+    const rate = parseFloat(tcInput?.dataset.rate || '0');
+
+    // GST = amount * rate / 100
+    const gst = amount * rate / 100;
+    gstEl.value = gst.toFixed(2);
+
+    _recalcBillTotals();
+  }
+
+  function _recalcBillTotals() {
+    let totalExGST = 0;
+    let totalTax = 0;
+
+    // Sum all rows
+    for (let i = 0; i < 100; i++) {
+      const amtEl = document.getElementById('cb_amt_' + i);
+      const gstEl = document.getElementById('cb_gst_' + i);
+      if (!amtEl) continue;
+      totalExGST += parseFloat(amtEl.value.replace(/,/g, '')) || 0;
+      totalTax += parseFloat(gstEl?.value || '0');
+    }
+
+    const totalsEl = document.getElementById('cb_totals');
+    if (totalsEl) totalsEl.innerHTML = _buildTotalsHTML(totalExGST, totalTax);
+  }
+
+  function _buildTotalsHTML(exGST, tax) {
+    const total = exGST + tax;
+    return `<div style="display:flex;justify-content:flex-end;gap:16px;padding:4px 0"><b>Total Amount ex GST</b><b>${App.formatMoney(exGST)}</b></div>`
+      + `<div style="display:flex;justify-content:flex-end;gap:16px;padding:4px 0;color:var(--t2)">Tax <span>${App.formatMoney(tax)}</span></div>`
+      + `<div style="display:flex;justify-content:flex-end;gap:16px;padding:4px 0"><b>Total</b><b>${App.formatMoney(total)}</b></div>`
+      + `<div style="display:flex;justify-content:flex-end;gap:16px;padding:4px 0">Amount paid <input id="cb_paid" value="0.00" style="width:70px;text-align:right;padding:3px 6px;border:1px solid var(--bd);border-radius:4px;font-size:var(--fs-body)" oninput="ScrInput._recalcBillBalance()"></div>`
+      + `<div style="display:flex;justify-content:flex-end;gap:16px;padding:6px 0;font-weight:700" id="cb_balance">Balance due <span>${App.formatMoney(total)}</span></div>`;
+  }
+
+  function _recalcBillBalance() {
+    const paidEl = document.getElementById('cb_paid');
+    const balEl = document.getElementById('cb_balance');
+    if (!paidEl || !balEl) return;
+    const paid = parseFloat(paidEl.value.replace(/,/g, '')) || 0;
+
+    let totalExGST = 0, totalTax = 0;
+    for (let i = 0; i < 100; i++) {
+      const amtEl = document.getElementById('cb_amt_' + i);
+      const gstEl = document.getElementById('cb_gst_' + i);
+      if (!amtEl) continue;
+      totalExGST += parseFloat(amtEl.value.replace(/,/g, '')) || 0;
+      totalTax += parseFloat(gstEl?.value || '0');
+    }
+    const balance = totalExGST + totalTax - paid;
+    balEl.innerHTML = `Balance due <span>${App.formatMoney(balance)}</span>`;
+  }
+
+  // ── Save and... dropdown ──
+  function _toggleSaveDD() {
+    const dd = document.getElementById('cb_save_dd');
+    if (dd) dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
+  }
+
+  function _saveBill(mode, btnEl) {
+    const saveBtn = btnEl || document.querySelector('.bs');
+    guardedSave(saveBtn, () => {
+      App.toast('Bill saved');
+      const dd = document.getElementById('cb_save_dd');
+      if (dd) dd.style.display = 'none';
+      if (mode === 'new') {
+        App.go('cr_bill'); // reload fresh form
+      } else if (mode === 'dup') {
+        App.toast('Duplicated — edit and save');
+      } else {
+        App.go('tx_bill');
+      }
+    });
+  }
+
+  // ══════════════════════════════════════════
   // REGISTER ROUTES
   // ══════════════════════════════════════════
   App.registerRoutes({
     cr_sale:     { render: renderCreateSale },
     cr_transfer: { render: renderCreateTransfer },
     cr_debit:    { render: renderCreateDebit },
+    cr_bill:     { render: renderCreateBill },
   });
 
   // ══════════════════════════════════════════
   // PUBLIC API — functions called from onclick
   // ══════════════════════════════════════════
   window.ScrInput = {
+    // P2a
     _calcSaleGST,
     _saveSale,
     _pickTransferType,
     _updateTransferBal,
     _saveTransfer,
     _saveDebit,
+    // P2b — shared
+    _toggleTaxDD,
+    _pickTaxCode,
+    _toggleAllocPopup,
+    _setAllocMode,
+    // P2b — bill specific
+    _addBillRow,
+    _removeBillRow,
+    _recalcBillRow,
+    _recalcBillBalance,
+    _toggleSaveDD,
+    _saveBill,
   };
 
 })();

@@ -1,4 +1,4 @@
-/** Version 1.3 | 12 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 1.4 | 13 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_input_fin.js
@@ -386,6 +386,24 @@
   // ══════════════════════════════════════════
   const MOCK_CATS = ['', '27002 Purchases-GST Free', '27010 Packaging', '42700 Rent', '43000 Utilities', '46000 Wages'];
 
+  /** Get categories — prefer S.categories from API, fallback to MOCK */
+  function _getCats() {
+    const cats = App.S.categories;
+    if (cats && cats.length > 0) return ['', ...cats.map(c => c.code + ' ' + c.name)];
+    return MOCK_CATS;
+  }
+
+  /** Get vendor options — prefer S.vendors from API, fallback to MOCK */
+  function _vendorOpts() {
+    const vendors = App.S.vendors;
+    if (vendors && vendors.length > 0) {
+      return '<option value=""></option>' + vendors.map(v =>
+        `<option value="${esc(v.id)}" data-name="${esc(v.name)}">${esc(v.name)}</option>`
+      ).join('');
+    }
+    return opts(MOCK.suppliers);
+  }
+
   // ══════════════════════════════════════════
   // SHARED: ALLOCATION LAYOUT POPUP
   // ══════════════════════════════════════════
@@ -439,7 +457,7 @@
                 </div>
                 <div class="fg">
                   <label class="lb">Supplier *</label>
-                  <select class="inp" id="cb_supplier" style="width:280px">${opts(MOCK.suppliers)}</select>
+                  <select class="inp" id="cb_supplier" style="width:280px">${_vendorOpts()}</select>
                 </div>
                 <div class="fg">
                   <label class="lb">Supplier Invoice Number</label>
@@ -452,8 +470,8 @@
                 <div style="display:flex;align-items:flex-start;margin-bottom:10px;justify-content:flex-end;gap:10px">
                   <span class="lb" style="padding-top:8px;margin:0">Bill Number *</span>
                   <div style="width:180px">
-                    <input class="inp" value="${esc(MOCK.nextBillNo)}" readonly style="background:var(--bg3);color:var(--t3)">
-                    <div style="font-size:var(--fs-xxs);color:var(--t4)">Auto sequential</div>
+                    <input class="inp" value="(auto)" readonly style="background:var(--bg3);color:var(--t3)">
+                    <div style="font-size:var(--fs-xxs);color:var(--t4)">Auto — DB generates T-000001</div>
                   </div>
                 </div>
                 <div style="display:flex;align-items:center;margin-bottom:10px;justify-content:flex-end;gap:10px">
@@ -571,19 +589,20 @@
 
   function _buildOneRow(idx, isOB) {
     const C = 'padding:0;border:1px solid #e5e7eb';
-    const S = 'width:100%;padding:8px 10px;border:none;font-size:var(--fs-body);font-family:inherit';
-    const catOpts = MOCK_CATS.map(c => `<option>${esc(c)}</option>`).join('');
-    const brandOpts = MOCK.brands.map(b => `<option>${esc(b)}</option>`).join('');
+    const ST = 'width:100%;padding:8px 10px;border:none;font-size:var(--fs-body);font-family:inherit';
+    const catOpts = _getCats().map(c => `<option>${esc(c)}</option>`).join('');
+    const brands = App.S.brands && App.S.brands.length > 0 ? App.S.brands : MOCK.brands;
+    const brandOpts = brands.map(b => `<option>${esc(b)}</option>`).join('');
 
     let ownerCol = '';
     if (isOB) {
-      ownerCol = `<td style="${C}"><select style="${S}"><option></option>${brandOpts}</select></td>`;
+      ownerCol = `<td style="${C}"><select style="${ST}"><option></option>${brandOpts}</select></td>`;
     }
 
     return `<tr data-row="${idx}">`
       + ownerCol
       + `<td style="${C}"><div contenteditable style="padding:8px 10px;min-height:36px;outline:none;font-size:var(--fs-body)"></div></td>`
-      + `<td style="${C}"><select style="${S}">${catOpts}</select></td>`
+      + `<td style="${C}"><select style="${ST}">${catOpts}</select></td>`
       + `<td style="${C}"><input id="cb_amt_${idx}" style="width:100%;padding:8px 10px;border:none;text-align:right;font-size:var(--fs-body)" oninput="ScrInput._recalcBillRow('tcw_${idx}')"></td>`
       + `<td style="${C};background:#fafafa"><input id="cb_gst_${idx}" readonly style="width:100%;padding:8px 10px;border:none;text-align:right;background:#fafafa;color:var(--t3);font-size:var(--fs-body)"></td>`
       + `<td style="${C}">${taxCodeDropdownHTML(idx)}</td>`
@@ -679,20 +698,86 @@
     if (dd) dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
   }
 
-  function _saveBill(mode, btnEl) {
+  async function _saveBill(mode, btnEl) {
     const saveBtn = btnEl || document.querySelector('.bs');
-    guardedSave(saveBtn, () => {
-      App.toast('Bill saved');
+    if (!saveBtn || saveBtn.disabled) return;
+    const origText = saveBtn.textContent;
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+
+    try {
+      // Collect form data
+      const supplierEl = document.getElementById('cb_supplier');
+      const supplierOpt = supplierEl?.selectedOptions[0];
+      const vendor_id = supplierOpt?.value || null;
+      const vendor_name = supplierOpt?.dataset?.name || supplierOpt?.textContent || '';
+
+      // Collect line items
+      const lineItems = [];
+      for (let i = 0; i < 100; i++) {
+        const amtEl = document.getElementById('cb_amt_' + i);
+        if (!amtEl) continue;
+        const amount = parseFloat(amtEl.value.replace(/,/g, '')) || 0;
+        if (amount === 0) continue;
+
+        const gstEl = document.getElementById('cb_gst_' + i);
+        const tcWrap = document.getElementById('tcw_' + i);
+        const tcInput = tcWrap?.querySelector('.tc-val');
+        const row = amtEl.closest('tr');
+        const descEl = row?.querySelector('[contenteditable]');
+        const catEl = row?.querySelector('select');
+
+        lineItems.push({
+          description: descEl?.textContent?.trim() || '',
+          category_display: catEl?.value || '',
+          amount: amount,
+          gst: parseFloat(gstEl?.value || '0'),
+          tax_code: tcInput?.value || 'FRE',
+          cost_owner: null,
+        });
+      }
+
+      // Calculate total
+      const totalExGst = lineItems.reduce((s, li) => s + li.amount, 0);
+      const totalGst = lineItems.reduce((s, li) => s + li.gst, 0);
+
+      const data = {
+        vendor_id: vendor_id && vendor_id !== '' ? vendor_id : null,
+        vendor_name: vendor_name,
+        supplier_inv_no: document.getElementById('cb_inv_no')?.value || '',
+        issue_date: document.getElementById('cb_issue_date')?.value || App.today(),
+        due_date: document.getElementById('cb_due_date')?.value || null,
+        accrual_month: document.getElementById('cb_accrual')?.value || null,
+        brand: null, // TODO: from allocation
+        allocation: _billAllocMode,
+        notes: document.getElementById('cb_notes')?.value || '',
+        total: totalExGst + totalGst,
+        lineItems: lineItems,
+      };
+
+      const result = await API.createBill(data);
+
+      // Close save dropdown
       const dd = document.getElementById('cb_save_dd');
       if (dd) dd.style.display = 'none';
+
       if (mode === 'new') {
-        App.go('cr_bill'); // reload fresh form
+        App.toast('Bill saved — ' + (result.bill?.bill_no || ''));
+        App.go('cr_bill');
       } else if (mode === 'dup') {
-        App.toast('Duplicated — edit and save');
+        App.toast('Bill saved — edit duplicate');
       } else {
-        App.go('tx_bill');
+        // Save & Close → go to Bill Detail (data already in memory)
+        App.toast('Bill saved — ' + (result.bill?.bill_no || ''));
+        App.go('tx_bill_detail');
       }
-    });
+
+    } catch (e) {
+      App.toast('Error: ' + e.message);
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = origText;
+    }
   }
 
   // ══════════════════════════════════════════

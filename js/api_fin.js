@@ -1,4 +1,4 @@
-/** Version 1.0 | 13 MAR 2026 | Siam Palette Group */
+/** Version 1.1 | 13 MAR 2026 | Siam Palette Group */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — api_fin.js
@@ -146,20 +146,39 @@ const API = (() => {
     if (_loading.bundle) return;
     _loading.bundle = true;
     try {
-      // MOCK — replace with: const res = await _call('fin_init_bundle', {});
-      const res = {
-        session: _MOCK_SESSION,
-        brands: _MOCK_MASTER.brands,
-        channels: _MOCK_MASTER.channels,
-        bankAccounts: _MOCK_MASTER.bankAccounts,
-        taxCodes: _MOCK_MASTER.taxCodes,
-      };
+      // Read token from URL param or localStorage
+      const params = new URLSearchParams(window.location.search);
+      let token = params.get('token');
+      if (!token) token = localStorage.getItem('spg_token');
+      if (token) {
+        localStorage.setItem('spg_token', token);
+        _S().token = token;
+        // Clean URL if token was in param
+        if (params.get('token')) {
+          window.history.replaceState({}, '', window.location.pathname + window.location.hash);
+        }
+      }
+
+      let res;
+      try {
+        res = await _call('fin_init_bundle');
+      } catch (e) {
+        console.warn('initBundle API failed, using MOCK:', e.message);
+        // Fallback to MOCK if no token or API fails
+        res = {
+          session: _MOCK_SESSION,
+          brands: _MOCK_MASTER.brands,
+          channels: _MOCK_MASTER.channels,
+          bankAccounts: _MOCK_MASTER.bankAccounts,
+          taxCodes: _MOCK_MASTER.taxCodes,
+        };
+      }
 
       _S().session = res.session;
-      _S().brands = res.brands;
-      _S().channels = res.channels;
-      _S().bankAccounts = res.bankAccounts;
-      _S().taxCodes = res.taxCodes;
+      _S().brands = res.brands || [];
+      _S().channels = res.channels || [];
+      _S().bankAccounts = res.bankAccounts || [];
+      _S().taxCodes = res.taxCodes || [];
 
       return res;
     } finally {
@@ -173,16 +192,21 @@ const API = (() => {
     if (_S().vendors && _S().vendors.length > 0) return; // already loaded
     _loading.master = true;
     try {
-      // MOCK — replace with: const res = await _call('fin_init_master', {});
-      const res = {
-        vendors: _MOCK_DETAIL.vendors,
-        categories: _MOCK_DETAIL.categories,
-        vendorRules: _MOCK_DETAIL.vendorRules,
-      };
+      let res;
+      try {
+        res = await _call('fin_init_master');
+      } catch (e) {
+        console.warn('initMaster API failed, using MOCK:', e.message);
+        res = {
+          vendors: _MOCK_DETAIL.vendors,
+          categories: _MOCK_DETAIL.categories,
+          vendorRules: _MOCK_DETAIL.vendorRules,
+        };
+      }
 
-      _S().vendors = res.vendors;
-      _S().categories = res.categories;
-      _S().vendorRules = res.vendorRules;
+      _S().vendors = res.vendors || [];
+      _S().categories = res.categories || [];
+      _S().vendorRules = res.vendorRules || [];
       _S()._masterReady = true;
 
       return res;
@@ -226,20 +250,22 @@ const API = (() => {
   // API CALL WRAPPER
   // ═══════════════════════════════════════
 
-  /** Base API call — MOCK for now, replace with fetch later */
-  async function _call(action, body) {
-    // TODO: Replace with real fetch when connecting DB
-    // const url = 'https://ahvzblrfzhtrjhvbzdhg.supabase.co/functions/v1/finance';
-    // const res = await fetch(url, {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${_S().token}` },
-    //   body: JSON.stringify({ action, ...body }),
-    // });
-    // if (!res.ok) throw new Error('API error: ' + res.status);
-    // return res.json();
+  /** Base API call — fetch to Edge Function */
+  const _API_URL = 'https://ahvzblrfzhtrjhvbzdhg.supabase.co/functions/v1/finance';
 
-    console.log('[API mock]', action, body);
-    return { success: true, data: null };
+  async function _call(action, body = {}) {
+    const token = _S().token || localStorage.getItem('spg_token') || '';
+    const res = await fetch(_API_URL + '?action=' + action, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, ...body }),
+    });
+    const json = await res.json();
+    if (!json.success) {
+      const msg = json.error?.message || 'API error';
+      throw new Error(msg);
+    }
+    return json.data;
   }
 
   // ═══════════════════════════════════════
@@ -308,7 +334,7 @@ const API = (() => {
   /** Get transactions — paginated */
   async function getTransactions(filters = {}) {
     const key = '_tx_' + (filters.type || 'log');
-    if (_loading[key]) return { rows: S[key] || [], hasMore: false };
+    if (_loading[key]) return { rows: _S()[key] || [], hasMore: false };
     _loading[key] = true;
     try {
       // MOCK — replace with: const res = await _call('fin_get_transactions', filters);
@@ -326,12 +352,12 @@ const API = (() => {
       const hasMore = start + perPage < source.length;
 
       if (page === 1) {
-        S[key] = rows;
+        _S()[key] = rows;
       } else {
-        S[key] = (S[key] || []).concat(rows);
+        _S()[key] = (_S()[key] || []).concat(rows);
       }
 
-      return { rows: S[key], hasMore };
+      return { rows: _S()[key], hasMore };
     } finally {
       _loading[key] = false;
     }
@@ -401,41 +427,54 @@ const API = (() => {
   // CRUD — Save → wait DB → update memory
   // ═══════════════════════════════════════
 
-  /** Create bill → return full bill object (DB generates bill_no) */
+  /** Create bill → call API → return full bill object (DB generates bill_no) */
   async function createBill(data) {
-    // MOCK — replace with: const res = await _call('fin_create_bill', data);
-    await _mockDelay(400);
+    try {
+      const res = await _call('fin_create_bill', data);
 
-    const newBill = {
-      id: 'B-' + Date.now(),
-      date: data.issue_date || App.today(),
-      bill_no: 'FIN-' + String((_MOCK_BILLS.length + 50 + 1)).padStart(4, '0'),
-      supplier_id: data.supplier_id,
-      supplier_name: data.supplier_name || 'Unknown',
-      inv_no: data.inv_no || '',
-      amount: data.total || 0,
-      balance: data.total || 0,
-      due_date: data.due_date || '',
-      has_file: false,
-      status: 'Open',
-      updated_at: new Date().toISOString(),
-    };
+      // Update memory — prepend to bills list
+      if (res.bill && _S()._bills) {
+        _S()._bills.unshift(res.bill);
+      }
 
-    // Update memory — prepend to bills list
-    if (_S()._bills) {
-      _S()._bills.unshift(newBill);
+      // Store bill detail in memory for immediate display
+      _S()._billDetail = res;
+
+      return res;
+    } catch (e) {
+      // Fallback to MOCK if API fails
+      console.warn('createBill API failed, using MOCK:', e.message);
+      await _mockDelay(400);
+
+      const newBill = {
+        id: 'B-' + Date.now(),
+        date: data.issue_date || App.today(),
+        bill_no: 'MOCK-' + Date.now(),
+        supplier_id: data.supplier_id,
+        supplier_name: data.supplier_name || 'Unknown',
+        inv_no: data.inv_no || '',
+        amount: data.total || 0,
+        balance: data.total || 0,
+        due_date: data.due_date || '',
+        has_file: false,
+        status: 'Open',
+        updated_at: new Date().toISOString(),
+      };
+
+      if (_S()._bills) _S()._bills.unshift(newBill);
+      _MOCK_BILLS.unshift(newBill);
+
+      const detail = {
+        bill: newBill,
+        lineItems: data.lineItems || [],
+        payments: [],
+        attachments: [],
+        sourceDoc: { url: null, linked: false },
+        allocation: data.allocation || 'self',
+      };
+      _S()._billDetail = detail;
+      return detail;
     }
-    _MOCK_BILLS.unshift(newBill);
-
-    // Return full bill object + line items for Bill Detail page
-    return {
-      bill: newBill,
-      lineItems: data.lineItems || [],
-      payments: [],
-      attachments: [],
-      sourceDoc: { url: null, linked: false },
-      allocation: data.allocation || 'self',
-    };
   }
 
   /** Create sale transaction */

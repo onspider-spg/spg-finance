@@ -1,4 +1,4 @@
-/** Version 1.3.2 | 13 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 1.3.3 | 13 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /** SPG Finance — scr_tx_fin.js — Transaction screens */
 (() => {
 const esc=App.esc,fm=App.formatMoney,sb=App.statusBadge;
@@ -29,7 +29,7 @@ groupedTx:[
 };
 function dateRange(){const t=new Date(),f=new Date(t);f.setDate(f.getDate()-30);return{from:f.toISOString().split('T')[0],to:t.toISOString().split('T')[0]};}
 function reconBadge(v){if(!v)return '';const c={'Match':'var(--g)','Group Match':'var(--b)','Unmatch':'var(--r)'};return `<span style="font-size:var(--fs-xs);color:${c[v]||'var(--t3)'};font-weight:600">${esc(v)}</span>`;}
-const TW='max-width:1400px;margin:0 auto';
+const TW='max-width:1000px;margin:0 auto';
 let _sortState={};
 function _sortTable(tid,key){const table=document.getElementById(tid);if(!table)return;const tbody=table.querySelector('tbody');if(!tbody)return;const rows=Array.from(tbody.querySelectorAll('tr'));const ths=Array.from(table.querySelectorAll('th'));let idx=-1;ths.forEach((th,i)=>{if(th.getAttribute('data-key')===key)idx=i;});if(idx<0)return;const sk=tid+'_'+key;_sortState[sk]=!_sortState[sk];const asc=_sortState[sk];rows.sort((a,b)=>{const aV=(a.cells[idx]?.textContent||'').trim().replace(/[$,+]/g,'');const bV=(b.cells[idx]?.textContent||'').trim().replace(/[$,+]/g,'');const aN=parseFloat(aV),bN=parseFloat(bV);if(!isNaN(aN)&&!isNaN(bN))return asc?aN-bN:bN-aN;return asc?aV.localeCompare(bV):bV.localeCompare(aV);});rows.forEach(r=>tbody.appendChild(r));}
 function sth(label,key,tid){return `<th data-key="${key}" style="cursor:pointer" onclick="ScrTx._sortTable('${tid}','${key}')">${esc(label)} <span class="s">⇅</span></th>`;}

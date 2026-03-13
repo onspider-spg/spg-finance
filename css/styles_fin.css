@@ -1,4 +1,4 @@
-/* Version 1.6.1 | 12 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/* Version 1.6.2 | 13 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /* ═══════════════════════════════════════════
    SPG Finance Module — styles_fin.css
    Desktop-first · System Font · MYOB Purple
@@ -180,34 +180,25 @@ html, body {
 /* Collapsed state */
 .sd.cl { width: var(--sidebar-w-cl); min-width: var(--sidebar-w-cl); }
 
-/* Toggle button — fixed position, pure CSS, no JS positioning */
-.stg-btn {
-  position: fixed;
-  top: 114px;
-  left: 169px;
-  width: 22px;
-  height: 22px;
-  border: none;
-  background: var(--acc);
-  border-radius: 50%;
-  cursor: pointer;
-  font-size: 10px;
-  color: #fff;
+/* Toggle button — inside sidebar, top position */
+.sd-toggle {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 1px 4px rgba(0,0,0,.15);
-  z-index: 9998;
-  transition: left .2s, background .15s;
-  padding: 0;
-  font-family: inherit;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--acc);
+  color: #fff;
+  font-size: 10px;
+  cursor: pointer;
+  margin: 8px auto 4px;
+  transition: background .15s;
+  flex-shrink: 0;
 }
-.stg-btn:hover { background: var(--acc3); }
+.sd-toggle:hover { background: var(--acc3); }
 
-/* When sidebar is collapsed, move button to match */
-body.sd-collapsed .stg-btn {
-  left: 31px;
-}
+.cl .sd-toggle { margin: 8px auto 4px; }
 
 /* Sidebar item */
 .si {
@@ -722,7 +713,6 @@ body.sd-collapsed .stg-btn {
   .sd .sg-head { padding: 6px 0; justify-content: center; margin: 0; }
   .sd .sf .sit { display: none; }
   .sd .sg-sub { left: var(--sidebar-w-cl); }
-  .stg { display: none; }
   .ct { padding: 12px; }
   .tb { padding: 8px 12px; }
 }

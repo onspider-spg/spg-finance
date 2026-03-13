@@ -1,4 +1,4 @@
-/** Version 1.1 | 13 MAR 2026 | Siam Palette Group */
+/** Version 1.2 | 13 MAR 2026 | Siam Palette Group | Created 13 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — api_fin.js
@@ -272,32 +272,44 @@ const API = (() => {
   // SCREEN DATA — Memory-first + Silent Refresh
   // ═══════════════════════════════════════
 
-  /** Get bills — paginated, filter, sort */
+  /** Get bills — paginated, filter, sort → DB จริง */
   async function getBills(filters = {}) {
-    if (_loading.bills) return { rows: _S()._bills || [], hasMore: false, summary: _billSummary() };
+    if (_loading.bills) return { rows: _S()._bills || [], hasMore: false, summary: _S()._billSummary || {} };
     _loading.bills = true;
     try {
-      // MOCK — replace with: const res = await _call('fin_get_bills', filters);
-      const page = filters.page || 1;
-      const perPage = 30;
-      const start = (page - 1) * perPage;
-      const rows = _MOCK_BILLS.slice(start, start + perPage);
-      const hasMore = start + perPage < _MOCK_BILLS.length;
-
-      if (page === 1) {
-        _S()._bills = rows;
-      } else {
-        _S()._bills = (_S()._bills || []).concat(rows);
+      let result;
+      try {
+        result = await _call('fin_get_bills', filters);
+      } catch (e) {
+        console.warn('getBills API failed, using MOCK:', e.message);
+        // Fallback to MOCK
+        const page = filters.page || 1;
+        const perPage = 30;
+        const start = (page - 1) * perPage;
+        const rows = _MOCK_BILLS.slice(start, start + perPage);
+        result = {
+          rows: rows,
+          hasMore: start + perPage < _MOCK_BILLS.length,
+          summary: _billSummaryFromMock(),
+        };
       }
 
-      return { rows: _S()._bills, hasMore, summary: _billSummary() };
+      const page = filters.page || 1;
+      if (page === 1) {
+        _S()._bills = result.rows;
+      } else {
+        _S()._bills = (_S()._bills || []).concat(result.rows);
+      }
+      _S()._billSummary = result.summary;
+
+      return { rows: _S()._bills, hasMore: result.hasMore, summary: result.summary };
     } finally {
       _loading.bills = false;
     }
   }
 
-  function _billSummary() {
-    const bills = _S()._bills || [];
+  function _billSummaryFromMock() {
+    const bills = _MOCK_BILLS;
     return {
       totalAmount: bills.reduce((s, r) => s + Math.abs(r.amount), 0),
       balanceDue: bills.reduce((s, r) => s + r.balance, 0),
@@ -305,30 +317,35 @@ const API = (() => {
     };
   }
 
-  /** Get bill detail */
+  /** Get bill detail → DB จริง */
   async function getBillDetail(billId) {
     // Check memory first
     if (_S()._billDetail && _S()._billDetail.bill && _S()._billDetail.bill.id === billId) {
       return _S()._billDetail;
     }
-    // MOCK — replace with: const res = await _call('fin_get_bill_detail', { bill_id: billId });
-    const bill = _MOCK_BILLS.find(b => b.id === billId || b.bill_no === billId);
-    if (!bill) return null;
-
-    const detail = {
-      bill: bill,
-      lineItems: [
-        { desc: 'Food supplies', category: '27002 Purchases', amount: 750.00, gst: 0, tax_code: 'FRE', cost_owner: bill.supplier_name },
-        { desc: 'Beverage', category: '27002 Purchases', amount: 140.55, gst: 0, tax_code: 'FRE', cost_owner: bill.supplier_name },
-      ],
-      payments: bill.status === 'Closed' ? [{ date: '2026-03-10', amount: bill.amount, method: 'Bank Transfer', ref: 'PAY-001' }] : [],
-      attachments: bill.has_file ? [{ name: 'invoice.pdf', size: '0.45 MB', url: '#' }] : [],
-      sourceDoc: { url: '#', linked: bill.has_file },
-      allocation: 'self',
-    };
-
-    _S()._billDetail = detail;
-    return detail;
+    try {
+      const detail = await _call('fin_get_bill_detail', { bill_id: billId });
+      _S()._billDetail = detail;
+      return detail;
+    } catch (e) {
+      console.warn('getBillDetail API failed, using MOCK:', e.message);
+      // Fallback to MOCK
+      const bill = _MOCK_BILLS.find(b => b.id === billId || b.bill_no === billId);
+      if (!bill) return null;
+      const detail = {
+        bill: bill,
+        lineItems: [
+          { desc: 'Food supplies', category: '27002 Purchases', amount: 750.00, gst: 0, tax_code: 'FRE', cost_owner: bill.supplier_name },
+          { desc: 'Beverage', category: '27002 Purchases', amount: 140.55, gst: 0, tax_code: 'FRE', cost_owner: bill.supplier_name },
+        ],
+        payments: bill.status === 'Closed' ? [{ date: '2026-03-10', amount: bill.amount, method: 'Bank Transfer', ref: 'PAY-001' }] : [],
+        attachments: bill.has_file ? [{ name: 'invoice.pdf', size: '0.45 MB', url: '#' }] : [],
+        sourceDoc: { url: '#', linked: bill.has_file },
+        allocation: 'self',
+      };
+      _S()._billDetail = detail;
+      return detail;
+    }
   }
 
   /** Get transactions — paginated */

@@ -1,4 +1,4 @@
-/** Version 1.9.6 | 13 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 1.9.7 | 13 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — app_fin.js
@@ -292,7 +292,8 @@ const App = (() => {
     const el = document.getElementById('sidebar');
     if (!el) return;
 
-    let html = '';
+    // Toggle button at top of sidebar
+    let html = '<div class="sd-toggle" onclick="App._toggleSidebar()"><span class="sd-toggle-icon">◂</span></div>';
 
     NAV.forEach(n => {
       if (n === '_spacer') {
@@ -329,7 +330,7 @@ const App = (() => {
 
     // Footer
     html += `<div class="sf">
-      <div style="font-size:9px;color:var(--t4);padding:2px 0;margin-bottom:4px">v1.9.6 | 13 Mar 2026 AEDT</div>
+      <div style="font-size:9px;color:var(--t4);padding:2px 0;margin-bottom:4px">v1.9.7 | 13 Mar 2026 AEDT</div>
       <a href="https://onspider-spg.github.io/spg-home/#dashboard"><span style="font-size:12px">←</span><span class="sit"> Back to Home</span></a>
       <a href="https://onspider-spg.github.io/spg-home/#logout" class="danger"><span style="font-size:12px">→</span><span class="sit"> Log out</span></a>
     </div>`;
@@ -382,12 +383,12 @@ const App = (() => {
 
   function _toggleSidebar() {
     const sd = document.getElementById('sidebar');
-    const btn = document.getElementById('stg-b');
     if (!sd) return;
     _sidebarCollapsed = !_sidebarCollapsed;
     sd.classList.toggle('cl', _sidebarCollapsed);
     document.body.classList.toggle('sd-collapsed', _sidebarCollapsed);
-    if (btn) btn.textContent = _sidebarCollapsed ? '▸' : '◂';
+    const icon = sd.querySelector('.sd-toggle-icon');
+    if (icon) icon.textContent = _sidebarCollapsed ? '▸' : '◂';
   }
 
   function _highlightNav(route) {

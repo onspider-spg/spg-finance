@@ -60,7 +60,7 @@ const App = (() => {
   // ── NAV STRUCTURE (from wireframe Part 1 + Part 2) ──
   const NAV = [
     { id: 'dashboard', icon: '◇', label: 'Dashboard', type: 'item' },
-    '_spacer_30',
+    '_spacer',
     { id: 'create', icon: '＋', label: 'Create', type: 'group', items: [
       { id: 'cr_sale', label: 'Sale' },
       { id: 'cr_bill', label: 'Bill / Invoice' },
@@ -71,7 +71,6 @@ const App = (() => {
       { id: 'cr_upload', label: 'Upload Create' },
       { id: 'cr_import', label: 'Import' },
     ]},
-    '_spacer',
     { id: 'transactions', icon: '☰', label: 'Transactions', type: 'group', items: [
       { id: 'tx_log', label: 'Transaction Log' },
       { id: 'tx_sale', label: 'Sale' },

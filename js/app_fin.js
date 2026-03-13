@@ -1,4 +1,4 @@
-/** Version 1.9.7.3 | 13 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 1.9.7.4 | 13 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — app_fin.js
@@ -293,7 +293,7 @@ const App = (() => {
     if (!el) return;
 
     // Toggle button at top of sidebar
-    let html = '<div class="sd-toggle" onclick="App._toggleSidebar()"><span class="sd-toggle-icon">☰</span></div>';
+    let html = '<div class="sd-top"><div class="sd-toggle" onclick="App._toggleSidebar()"><span class="sd-toggle-icon">☰</span></div></div>';
 
     NAV.forEach(n => {
       if (n === '_spacer') {

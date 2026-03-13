@@ -1,4 +1,4 @@
-/** Version 1.6.1 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 1.6.2 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_input_fin.js
@@ -947,6 +947,8 @@
 
       const dueDateCheck = document.getElementById('cb_due_date');
       if (!dueDateCheck || !dueDateCheck.value) { _vFail('Please enter Due Date'); return; }
+
+      if (dueDateCheck.value < issueDateCheck.value) { _vFail('Due Date cannot be before Issue Date'); return; }
 
       const accrualCheck = document.getElementById('cb_accrual');
       if (!accrualCheck || !accrualCheck.value) { _vFail('Please enter Accrual Month'); return; }

@@ -1,4 +1,4 @@
-/* Version 1.6.4 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/* Version 1.6.5 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /* ═══════════════════════════════════════════
    SPG Finance Module — styles_fin.css
    Desktop-first · System Font · MYOB Purple
@@ -88,13 +88,14 @@ html, body {
   flex-direction: column;
   height: 100vh;
   height: 100dvh;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .fin-body {
   display: flex;
   flex: 1;
-  overflow: visible;
+  min-height: 0;
+  overflow: hidden;
   position: relative;
 }
 

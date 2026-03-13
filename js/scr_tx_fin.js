@@ -1,4 +1,4 @@
-/** Version 1.5 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 1.5.1 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_tx_fin.js
@@ -324,56 +324,106 @@ function renderTxBillDetail() {
   const li = detail.lineItems || [];
   const alloc = detail.allocation || 'self';
 
-  // Build line items table
-  const liRows = li.length > 0 ? li.map(l =>
-    `<tr><td>${esc(l.desc || l.description || '')}</td><td>${esc(l.category || l.category_display || '')}</td><td style="text-align:right">${fm(l.amount)}</td><td style="text-align:right">${fm(l.gst)}</td><td>${esc(l.tax_code)}</td></tr>`
-  ).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--t3);padding:12px">No line items</td></tr>';
-
   const subtotal = li.reduce((s, l) => s + (Number(l.amount) || 0), 0);
   const tax = li.reduce((s, l) => s + (Number(l.gst) || 0), 0);
   const total = subtotal + tax;
-  const isPaid = b.status === 'Closed';
+  const paid = total - (Number(b.balance) || 0);
+
+  // Line items rows (readonly)
+  const liRows = li.length > 0 ? li.map(l =>
+    `<tr>
+      <td style="padding:8px 10px">${esc(l.desc || l.description || '')}</td>
+      <td style="padding:8px 10px;font-size:var(--fs-sm)">${esc(l.category || l.category_display || '')}</td>
+      <td style="padding:8px 10px;text-align:right;font-weight:500">${fm(l.amount)}</td>
+      <td style="padding:8px 10px;text-align:right;color:var(--t3)">${fm(l.gst)}</td>
+      <td style="padding:8px 10px;font-size:var(--fs-sm)">${esc(l.tax_code || 'FRE')}</td>
+    </tr>`
+  ).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--t3);padding:16px">No line items</td></tr>';
 
   return {
-    tb: `<div class="tb"><button class="bg" onclick="App.go('tx_bill')">← Bills</button><div class="tb-t">Bill Detail — ${esc(b.bill_no)}</div></div>`,
-    ct: `<div style="max-width:1060px;margin:0 auto">
-      <div class="card" style="margin-bottom:12px">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
-          <div>
-            <div style="font-size:var(--fs-h1);font-weight:700">${esc(b.bill_no)}</div>
-            <div style="font-size:var(--fs-sm);color:var(--t3)">${esc(alloc)} allocation</div>
+    tb: `<div class="tb"><button class="bg" onclick="App.go('tx_bill')">← Bills</button><div class="tb-t">Bill Detail — ${esc(b.bill_no)}</div><div style="flex:1"></div>${sb(b.status)}</div>`,
+    ct: `<div style="max-width:860px;margin:0 auto">
+      <!-- Main detail card — same layout as Create Bill -->
+      <div class="card">
+        <!-- 2-column header fields -->
+        <div style="display:flex;gap:30px">
+          <!-- Left column -->
+          <div style="width:300px">
+            <div class="fg">
+              <label class="lb">Transaction Type</label>
+              <div class="inp" style="background:var(--bg2);width:280px">Expense / Bill</div>
+            </div>
+            <div class="fg">
+              <label class="lb">Supplier</label>
+              <div class="inp" style="background:var(--bg2);font-weight:600;width:280px">${esc(b.supplier_name || '—')}</div>
+            </div>
+            <div class="fg">
+              <label class="lb">Supplier Invoice Number</label>
+              <div class="inp" style="background:var(--bg2);width:280px">${esc(b.inv_no || '—')}</div>
+            </div>
           </div>
-          <div>${sb(b.status)}</div>
-        </div>
-        <div class="fr">
-          <div class="fg"><label class="lb">Supplier</label><div style="font-weight:600">${esc(b.supplier_name)}</div></div>
-          <div class="fg"><label class="lb">Bill Number</label><div>${esc(b.bill_no)}</div></div>
-        </div>
-        <div class="fr">
-          <div class="fg"><label class="lb">Invoice No</label><div>${esc(b.inv_no || '—')}</div></div>
-          <div class="fg"><label class="lb">Brand</label><div>${esc(b.brand || '—')}</div></div>
-        </div>
-        <div class="fr">
-          <div class="fg"><label class="lb">Issue Date</label><div>${_fmtDate(b.date)}</div></div>
-          <div class="fg"><label class="lb">Due Date</label><div>${_fmtDate(b.due_date) || '—'}</div></div>
-        </div>
-        ${b.notes ? `<div class="fg"><label class="lb">Notes</label><div style="color:var(--t2)">${esc(b.notes)}</div></div>` : ''}
-      </div>
 
-      <div class="card" style="padding:0;margin-bottom:12px">
-        <table class="tbl">
-          <thead><tr><th>Description</th><th>Category</th><th style="text-align:right">Amount</th><th style="text-align:right">GST</th><th>Tax code</th></tr></thead>
+          <!-- Right column -->
+          <div style="flex:1">
+            <div style="display:flex;align-items:center;margin-bottom:10px;justify-content:flex-end;gap:10px">
+              <span class="lb" style="margin:0">Bill Number</span>
+              <div class="inp" style="background:var(--bg3);color:var(--t3);width:180px;font-weight:600">${esc(b.bill_no)}</div>
+            </div>
+            <div style="display:flex;align-items:center;margin-bottom:10px;justify-content:flex-end;gap:10px">
+              <span class="lb" style="margin:0">Issue Date</span>
+              <div class="inp" style="background:var(--bg2);width:180px">${_fmtDate(b.date)}</div>
+            </div>
+            <div style="display:flex;align-items:center;margin-bottom:10px;justify-content:flex-end;gap:10px">
+              <span class="lb" style="margin:0">Due Date</span>
+              <div class="inp" style="background:var(--bg2);width:180px">${_fmtDate(b.due_date) || '—'}</div>
+            </div>
+            <div style="display:flex;align-items:center;margin-bottom:10px;justify-content:flex-end;gap:10px">
+              <span class="lb" style="margin:0">Accrual Month</span>
+              <div class="inp" style="background:var(--bg2);width:180px">${b.date ? b.date.substring(0, 7) : '—'}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Allocation divider -->
+        <div style="display:flex;align-items:center;margin:12px 0">
+          <hr style="border:none;border-top:1px solid #eee;flex:1;margin:0">
+          <div style="padding:0 8px;font-size:var(--fs-xs);color:var(--t4)">Allocation: ${esc(alloc)}</div>
+        </div>
+
+        <!-- Line Items Table (readonly) -->
+        <table style="width:100%;border-collapse:collapse;font-size:var(--fs-body);margin-top:10px">
+          <thead><tr>
+            <th style="text-align:left;padding:8px;font-weight:600;font-size:var(--fs-sm);width:30%">Description</th>
+            <th style="text-align:left;padding:8px;font-weight:600;font-size:var(--fs-sm);width:26%">Category</th>
+            <th style="text-align:left;padding:8px;font-weight:600;font-size:var(--fs-sm);width:18%">Amount ($)</th>
+            <th style="text-align:left;padding:8px;font-weight:600;font-size:var(--fs-sm);width:10%">GST</th>
+            <th style="text-align:left;padding:8px;font-weight:600;font-size:var(--fs-sm);width:14%">Tax code</th>
+          </tr></thead>
           <tbody>${liRows}</tbody>
         </table>
+
+        <!-- Notes + Totals -->
+        <div style="display:flex;gap:16px;margin-top:12px">
+          <div style="flex:1">
+            ${b.notes ? `<div style="font-size:var(--fs-xs);color:var(--t3);margin-bottom:2px">Notes</div><div style="padding:8px;border:1px solid var(--bd);border-radius:var(--rd);font-size:var(--fs-body);background:var(--bg2);min-height:40px">${esc(b.notes)}</div>` : ''}
+          </div>
+          <div style="width:240px;text-align:right;font-size:var(--fs-body)">
+            <div style="display:flex;justify-content:flex-end;gap:16px;padding:4px 0"><b>Subtotal</b><b>${fm(subtotal)}</b></div>
+            <div style="display:flex;justify-content:flex-end;gap:16px;padding:4px 0;color:var(--t2)">Tax <span>${fm(tax)}</span></div>
+            <div style="display:flex;justify-content:flex-end;gap:16px;padding:4px 0"><b>Total</b><b>${fm(total)}</b></div>
+            <div style="display:flex;justify-content:flex-end;gap:16px;padding:4px 0;color:var(--t2)">Amount paid <span>${fm(paid)}</span></div>
+            <div style="display:flex;justify-content:flex-end;gap:16px;padding:6px 0;font-weight:700;color:${b.status === 'Closed' ? 'var(--g)' : 'var(--r)'}">Balance due <span>${b.status === 'Closed' ? fm(0) : fm(b.balance)}</span></div>
+          </div>
+        </div>
       </div>
 
-      <div class="card">
-        <div style="text-align:right;margin:8px 0">
-          <div>Subtotal <b>${fm(subtotal)}</b></div>
-          <div style="color:var(--t3)">Tax ${fm(tax)}</div>
-          <div style="font-weight:700;font-size:14px">Total ${fm(total)}</div>
-          <div style="font-weight:700;font-size:14px;color:${isPaid ? 'var(--g)' : 'var(--r)'}">${isPaid ? 'Paid in full' : 'Balance due ' + fm(b.balance)}</div>
-        </div>
+      <!-- Action buttons -->
+      <div style="display:flex;align-items:center;gap:6px;padding:8px 0">
+        <button class="btn bo">View PDF</button>
+        <button class="btn bo">Print</button>
+        <div style="flex:1"></div>
+        <button class="btn bo" onclick="App.go('tx_bill')">Back to Bills</button>
+        <button class="bs">Record Payment</button>
       </div>
     </div>`,
   };

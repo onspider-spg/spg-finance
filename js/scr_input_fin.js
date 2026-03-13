@@ -1,4 +1,4 @@
-/** Version 1.5 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 1.6 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_input_fin.js
@@ -85,6 +85,11 @@
 
           <div class="fa">Auto: Income → Revenue → selected channel</div>
 
+          <div style="display:flex;align-items:center;gap:10px;margin:8px 0;font-size:var(--fs-sm)">
+            <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="cs_has_gst" checked style="accent-color:var(--acc)" onchange="ScrInput._calcSaleGST()"> Has GST</label>
+            <span style="color:var(--t4);font-size:var(--fs-xs)">(Amount is always GST inclusive when checked)</span>
+          </div>
+
           <div class="fr">
             <div class="fg">
               <label class="lb">Amount ($) *</label>
@@ -139,9 +144,14 @@
   function _calcSaleGST() {
     const amtEl = document.getElementById('cs_amount');
     const gstEl = document.getElementById('cs_gst');
+    const hasGst = document.getElementById('cs_has_gst');
     if (!amtEl || !gstEl) return;
     const val = parseFloat(amtEl.value.replace(/,/g, '')) || 0;
-    gstEl.value = (val / 11).toFixed(2);
+    if (hasGst && hasGst.checked && val > 0) {
+      gstEl.value = (val / 11).toFixed(2);
+    } else {
+      gstEl.value = '0.00';
+    }
   }
 
   async function _saveSale(btnEl, mode) {
@@ -153,20 +163,30 @@
     try {
       // Validate
       const amtEl = document.getElementById('cs_amount');
-      const amt = parseFloat((amtEl?.value || '').replace(/,/g, '')) || 0;
-      if (amt <= 0) {
+      const inputAmt = parseFloat((amtEl?.value || '').replace(/,/g, '')) || 0;
+      if (inputAmt <= 0) {
         App.toast('Please enter an amount');
         btnEl.disabled = false;
         btnEl.textContent = origText;
         return;
       }
 
-      // Collect form data
+      // Calculate correct amount_ex_gst based on GST toggle
+      const hasGst = document.getElementById('cs_has_gst')?.checked;
+      let amountExGst, gst;
+      if (hasGst) {
+        gst = parseFloat((inputAmt / 11).toFixed(2));
+        amountExGst = parseFloat((inputAmt - gst).toFixed(2));
+      } else {
+        gst = 0;
+        amountExGst = inputAmt;
+      }
+
       const data = {
         brand: document.getElementById('cs_brand')?.value || '',
         channel: document.getElementById('cs_channel')?.value || '',
-        amount: amt,
-        gst: parseFloat(document.getElementById('cs_gst')?.value || '0'),
+        amount: amountExGst,
+        gst: gst,
         date: document.getElementById('cs_date')?.value || App.today(),
         bank_account_id: document.getElementById('cs_bank')?.value || null,
       };
@@ -184,7 +204,7 @@
         const tbody = document.getElementById('cs_recent');
         if (tbody) {
           const row = document.createElement('tr');
-          row.innerHTML = `<td>${App.formatDate(data.date)}</td><td>${App.esc(data.channel)}</td><td>${App.esc(data.brand)}</td><td style="text-align:right;color:var(--g)">+${App.formatMoney(data.amount)}</td>`;
+          row.innerHTML = `<td>${App.formatDate(data.date)}</td><td>${App.esc(data.channel)}</td><td>${App.esc(data.brand)}</td><td style="text-align:right;color:var(--g)">+${App.formatMoney(inputAmt)}</td>`;
           tbody.insertBefore(row, tbody.firstChild);
         }
       } else {
@@ -381,10 +401,27 @@
 
           <hr style="border:none;border-top:1px solid var(--bd2);margin:12px 0">
 
+          <div style="display:flex;gap:12px;margin:8px 0;font-size:var(--fs-sm);align-items:center">
+            <span style="color:var(--t3)">Amounts are</span>
+            <label style="cursor:pointer"><input type="radio" name="cd_taxmode" value="exclusive" checked style="accent-color:var(--acc)" onchange="ScrInput._calcDebitGST()"> Tax exclusive</label>
+            <label style="cursor:pointer"><input type="radio" name="cd_taxmode" value="inclusive" style="accent-color:var(--acc)" onchange="ScrInput._calcDebitGST()"> Tax inclusive</label>
+          </div>
+
           <div class="fr">
             <div class="fg">
               <label class="lb">Debit Amount ($) *</label>
-              <input class="inp" id="cd_amount" style="font-size:15px;font-weight:700;text-align:right;padding:8px" placeholder="0.00">
+              <input class="inp" id="cd_amount" style="font-size:15px;font-weight:700;text-align:right;padding:8px" placeholder="0.00" oninput="ScrInput._calcDebitGST()">
+            </div>
+            <div class="fg">
+              <label class="lb">GST</label>
+              <input class="inp" id="cd_gst" style="text-align:right;padding:8px;background:var(--bg3);color:var(--t3)" readonly>
+            </div>
+          </div>
+
+          <div class="fr">
+            <div class="fg">
+              <label class="lb">Tax Code</label>
+              <select class="inp" id="cd_taxcode" onchange="ScrInput._calcDebitGST()"><option value="FRE" data-rate="0">FRE — GST Free</option><option value="GST" data-rate="10">GST — 10%</option><option value="CAP" data-rate="10">CAP — 10%</option></select>
             </div>
             <div class="fg">
               <label class="lb">Bill Number *</label>
@@ -449,11 +486,22 @@
       const invoiceEl = document.getElementById('cd_invoice');
       const originalBillNo = invoiceEl?.value || '';
 
+      // Calculate GST for debit
+      const debitGst = parseFloat(document.getElementById('cd_gst')?.value || '0');
+      const debitMode = document.querySelector('input[name="cd_taxmode"]:checked')?.value || 'exclusive';
+      let debitExGst;
+      if (debitMode === 'inclusive') {
+        debitExGst = parseFloat((amt - debitGst).toFixed(2));
+      } else {
+        debitExGst = amt;
+      }
+
       const data = {
         vendor_id: null,
         vendor_name: supplierEl.value,
         inv_no: document.getElementById('cd_inv_no')?.value || '',
-        amount: amt,
+        amount: debitExGst,
+        gst: debitGst,
         date: document.getElementById('cd_date')?.value || App.today(),
         notes: document.getElementById('cd_notes')?.value || '',
         original_bill_no: originalBillNo,
@@ -468,6 +516,24 @@
     } finally {
       btnEl.disabled = false;
       btnEl.textContent = origText;
+    }
+  }
+
+  function _calcDebitGST() {
+    const amtEl = document.getElementById('cd_amount');
+    const gstEl = document.getElementById('cd_gst');
+    const tcEl = document.getElementById('cd_taxcode');
+    if (!amtEl || !gstEl) return;
+    const val = parseFloat(amtEl.value.replace(/,/g, '')) || 0;
+    const rate = parseFloat(tcEl?.selectedOptions?.[0]?.dataset?.rate || '0');
+    const mode = document.querySelector('input[name="cd_taxmode"]:checked')?.value || 'exclusive';
+
+    if (rate === 0 || val === 0) {
+      gstEl.value = '0.00';
+    } else if (mode === 'inclusive') {
+      gstEl.value = (val - val / (1 + rate / 100)).toFixed(2);
+    } else {
+      gstEl.value = (val * rate / 100).toFixed(2);
     }
   }
 
@@ -542,6 +608,7 @@
   // SHARED: ALLOCATION LAYOUT POPUP
   // ══════════════════════════════════════════
   let _billAllocMode = 'self'; // 'self' or 'ob'
+  let _billTaxMode = 'exclusive'; // 'inclusive' or 'exclusive'
 
   function _toggleAllocPopup() {
     const p = document.getElementById('al_pop');
@@ -621,6 +688,13 @@
                   <input class="inp" id="cb_accrual" type="month" value="${today().substring(0,7)}" style="width:180px">
                 </div>
               </div>
+            </div>
+
+            <!-- Tax mode -->
+            <div style="display:flex;gap:12px;margin:10px 0;font-size:var(--fs-sm);align-items:center">
+              <span style="color:var(--t3)">Amounts are</span>
+              <label style="cursor:pointer"><input type="radio" name="cb_taxmode" value="exclusive" checked style="accent-color:var(--acc)" onchange="ScrInput._setBillTaxMode('exclusive')"> Tax exclusive</label>
+              <label style="cursor:pointer"><input type="radio" name="cb_taxmode" value="inclusive" style="accent-color:var(--acc)" onchange="ScrInput._setBillTaxMode('inclusive')"> Tax inclusive</label>
             </div>
 
             <!-- Allocation Layout divider -->
@@ -764,36 +838,54 @@
 
   // ── GST + Totals calculation ──
   function _recalcBillRow(wrapId) {
-    // Extract row index from wrapId (format: tcw_0, tcw_1, ...)
     const idx = wrapId.replace('tcw_', '');
     const amtEl = document.getElementById('cb_amt_' + idx);
     const gstEl = document.getElementById('cb_gst_' + idx);
     const tcWrap = document.getElementById(wrapId);
     if (!amtEl || !gstEl || !tcWrap) return;
 
-    const amount = parseFloat(amtEl.value.replace(/,/g, '')) || 0;
+    const inputAmt = parseFloat(amtEl.value.replace(/,/g, '')) || 0;
     const tcInput = tcWrap.querySelector('.tc-val');
     const rate = parseFloat(tcInput?.dataset.rate || '0');
 
-    // GST = amount * rate / 100
-    const gst = amount * rate / 100;
-    gstEl.value = gst.toFixed(2);
+    if (_billTaxMode === 'inclusive' && rate > 0) {
+      // Inclusive: inputAmt includes GST → GST = inputAmt / (1 + rate/100) * rate/100
+      const gst = inputAmt - (inputAmt / (1 + rate / 100));
+      gstEl.value = gst.toFixed(2);
+    } else {
+      // Exclusive: GST = inputAmt * rate / 100
+      const gst = inputAmt * rate / 100;
+      gstEl.value = gst.toFixed(2);
+    }
 
     _recalcBillTotals();
   }
 
+  function _setBillTaxMode(mode) {
+    _billTaxMode = mode;
+    // Recalculate all rows with new mode
+    for (let i = 0; i < 100; i++) {
+      const tcWrap = document.getElementById('tcw_' + i);
+      if (!tcWrap) continue;
+      _recalcBillRow('tcw_' + i);
+    }
+  }
+
   function _recalcBillTotals() {
-    let totalExGST = 0;
+    let totalInput = 0;
     let totalTax = 0;
 
-    // Sum all rows
     for (let i = 0; i < 100; i++) {
       const amtEl = document.getElementById('cb_amt_' + i);
       const gstEl = document.getElementById('cb_gst_' + i);
       if (!amtEl) continue;
-      totalExGST += parseFloat(amtEl.value.replace(/,/g, '')) || 0;
+      totalInput += parseFloat(amtEl.value.replace(/,/g, '')) || 0;
       totalTax += parseFloat(gstEl?.value || '0');
     }
+
+    // If inclusive: Amount column = total incl GST, so ex GST = input - tax
+    // If exclusive: Amount column = ex GST, so ex GST = input
+    const totalExGST = _billTaxMode === 'inclusive' ? totalInput - totalTax : totalInput;
 
     const totalsEl = document.getElementById('cb_totals');
     if (totalsEl) totalsEl.innerHTML = _buildTotalsHTML(totalExGST, totalTax);
@@ -1239,6 +1331,8 @@
     _saveTransfer,
     _saveDebit,
     // P2b — shared
+    _setBillTaxMode,
+    _calcDebitGST,
     _toggleTaxDD,
     _pickTaxCode,
     _toggleAllocPopup,

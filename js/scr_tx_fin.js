@@ -1,4 +1,4 @@
-/** Version 1.4 | 13 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 1.5 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_tx_fin.js
@@ -6,12 +6,13 @@
  * Bill Detail, SD Bridge, Find Transactions
  * ═══════════════════════════════════════════
  *
- * CHANGED v1.3.3 → v1.4:
- * - renderTxBill: fetch from API.getBills() → memory-first + skeleton
- * - renderTxBillDetail: read from App.S._billDetail (set by createBill or API)
- * - Bill List: onLoad fetches from DB, shows skeleton while loading
- * - Bill row click: passes bill_id to detail
- * - Sale, Return, SD Bridge, Find: still MOCK (Step 5+)
+ * CHANGED v1.4 → v1.5:
+ * - Tx Log: MOCK → API.getTransactions({type:'all'}) + skeleton + onLoad
+ * - Tx Sales: MOCK → API.getTransactions({type:'sale'}) + skeleton + onLoad
+ * - Tx Return: MOCK → API.getTransactions({type:'return'}) + skeleton + onLoad
+ * - Find Tx DC tab: MOCK → API.getDebitCredits() async load
+ * - SD Bridge: MOCK → API.getSdPending() + dynamic render + onLoad
+ * - Bills, Bill Detail: unchanged (already DB)
  * ═══════════════════════════════════════════
  */
 (() => {
@@ -61,6 +62,11 @@ function reconBadge(v) {
 const TW = 'max-width:1000px;margin:0 auto';
 let _sortState = {};
 
+/** Skeleton loading row for tables */
+function _skeletonRow(cols) {
+  return `<tr><td colspan="${cols}" style="text-align:center;padding:20px;color:var(--t3)"><div class="fin-spinner" style="margin:0 auto 8px"></div>Loading...</td></tr>`;
+}
+
 function _sortTable(tid, key) {
   const table = document.getElementById(tid);
   if (!table) return;
@@ -100,28 +106,78 @@ function _fmtDate(d) {
 }
 
 // ═══════════════════════════════════════
-// 1. TRANSACTION LOG — still MOCK
+// 1. TRANSACTION LOG — ★ CONNECTED TO DB
 // ═══════════════════════════════════════
+
+/** Render log table rows from data array */
+function _logRows(rows) {
+  if (!rows || rows.length === 0) {
+    return '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--t3)">No transactions found</td></tr>';
+  }
+  return rows.map(r => `<tr><td>${_fmtDate(r.date)}</td><td><a class="lk">${esc(r.ref)}</a></td><td>${esc(r.type)}</td><td>${esc(r.desc)}</td><td>${esc(r.brand)}</td><td>${esc(r.contact)}</td><td style="text-align:right">${fm(r.amount)}</td><td>${reconBadge(r.recon)}</td></tr>`).join('');
+}
+
 function renderTxLog() {
   const dr = dateRange();
-  const rows = TX_MOCK.log.map(r => `<tr><td>${esc(r.date)}</td><td><a class="lk">${esc(r.ref)}</a></td><td>${esc(r.type)}</td><td>${esc(r.desc)}</td><td>${esc(r.brand)}</td><td>${esc(r.contact)}</td><td style="text-align:right">${fm(r.amount)}</td><td>${reconBadge(r.recon)}</td></tr>`).join('');
+  const mem = App.S._tx_log;
+  const hasMem = mem && mem.length > 0;
+  const rows = hasMem ? _logRows(mem) : _skeletonRow(8);
+
   return {
     tb: `<div class="tb"><div class="tb-t">Transaction Log</div><button class="bs" onclick="App.go('rc_bank')">Reconcile</button></div>`,
-    ct: `<div style="${TW}"><div class="card"><div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:6px"><div><div class="fl-l">Type</div><select class="fl" style="width:100px"><option>All</option><option>Income</option><option>Expense</option><option>Transfer</option></select></div><div><div class="fl-l">Brand</div><select class="fl" style="width:120px"><option>All</option><option>Mango Coco</option><option>Flying Tigress</option></select></div><div><div class="fl-l">Status</div><select class="fl" style="width:80px"><option>All</option><option>Paid</option><option>Unpaid</option></select></div><div><div class="fl-l">Date from</div><input class="fl" type="date" value="${dr.from}" style="width:130px"></div><div><div class="fl-l">Date to</div><input class="fl" type="date" value="${dr.to}" style="width:130px"></div><div><div class="fl-l">Search</div><input class="fl" placeholder="" style="width:100px"></div><div style="flex:1"></div><button class="bg" style="color:var(--acc)">Reset</button></div></div><div class="card" style="padding:0"><table class="tbl" id="tbl_log"><thead><tr>${sth('Date', 'date', 'tbl_log')}${sth('Ref no', 'ref', 'tbl_log')}${sth('Type', 'type', 'tbl_log')}${sth('Description', 'desc', 'tbl_log')}${sth('Brand', 'brand', 'tbl_log')}${sth('Contact', 'contact', 'tbl_log')}${sthR('Amount ($)', 'amount', 'tbl_log')}${sth('Reconcile', 'recon', 'tbl_log')}</tr></thead><tbody>${rows}</tbody></table></div><div id="txlog_lm" style="text-align:center;padding:10px;display:none"><button class="btn bo" style="font-size:var(--fs-sm)">Load more</button></div></div>`,
+    ct: `<div style="${TW}"><div class="card"><div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:6px"><div><div class="fl-l">Type</div><select class="fl" style="width:100px"><option>All</option><option>Income</option><option>Expense</option><option>Transfer</option></select></div><div><div class="fl-l">Brand</div><select class="fl" style="width:120px"><option>All</option><option>Mango Coco</option><option>Flying Tigress</option></select></div><div><div class="fl-l">Status</div><select class="fl" style="width:80px"><option>All</option><option>Paid</option><option>Unpaid</option></select></div><div><div class="fl-l">Date from</div><input class="fl" type="date" value="${dr.from}" style="width:130px"></div><div><div class="fl-l">Date to</div><input class="fl" type="date" value="${dr.to}" style="width:130px"></div><div><div class="fl-l">Search</div><input class="fl" placeholder="" style="width:100px"></div><div style="flex:1"></div><button class="bg" style="color:var(--acc)">Reset</button></div></div><div class="card" style="padding:0"><table class="tbl" id="tbl_log"><thead><tr>${sth('Date', 'date', 'tbl_log')}${sth('Ref no', 'ref', 'tbl_log')}${sth('Type', 'type', 'tbl_log')}${sth('Description', 'desc', 'tbl_log')}${sth('Brand', 'brand', 'tbl_log')}${sth('Contact', 'contact', 'tbl_log')}${sthR('Amount ($)', 'amount', 'tbl_log')}${sth('Reconcile', 'recon', 'tbl_log')}</tr></thead><tbody id="log_tbody">${rows}</tbody></table></div><div id="txlog_lm" style="text-align:center;padding:10px;display:none"><button class="btn bo" style="font-size:var(--fs-sm)">Load more</button></div></div>`,
   };
 }
 
+async function _loadLog() {
+  try {
+    const result = await API.getTransactions({ type: 'all', page: 1 });
+    const tbody = document.getElementById('log_tbody');
+    if (tbody) tbody.innerHTML = _logRows(result.rows);
+  } catch (e) {
+    const tbody = document.getElementById('log_tbody');
+    if (tbody) tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--r)">Error: ${esc(e.message)}</td></tr>`;
+  }
+}
+
 // ═══════════════════════════════════════
-// 2. SALES — still MOCK
+// 2. SALES — ★ CONNECTED TO DB
 // ═══════════════════════════════════════
+
+function _saleRows(rows) {
+  if (!rows || rows.length === 0) {
+    return '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--t3)">No sales found</td></tr>';
+  }
+  return rows.map(r => `<tr><td>${_fmtDate(r.date)}</td><td>${esc(r.brand)}</td><td>${esc(r.channel || r.desc || '')}</td><td style="text-align:right;color:var(--g)">+${fm(r.amount)}</td><td style="text-align:right">${fm(r.gst || 0)}</td><td>${sb(r.status)}</td></tr>`).join('');
+}
+
 function renderTxSale() {
   const dr = dateRange();
-  const total = TX_MOCK.sales.reduce((s, r) => s + r.amount, 0);
-  const rows = TX_MOCK.sales.map(r => `<tr><td>${esc(r.date)}</td><td>${esc(r.brand)}</td><td>${esc(r.channel)}</td><td style="text-align:right;color:var(--g)">+${fm(r.amount)}</td><td style="text-align:right">${fm(r.gst)}</td><td>${sb(r.status)}</td></tr>`).join('');
+  const mem = App.S._tx_sale;
+  const hasMem = mem && mem.length > 0;
+  const rows = hasMem ? _saleRows(mem) : _skeletonRow(6);
+  const total = hasMem ? mem.reduce((s, r) => s + (Number(r.amount) || 0), 0) : 0;
+
   return {
     tb: `<div class="tb"><div class="tb-t">Sales</div><button class="bs" onclick="App.go('cr_sale')">+ Record Sale</button></div>`,
-    ct: `<div style="${TW}"><div class="card"><div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:6px"><div><div class="fl-l">Brand</div><select class="fl" style="width:120px"><option>All</option><option>Mango Coco</option><option>Flying Tigress</option></select></div><div><div class="fl-l">Channel</div><select class="fl" style="width:100px"><option>All</option><option>Cash</option><option>Card</option><option>UberEats</option></select></div><div><div class="fl-l">Date from</div><input class="fl" type="date" value="${dr.from}" style="width:130px"></div><div><div class="fl-l">Date to</div><input class="fl" type="date" value="${dr.to}" style="width:130px"></div><div style="flex:1"></div><button class="bg" style="color:var(--acc)">Reset</button></div><div style="text-align:right;font-size:var(--fs-sm);color:var(--t2)">Total Revenue <b style="color:var(--g)">${fm(total)}</b></div></div><div class="card" style="padding:0"><table class="tbl" id="tbl_sale"><thead><tr>${sth('Date', 'date', 'tbl_sale')}${sth('Brand', 'brand', 'tbl_sale')}${sth('Channel', 'channel', 'tbl_sale')}${sthR('Amount ($)', 'amount', 'tbl_sale')}${sthR('GST', 'gst', 'tbl_sale')}${sth('Status', 'status', 'tbl_sale')}</tr></thead><tbody>${rows}</tbody></table></div><div id="txsale_lm" style="text-align:center;padding:10px;display:none"><button class="btn bo" style="font-size:var(--fs-sm)">Load more</button></div></div>`,
+    ct: `<div style="${TW}"><div class="card"><div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:6px"><div><div class="fl-l">Brand</div><select class="fl" style="width:120px"><option>All</option><option>Mango Coco</option><option>Flying Tigress</option></select></div><div><div class="fl-l">Channel</div><select class="fl" style="width:100px"><option>All</option><option>Cash</option><option>Card</option><option>UberEats</option></select></div><div><div class="fl-l">Date from</div><input class="fl" type="date" value="${dr.from}" style="width:130px"></div><div><div class="fl-l">Date to</div><input class="fl" type="date" value="${dr.to}" style="width:130px"></div><div style="flex:1"></div><button class="bg" style="color:var(--acc)">Reset</button></div><div id="sale_total" style="text-align:right;font-size:var(--fs-sm);color:var(--t2)">Total Revenue <b style="color:var(--g)">${fm(total)}</b></div></div><div class="card" style="padding:0"><table class="tbl" id="tbl_sale"><thead><tr>${sth('Date', 'date', 'tbl_sale')}${sth('Brand', 'brand', 'tbl_sale')}${sth('Channel', 'channel', 'tbl_sale')}${sthR('Amount ($)', 'amount', 'tbl_sale')}${sthR('GST', 'gst', 'tbl_sale')}${sth('Status', 'status', 'tbl_sale')}</tr></thead><tbody id="sale_tbody">${rows}</tbody></table></div><div id="txsale_lm" style="text-align:center;padding:10px;display:none"><button class="btn bo" style="font-size:var(--fs-sm)">Load more</button></div></div>`,
   };
+}
+
+async function _loadSales() {
+  try {
+    const result = await API.getTransactions({ type: 'sale', page: 1 });
+    const tbody = document.getElementById('sale_tbody');
+    const totalEl = document.getElementById('sale_total');
+    if (tbody) tbody.innerHTML = _saleRows(result.rows);
+    if (totalEl && result.rows) {
+      const total = result.rows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+      totalEl.innerHTML = `Total Revenue <b style="color:var(--g)">${fm(total)}</b>`;
+    }
+  } catch (e) {
+    const tbody = document.getElementById('sale_tbody');
+    if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--r)">Error: ${esc(e.message)}</td></tr>`;
+  }
 }
 
 // ═══════════════════════════════════════
@@ -194,24 +250,56 @@ async function _loadMoreBills() {
 }
 
 // ═══════════════════════════════════════
-// 4. RETURN AND DEBIT — still MOCK
+// 4. RETURN AND DEBIT — ★ CONNECTED TO DB
 // ═══════════════════════════════════════
+
+function _returnRows(rows) {
+  if (!rows || rows.length === 0) {
+    return '<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--t3)">No debit notes found</td></tr>';
+  }
+  return rows.map(r => {
+    const billNo = r.ref || r.bill_no || '';
+    return `<tr style="cursor:pointer" onclick="ScrTx._showDebitDetail('${esc(r.id || billNo)}')"><td>${_fmtDate(r.date)}</td><td style="color:var(--b)"><a class="lk">${esc(billNo)}</a></td><td style="color:var(--b)">${esc(r.contact || r.supplier_name || '')}</td><td style="color:var(--b)">${esc(r.inv_no || '')}</td><td>${esc(r.desc || '')}</td><td style="text-align:right;color:var(--b)">${fm(r.amount)}</td><td style="text-align:right;color:var(--b)">${fm(r.balance || r.amount)}</td><td>${sb(r.status === 'Debit' ? 'pending' : 'closed')}</td><td><a class="lk" style="font-size:var(--fs-xs)">Record</a></td><td><a class="lk" style="font-size:var(--fs-xs)">Apply</a></td></tr>`;
+  }).join('');
+}
+
 function renderTxReturn() {
-  const tA = TX_MOCK.returns.reduce((s, r) => s + r.amount, 0);
-  const rows = TX_MOCK.returns.map(r => `<tr style="cursor:pointer" onclick="ScrTx._showDebitDetail('${esc(r.bill)}')"><td>${esc(r.date)}</td><td style="color:var(--b)"><a class="lk">${esc(r.bill)}</a></td><td style="color:var(--b)">${esc(r.supplier)}</td><td style="color:var(--b)">${esc(r.inv)}</td><td>${esc(r.origInv)}</td><td style="text-align:right;color:var(--b)">${fm(r.amount)}</td><td style="text-align:right;color:var(--b)">${fm(r.balance)}</td><td>${sb(r.applyStatus === 'Unused' ? 'pending' : 'closed')}</td><td><a class="lk" style="font-size:var(--fs-xs)">Record</a></td><td><a class="lk" style="font-size:var(--fs-xs)">Apply</a></td></tr>`).join('');
+  const mem = App.S._tx_return;
+  const hasMem = mem && mem.length > 0;
+  const rows = hasMem ? _returnRows(mem) : _skeletonRow(10);
+  const tA = hasMem ? mem.reduce((s, r) => s + (Number(r.amount) || 0), 0) : 0;
+
   return {
     tb: `<div class="tb"><div class="tb-t">Purchase Returns and Debits</div><button class="bs" onclick="App.go('cr_debit')">Create debit note</button></div>`,
-    ct: `<div style="${TW}"><div class="card"><div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:6px"><div><div class="fl-l">Supplier</div><select class="fl" style="width:160px"><option>All</option><option>Siam Pacific Food</option></select></div><div><div class="fl-l">Search</div><input class="fl" placeholder="Search..." style="width:140px"></div><div style="flex:1"></div><button class="bg" style="color:var(--acc)">Reset</button></div><div style="text-align:right;font-size:var(--fs-sm);color:var(--t2)">Total debit: <b>${fm(tA)}</b></div></div><div class="card" style="padding:0"><table class="tbl" id="tbl_ret"><thead><tr>${sth('Date', 'date', 'tbl_ret')}${sth('Bill no', 'bill', 'tbl_ret')}${sth('Supplier', 'supplier', 'tbl_ret')}${sth('Inv no', 'inv', 'tbl_ret')}<th>Linked Invoice</th>${sthR('Amount ($)', 'amount', 'tbl_ret')}<th style="text-align:right">Balance</th><th>Status</th><th>Refund</th><th>Apply</th></tr></thead><tbody>${rows}</tbody></table></div><div id="txret_lm" style="text-align:center;padding:10px;display:none"><button class="btn bo" style="font-size:var(--fs-sm)">Load more</button></div><div id="debit_detail" style="display:none"></div></div>`,
+    ct: `<div style="${TW}"><div class="card"><div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:6px"><div><div class="fl-l">Supplier</div><select class="fl" style="width:160px"><option>All</option></select></div><div><div class="fl-l">Search</div><input class="fl" placeholder="Search..." style="width:140px"></div><div style="flex:1"></div><button class="bg" style="color:var(--acc)">Reset</button></div><div id="ret_total" style="text-align:right;font-size:var(--fs-sm);color:var(--t2)">Total debit: <b>${fm(tA)}</b></div></div><div class="card" style="padding:0"><table class="tbl" id="tbl_ret"><thead><tr>${sth('Date', 'date', 'tbl_ret')}${sth('Bill no', 'bill', 'tbl_ret')}${sth('Supplier', 'supplier', 'tbl_ret')}${sth('Inv no', 'inv', 'tbl_ret')}<th>Notes</th>${sthR('Amount ($)', 'amount', 'tbl_ret')}<th style="text-align:right">Balance</th><th>Status</th><th>Refund</th><th>Apply</th></tr></thead><tbody id="ret_tbody">${rows}</tbody></table></div><div id="txret_lm" style="text-align:center;padding:10px;display:none"><button class="btn bo" style="font-size:var(--fs-sm)">Load more</button></div><div id="debit_detail" style="display:none"></div></div>`,
   };
 }
 
-function _showDebitDetail(b) {
-  const r = TX_MOCK.returns.find(x => x.bill === b);
+async function _loadReturns() {
+  try {
+    const result = await API.getTransactions({ type: 'return', page: 1 });
+    const tbody = document.getElementById('ret_tbody');
+    const totalEl = document.getElementById('ret_total');
+    if (tbody) tbody.innerHTML = _returnRows(result.rows);
+    if (totalEl && result.rows) {
+      const tA = result.rows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+      totalEl.innerHTML = `Total debit: <b>${fm(tA)}</b>`;
+    }
+  } catch (e) {
+    const tbody = document.getElementById('ret_tbody');
+    if (tbody) tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--r)">Error: ${esc(e.message)}</td></tr>`;
+  }
+}
+
+function _showDebitDetail(idOrBill) {
+  // Try memory first
+  const mem = App.S._tx_return;
+  const r = mem ? mem.find(x => x.id === idOrBill || x.ref === idOrBill || x.bill_no === idOrBill) : null;
   if (!r) return;
   const el = document.getElementById('debit_detail');
   if (!el) return;
   el.style.display = 'block';
-  el.innerHTML = `<div class="card" style="margin-top:10px;border-left:3px solid var(--b)"><div style="display:flex;justify-content:space-between;margin-bottom:8px"><div style="font-weight:700;color:var(--b)">Debit Note — ${esc(r.bill)}</div><button class="bg" onclick="document.getElementById('debit_detail').style.display='none'">✕</button></div><div class="fr"><div class="fg"><label class="lb">Supplier</label><div style="font-weight:600">${esc(r.supplier)}</div></div><div class="fg"><label class="lb">Date</label><div>${esc(r.date)}</div></div></div><div class="fr"><div class="fg"><label class="lb">Inv No</label><div style="color:var(--b)">${esc(r.inv)}</div></div><div class="fg"><label class="lb">Amount</label><div style="font-weight:700;color:var(--b)">${fm(r.amount)}</div></div></div><div class="fr"><div class="fg"><label class="lb">Linked Invoice</label><div>${esc(r.origInv)}</div></div><div class="fg"><label class="lb">Status</label><div>${sb(r.applyStatus === 'Unused' ? 'pending' : 'closed')}</div></div></div></div>`;
+  el.innerHTML = `<div class="card" style="margin-top:10px;border-left:3px solid var(--b)"><div style="display:flex;justify-content:space-between;margin-bottom:8px"><div style="font-weight:700;color:var(--b)">Debit Note — ${esc(r.ref || r.bill_no || '')}</div><button class="bg" onclick="document.getElementById('debit_detail').style.display='none'">✕</button></div><div class="fr"><div class="fg"><label class="lb">Supplier</label><div style="font-weight:600">${esc(r.contact || r.supplier_name || '')}</div></div><div class="fg"><label class="lb">Date</label><div>${_fmtDate(r.date)}</div></div></div><div class="fr"><div class="fg"><label class="lb">Inv No</label><div style="color:var(--b)">${esc(r.inv_no || '')}</div></div><div class="fg"><label class="lb">Amount</label><div style="font-weight:700;color:var(--b)">${fm(r.amount)}</div></div></div><div class="fr"><div class="fg"><label class="lb">Notes</label><div>${esc(r.desc || '')}</div></div><div class="fg"><label class="lb">Status</label><div>${sb(r.status === 'Debit' ? 'pending' : 'closed')}</div></div></div></div>`;
   el.scrollIntoView({ behavior: 'smooth' });
 }
 
@@ -391,7 +479,7 @@ ct:`<div style="max-width:1100px;margin:0 auto">
 </div>`};}
 
 // ═══════════════════════════════════════
-// 7. FIND TRANSACTIONS — still MOCK
+// 7. FIND TRANSACTIONS — ★ CONNECTED TO DB (DC tab)
 // ═══════════════════════════════════════
 let _findTab = 'dc';
 
@@ -400,39 +488,60 @@ function renderTxFind() {
   const dr = dateRange();
   return {
     tb: '<div class="tb"><div class="tb-t">Find Transactions</div></div>',
-    ct: `<div class="card" style="max-width:1000px;margin:0 auto"><div class="tabs" id="find_tabs"><div class="tab a" onclick="ScrTx._switchFindTab('dc')">Debit and Credit</div><div class="tab" onclick="ScrTx._switchFindTab('ft')">Find Transaction</div></div><div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px"><div><div class="fl-l">Period</div><select class="fl"><option>This month</option><option>Last month</option></select></div><div><div class="fl-l">Date from</div><input class="fl" type="date" value="${dr.from}" style="width:130px"></div><div><div class="fl-l">Date to</div><input class="fl" type="date" value="${dr.to}" style="width:130px"></div><div><div class="fl-l">Contact</div><select class="fl" style="width:100px"><option>All</option></select></div><div><div class="fl-l">Search</div><input class="fl" placeholder="" style="width:100px"></div><div style="flex:1"></div><button class="bg" style="color:var(--acc)">Reset</button></div><div id="find_ct">${_findDC()}</div></div>`,
+    ct: `<div class="card" style="max-width:1000px;margin:0 auto"><div class="tabs" id="find_tabs"><div class="tab a" onclick="ScrTx._switchFindTab('dc')">Debit and Credit</div><div class="tab" onclick="ScrTx._switchFindTab('ft')">Find Transaction</div></div><div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px"><div><div class="fl-l">Period</div><select class="fl"><option>This month</option><option>Last month</option></select></div><div><div class="fl-l">Date from</div><input class="fl" type="date" value="${dr.from}" style="width:130px"></div><div><div class="fl-l">Date to</div><input class="fl" type="date" value="${dr.to}" style="width:130px"></div><div><div class="fl-l">Contact</div><select class="fl" style="width:100px"><option>All</option></select></div><div><div class="fl-l">Search</div><input class="fl" placeholder="" style="width:100px"></div><div style="flex:1"></div><button class="bg" style="color:var(--acc)">Reset</button></div><div id="find_ct">${_skeletonRow(7).replace('<tr>', '<table class="tbl"><tr>').replace('</tr>', '</tr></table>')}</div></div>`,
   };
+}
+
+async function _loadFind() {
+  const el = document.getElementById('find_ct');
+  if (el) el.innerHTML = _findTab === 'dc' ? await _findDC() : await _findFT();
 }
 
 function _switchFindTab(t) {
   _findTab = t;
   document.querySelectorAll('#find_tabs .tab').forEach(x => x.classList.remove('a'));
   document.querySelectorAll('#find_tabs .tab')[t === 'dc' ? 0 : 1]?.classList.add('a');
-  const el = document.getElementById('find_ct');
-  if (el) el.innerHTML = t === 'dc' ? _findDC() : _findFT();
+  _loadFind();
 }
 
-function _findDC() {
-  const rows = TX_MOCK.debitCredits.map(r => `<tr><td>${esc(r.date)}</td><td style="color:var(--b)"><a class="lk">${esc(r.debitRef)}</a></td><td><a class="lk">${esc(r.creditRef)}</a></td><td>${esc(r.supplier)}</td><td style="text-align:right;color:var(--b)">${fm(r.debitAmt)}</td><td style="text-align:right">${fm(r.creditAmt)}</td><td>${sb(r.status === 'Linked' ? 'closed' : 'pending')}</td></tr>`).join('');
-  return `<div style="font-size:var(--fs-xs);color:var(--t3);margin-bottom:8px">Debit notes paired with linked invoices</div><table class="tbl"><thead><tr><th>Date</th><th>Debit Note</th><th>Linked Invoice</th><th>Supplier</th><th style="text-align:right">Debit ($)</th><th style="text-align:right">Invoice ($)</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`;
+async function _findDC() {
+  try {
+    const data = await API.getDebitCredits({});
+    if (!data || data.length === 0) {
+      return '<div style="text-align:center;padding:20px;color:var(--t3)">No debit/credit records found</div>';
+    }
+    const rows = data.map(r => `<tr><td>${_fmtDate(r.date)}</td><td style="color:var(--b)"><a class="lk">${esc(r.debitRef)}</a></td><td><a class="lk">${esc(r.creditRef)}</a></td><td>${esc(r.supplier)}</td><td style="text-align:right;color:var(--b)">${fm(r.debitAmt)}</td><td style="text-align:right">${fm(r.creditAmt)}</td><td>${sb(r.status === 'Linked' ? 'closed' : 'pending')}</td></tr>`).join('');
+    return `<div style="font-size:var(--fs-xs);color:var(--t3);margin-bottom:8px">Debit notes paired with linked invoices</div><table class="tbl"><thead><tr><th>Date</th><th>Debit Note</th><th>Linked Invoice</th><th>Supplier</th><th style="text-align:right">Debit ($)</th><th style="text-align:right">Invoice ($)</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`;
+  } catch (e) {
+    return `<div style="text-align:center;padding:20px;color:var(--r)">Error: ${esc(e.message)}</div>`;
+  }
 }
 
-function _findFT() {
-  const rows = TX_MOCK.groupedTx.map(r => `<tr><td>${esc(r.date)}</td><td><a class="lk">${esc(r.ref)}</a></td><td>${esc(r.type)}</td><td>${esc(r.desc)}</td><td>${esc(r.contact)}</td><td style="text-align:right">${fm(r.amount)}</td><td style="text-align:center">${r.items > 1 ? '<span style="background:var(--acc2);color:var(--acc);padding:1px 6px;border-radius:8px;font-size:var(--fs-xs);font-weight:600">' + r.items + ' items</span>' : '1'}</td></tr>`).join('');
-  return `<div style="font-size:var(--fs-xs);color:var(--t3);margin-bottom:8px">Grouped/single payment transactions</div><table class="tbl"><thead><tr><th>Date</th><th>Reference</th><th>Type</th><th>Description</th><th>Contact</th><th style="text-align:right">Amount ($)</th><th style="text-align:center">Items</th></tr></thead><tbody>${rows}</tbody></table>`;
+async function _findFT() {
+  try {
+    const result = await API.getTransactions({ type: 'all', page: 1 });
+    const data = result.rows || [];
+    if (data.length === 0) {
+      return '<div style="text-align:center;padding:20px;color:var(--t3)">No transactions found</div>';
+    }
+    const rows = data.map(r => `<tr><td>${_fmtDate(r.date)}</td><td><a class="lk">${esc(r.ref)}</a></td><td>${esc(r.type)}</td><td>${esc(r.desc)}</td><td>${esc(r.contact)}</td><td style="text-align:right">${fm(r.amount)}</td><td>${sb(r.status)}</td></tr>`).join('');
+    return `<div style="font-size:var(--fs-xs);color:var(--t3);margin-bottom:8px">All transactions</div><table class="tbl"><thead><tr><th>Date</th><th>Reference</th><th>Type</th><th>Description</th><th>Contact</th><th style="text-align:right">Amount ($)</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`;
+  } catch (e) {
+    return `<div style="text-align:center;padding:20px;color:var(--r)">Error: ${esc(e.message)}</div>`;
+  }
 }
 
 // ═══════════════════════════════════════
 // REGISTER ROUTES
 // ═══════════════════════════════════════
 App.registerRoutes({
-  tx_log:         { render: renderTxLog },
-  tx_sale:        { render: renderTxSale },
+  tx_log:         { render: renderTxLog, onLoad: _loadLog },
+  tx_sale:        { render: renderTxSale, onLoad: _loadSales },
   tx_bill:        { render: renderTxBill, onLoad: _loadBills },
-  tx_return:      { render: renderTxReturn },
+  tx_return:      { render: renderTxReturn, onLoad: _loadReturns },
   tx_bill_detail: { render: renderTxBillDetail },
   tx_sd:          { render: renderTxSdBridge },
-  tx_find:        { render: renderTxFind },
+  tx_find:        { render: renderTxFind, onLoad: _loadFind },
 });
 
 // ═══════════════════════════════════════

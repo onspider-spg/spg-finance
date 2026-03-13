@@ -1,4 +1,4 @@
-/** Version 1.6.2 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 1.6.3 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_input_fin.js
@@ -685,7 +685,7 @@
                 </div>
                 <div style="display:flex;align-items:center;margin-bottom:10px;justify-content:flex-end;gap:10px">
                   <span class="lb" style="margin:0">Accrual Month</span>
-                  <input class="inp" id="cb_accrual" type="month" value="${today().substring(0,7)}" style="width:180px">
+                  <input class="inp" id="cb_accrual" type="month" value="" style="width:180px">
                 </div>
               </div>
             </div>
@@ -978,8 +978,11 @@
       // Collect form data
       const supplierEl = document.getElementById('cb_supplier');
       const supplierOpt = supplierEl?.selectedOptions[0];
-      const vendor_id = supplierOpt?.value || null;
-      const vendor_name = supplierOpt?.dataset?.name || supplierOpt?.textContent || '';
+      const rawVal = supplierOpt?.value || '';
+      // If value looks like UUID (from API vendors), use as vendor_id; otherwise it's MOCK name text
+      const isUUID = /^[0-9a-f-]{20,}$/i.test(rawVal);
+      const vendor_id = isUUID ? rawVal : null;
+      const vendor_name = isUUID ? (supplierOpt?.dataset?.name || supplierOpt?.textContent || '') : rawVal;
 
       // Collect line items
       const lineItems = [];

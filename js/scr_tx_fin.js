@@ -1,4 +1,4 @@
-/** Version 1.5.1 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 1.5.2 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_tx_fin.js
@@ -312,7 +312,6 @@ function renderTxBillDetail() {
   _bdView = 'self';
   const detail = App.S._billDetail;
 
-  // If no detail in memory, show placeholder
   if (!detail || !detail.bill) {
     return {
       tb: `<div class="tb"><button class="bg" onclick="App.go('tx_bill')">← Bills</button><div class="tb-t">Bill Detail</div></div>`,
@@ -323,20 +322,21 @@ function renderTxBillDetail() {
   const b = detail.bill;
   const li = detail.lineItems || [];
   const alloc = detail.allocation || 'self';
+  const DS = 'disabled style="background:var(--bg2);color:var(--t1);border-color:var(--bd2);-webkit-text-fill-color:var(--t1);opacity:1"';
 
   const subtotal = li.reduce((s, l) => s + (Number(l.amount) || 0), 0);
   const tax = li.reduce((s, l) => s + (Number(l.gst) || 0), 0);
   const total = subtotal + tax;
   const paid = total - (Number(b.balance) || 0);
 
-  // Line items rows (readonly)
+  // Line items rows — real inputs, disabled
   const liRows = li.length > 0 ? li.map(l =>
     `<tr>
-      <td style="padding:8px 10px">${esc(l.desc || l.description || '')}</td>
-      <td style="padding:8px 10px;font-size:var(--fs-sm)">${esc(l.category || l.category_display || '')}</td>
-      <td style="padding:8px 10px;text-align:right;font-weight:500">${fm(l.amount)}</td>
-      <td style="padding:8px 10px;text-align:right;color:var(--t3)">${fm(l.gst)}</td>
-      <td style="padding:8px 10px;font-size:var(--fs-sm)">${esc(l.tax_code || 'FRE')}</td>
+      <td style="padding:0;border:1px solid #e5e7eb"><input ${DS} value="${esc(l.desc || l.description || '')}" style="width:100%;padding:8px 10px;border:none;font-size:var(--fs-body);background:var(--bg2);-webkit-text-fill-color:var(--t1)"></td>
+      <td style="padding:0;border:1px solid #e5e7eb"><input ${DS} value="${esc(l.category || l.category_display || '')}" style="width:100%;padding:8px 10px;border:none;font-size:var(--fs-body);background:var(--bg2);-webkit-text-fill-color:var(--t1)"></td>
+      <td style="padding:0;border:1px solid #e5e7eb"><input ${DS} value="${fm(l.amount)}" style="width:100%;padding:8px 10px;border:none;text-align:right;font-size:var(--fs-body);font-weight:500;background:var(--bg2);-webkit-text-fill-color:var(--t1)"></td>
+      <td style="padding:0;border:1px solid #e5e7eb;background:var(--bg2)"><input ${DS} value="${fm(l.gst)}" style="width:100%;padding:8px 10px;border:none;text-align:right;font-size:var(--fs-body);background:var(--bg2);color:var(--t3);-webkit-text-fill-color:var(--t3)"></td>
+      <td style="padding:0;border:1px solid #e5e7eb"><input ${DS} value="${esc(l.tax_code || 'FRE')}" style="width:100%;padding:8px 10px;border:none;font-size:var(--fs-body);background:var(--bg2);-webkit-text-fill-color:var(--t1)"></td>
     </tr>`
   ).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--t3);padding:16px">No line items</td></tr>';
 
@@ -345,21 +345,21 @@ function renderTxBillDetail() {
     ct: `<div style="max-width:860px;margin:0 auto">
       <!-- Main detail card — same layout as Create Bill -->
       <div class="card">
-        <!-- 2-column header fields -->
+        <!-- 2-column header fields (disabled inputs) -->
         <div style="display:flex;gap:30px">
           <!-- Left column -->
           <div style="width:300px">
             <div class="fg">
               <label class="lb">Transaction Type</label>
-              <div class="inp" style="background:var(--bg2);width:280px">Expense / Bill</div>
+              <input class="inp" ${DS} value="Expense / Bill" style="width:280px">
             </div>
             <div class="fg">
               <label class="lb">Supplier</label>
-              <div class="inp" style="background:var(--bg2);font-weight:600;width:280px">${esc(b.supplier_name || '—')}</div>
+              <input class="inp" ${DS} value="${esc(b.supplier_name || '—')}" style="width:280px;font-weight:600">
             </div>
             <div class="fg">
               <label class="lb">Supplier Invoice Number</label>
-              <div class="inp" style="background:var(--bg2);width:280px">${esc(b.inv_no || '—')}</div>
+              <input class="inp" ${DS} value="${esc(b.inv_no || '—')}" style="width:280px">
             </div>
           </div>
 
@@ -367,19 +367,19 @@ function renderTxBillDetail() {
           <div style="flex:1">
             <div style="display:flex;align-items:center;margin-bottom:10px;justify-content:flex-end;gap:10px">
               <span class="lb" style="margin:0">Bill Number</span>
-              <div class="inp" style="background:var(--bg3);color:var(--t3);width:180px;font-weight:600">${esc(b.bill_no)}</div>
+              <input class="inp" ${DS} value="${esc(b.bill_no)}" style="width:180px;font-weight:600">
             </div>
             <div style="display:flex;align-items:center;margin-bottom:10px;justify-content:flex-end;gap:10px">
               <span class="lb" style="margin:0">Issue Date</span>
-              <div class="inp" style="background:var(--bg2);width:180px">${_fmtDate(b.date)}</div>
+              <input class="inp" type="date" ${DS} value="${b.date || ''}" style="width:180px">
             </div>
             <div style="display:flex;align-items:center;margin-bottom:10px;justify-content:flex-end;gap:10px">
               <span class="lb" style="margin:0">Due Date</span>
-              <div class="inp" style="background:var(--bg2);width:180px">${_fmtDate(b.due_date) || '—'}</div>
+              <input class="inp" type="date" ${DS} value="${b.due_date || ''}" style="width:180px">
             </div>
             <div style="display:flex;align-items:center;margin-bottom:10px;justify-content:flex-end;gap:10px">
               <span class="lb" style="margin:0">Accrual Month</span>
-              <div class="inp" style="background:var(--bg2);width:180px">${b.date ? b.date.substring(0, 7) : '—'}</div>
+              <input class="inp" type="month" ${DS} value="${b.date ? b.date.substring(0, 7) : ''}" style="width:180px">
             </div>
           </div>
         </div>
@@ -390,7 +390,7 @@ function renderTxBillDetail() {
           <div style="padding:0 8px;font-size:var(--fs-xs);color:var(--t4)">Allocation: ${esc(alloc)}</div>
         </div>
 
-        <!-- Line Items Table (readonly) -->
+        <!-- Line Items Table (disabled inputs) -->
         <table style="width:100%;border-collapse:collapse;font-size:var(--fs-body);margin-top:10px">
           <thead><tr>
             <th style="text-align:left;padding:8px;font-weight:600;font-size:var(--fs-sm);width:30%">Description</th>
@@ -405,7 +405,7 @@ function renderTxBillDetail() {
         <!-- Notes + Totals -->
         <div style="display:flex;gap:16px;margin-top:12px">
           <div style="flex:1">
-            ${b.notes ? `<div style="font-size:var(--fs-xs);color:var(--t3);margin-bottom:2px">Notes</div><div style="padding:8px;border:1px solid var(--bd);border-radius:var(--rd);font-size:var(--fs-body);background:var(--bg2);min-height:40px">${esc(b.notes)}</div>` : ''}
+            ${b.notes ? `<div style="font-size:var(--fs-xs);color:var(--t3);margin-bottom:2px">Notes</div><textarea class="inp" disabled style="width:100%;min-height:50px;resize:none;background:var(--bg2);color:var(--t1);-webkit-text-fill-color:var(--t1);opacity:1;border-color:var(--bd2)">${esc(b.notes)}</textarea>` : ''}
           </div>
           <div style="width:240px;text-align:right;font-size:var(--fs-body)">
             <div style="display:flex;justify-content:flex-end;gap:16px;padding:4px 0"><b>Subtotal</b><b>${fm(subtotal)}</b></div>

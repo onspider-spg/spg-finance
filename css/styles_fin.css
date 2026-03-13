@@ -180,25 +180,29 @@ html, body {
 /* Collapsed state */
 .sd.cl { width: var(--sidebar-w-cl); min-width: var(--sidebar-w-cl); }
 
-/* Toggle button — inside sidebar, top position */
+/* Toggle button — top-right of sidebar */
+.sd-top {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 8px 4px;
+  flex-shrink: 0;
+}
 .sd-toggle {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: none;
+  color: var(--t3);
+  font-size: 16px;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--acc);
-  color: #fff;
-  font-size: 10px;
-  cursor: pointer;
-  margin: 8px auto 4px;
-  transition: background .15s;
-  flex-shrink: 0;
+  transition: background .15s, color .15s;
 }
-.sd-toggle:hover { background: var(--acc3); }
+.sd-toggle:hover { background: var(--bg3); color: var(--t1); }
 
-.cl .sd-toggle { margin: 8px auto 4px; }
+.cl .sd-top { justify-content: center; padding: 8px 4px 4px; }
 
 /* Sidebar item */
 .si {

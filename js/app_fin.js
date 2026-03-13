@@ -292,8 +292,8 @@ const App = (() => {
     const el = document.getElementById('sidebar');
     if (!el) return;
 
-    // Toggle button at top of sidebar
-    let html = '<div class="sd-toggle" onclick="App._toggleSidebar()"><span class="sd-toggle-icon">◂</span></div>';
+    // Toggle button — top-right of sidebar (hamburger ☰)
+    let html = '<div class="sd-top"><div class="sd-toggle" onclick="App._toggleSidebar()"><span class="sd-toggle-icon">☰</span></div></div>';
 
     NAV.forEach(n => {
       if (n === '_spacer') {
@@ -388,7 +388,7 @@ const App = (() => {
     sd.classList.toggle('cl', _sidebarCollapsed);
     document.body.classList.toggle('sd-collapsed', _sidebarCollapsed);
     const icon = sd.querySelector('.sd-toggle-icon');
-    if (icon) icon.textContent = _sidebarCollapsed ? '▸' : '◂';
+    if (icon) icon.textContent = '☰';
   }
 
   function _highlightNav(route) {

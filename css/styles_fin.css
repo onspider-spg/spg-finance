@@ -168,7 +168,7 @@ html, body {
   border-right: 1px solid var(--bd2);
   display: flex;
   flex-direction: column;
-  padding: 45px 0 4px;
+  padding: 0 0 4px;
   position: relative;
   flex-shrink: 0;
   overflow-y: auto;
@@ -180,28 +180,28 @@ html, body {
 /* Collapsed state */
 .sd.cl { width: var(--sidebar-w-cl); min-width: var(--sidebar-w-cl); }
 
-/* Toggle button — top-left corner of sidebar */
+/* Toggle wrapper — flex container, same as Home wireframe */
+.sd-top { display: flex; justify-content: flex-start; padding: 8px 8px 20px; }
+.cl .sd-top { justify-content: center; }
+
+/* Toggle button — purple circle, same as Home wireframe */
 .sd-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
   width: 22px;
   height: 22px;
   border-radius: 50%;
+  border: none;
   background: var(--acc);
   color: #fff;
   font-size: 10px;
   cursor: pointer;
-  position: absolute;
-  top: 8px;
-  left: 10px;
-  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 4px rgba(0,0,0,.15);
   transition: background .15s;
   flex-shrink: 0;
 }
 .sd-toggle:hover { background: var(--acc3); }
-
-.cl .sd-toggle { left: 10px; }
 
 /* Sidebar item */
 .si {

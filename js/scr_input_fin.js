@@ -706,6 +706,27 @@
     saveBtn.textContent = 'Saving...';
 
     try {
+
+      // ★ VALIDATION ← ใส่ตรงนี้
+      const supplierCheck = document.getElementById('cb_supplier');
+      if (!supplierCheck || !supplierCheck.value || supplierCheck.value === '') {
+        App.toast('Please select a Supplier');
+        saveBtn.disabled = false;
+        saveBtn.textContent = origText;
+        return;
+      }
+
+      let hasAmount = false;
+      for (let i = 0; i < 100; i++) {
+        const a = document.getElementById('cb_amt_' + i);
+        if (a && parseFloat(a.value.replace(/,/g, '')) > 0) { hasAmount = true; break; }
+      }
+      if (!hasAmount) {
+        App.toast('Please enter at least one line item amount');
+        saveBtn.disabled = false;
+        saveBtn.textContent = origText;
+        return;
+      }      
       // Collect form data
       const supplierEl = document.getElementById('cb_supplier');
       const supplierOpt = supplierEl?.selectedOptions[0];

@@ -1,4 +1,4 @@
-/** Version 1.9.7.2 | 13 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 1.9.7.3 | 13 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — app_fin.js
@@ -293,7 +293,7 @@ const App = (() => {
     if (!el) return;
 
     // Toggle button at top of sidebar
-    let html = '<div class="sd-toggle" onclick="App._toggleSidebar()">☰</div>';
+    let html = '<div class="sd-toggle" onclick="App._toggleSidebar()"><span class="sd-toggle-icon">☰</span></div>';
 
     NAV.forEach(n => {
       if (n === '_spacer') {
@@ -387,6 +387,8 @@ const App = (() => {
     _sidebarCollapsed = !_sidebarCollapsed;
     sd.classList.toggle('cl', _sidebarCollapsed);
     document.body.classList.toggle('sd-collapsed', _sidebarCollapsed);
+    const icon = sd.querySelector('.sd-toggle-icon');
+    if (icon) icon.textContent = _sidebarCollapsed ? '☰' : '☰';
   }
 
   function _highlightNav(route) {

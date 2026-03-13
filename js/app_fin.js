@@ -1,4 +1,4 @@
-/** Version 1.9.8 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 1.9.8.1 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — app_fin.js
@@ -459,9 +459,9 @@ const App = (() => {
     return parts[2] + '/' + parts[1] + '/' + parts[0];
   }
 
-  /** Today as YYYY-MM-DD */
+  /** Today as YYYY-MM-DD (Sydney time) */
   function today() {
-    return new Date().toISOString().split('T')[0];
+    return new Date().toLocaleDateString('en-CA', { timeZone: 'Australia/Sydney' });
   }
 
   /** Toast notification */

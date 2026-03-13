@@ -1,4 +1,4 @@
-/** Version 1.6 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 1.6.1 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_input_fin.js
@@ -933,26 +933,46 @@
 
     try {
 
-      // ★ VALIDATION ← ใส่ตรงนี้
-      const supplierCheck = document.getElementById('cb_supplier');
-      if (!supplierCheck || !supplierCheck.value || supplierCheck.value === '') {
-        App.toast('Please select a Supplier');
-        saveBtn.disabled = false;
-        saveBtn.textContent = origText;
-        return;
-      }
+      // ★ VALIDATION — header fields
+      const _vFail = (msg) => { App.toast(msg); saveBtn.disabled = false; saveBtn.textContent = origText; };
 
+      const supplierCheck = document.getElementById('cb_supplier');
+      if (!supplierCheck || !supplierCheck.value) { _vFail('Please select a Supplier'); return; }
+
+      const invNoCheck = document.getElementById('cb_inv_no');
+      if (!invNoCheck || !invNoCheck.value.trim()) { _vFail('Please enter Supplier Invoice Number'); return; }
+
+      const issueDateCheck = document.getElementById('cb_issue_date');
+      if (!issueDateCheck || !issueDateCheck.value) { _vFail('Please enter Issue Date'); return; }
+
+      const dueDateCheck = document.getElementById('cb_due_date');
+      if (!dueDateCheck || !dueDateCheck.value) { _vFail('Please enter Due Date'); return; }
+
+      const accrualCheck = document.getElementById('cb_accrual');
+      if (!accrualCheck || !accrualCheck.value) { _vFail('Please enter Accrual Month'); return; }
+
+      // ★ VALIDATION — line items (amount + category + tax code)
       let hasAmount = false;
       for (let i = 0; i < 100; i++) {
         const a = document.getElementById('cb_amt_' + i);
-        if (a && parseFloat(a.value.replace(/,/g, '')) > 0) { hasAmount = true; break; }
+        if (!a) continue;
+        const amt = parseFloat(a.value.replace(/,/g, '')) || 0;
+        if (amt <= 0) continue;
+        hasAmount = true;
+
+        // Category — check the first <select> in the row (skip cost owner select in OB mode)
+        const row = a.closest('tr');
+        const selects = row?.querySelectorAll('select') || [];
+        const catSel = _billAllocMode === 'ob' ? selects[1] : selects[0];
+        if (!catSel || !catSel.value) { _vFail('Line ' + (i + 1) + ': Please select a Category'); return; }
+
+        // Tax code
+        const tcWrap = document.getElementById('tcw_' + i);
+        const tcVal = tcWrap?.querySelector('.tc-val');
+        if (!tcVal || !tcVal.value) { _vFail('Line ' + (i + 1) + ': Please select a Tax Code'); return; }
       }
-      if (!hasAmount) {
-        App.toast('Please enter at least one line item amount');
-        saveBtn.disabled = false;
-        saveBtn.textContent = origText;
-        return;
-      }      
+      if (!hasAmount) { _vFail('Please enter at least one line item amount'); return; }
+
       // Collect form data
       const supplierEl = document.getElementById('cb_supplier');
       const supplierOpt = supplierEl?.selectedOptions[0];

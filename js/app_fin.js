@@ -1,4 +1,4 @@
-/** Version 1.9.7.5 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 1.9.8 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — app_fin.js
@@ -133,6 +133,12 @@ const App = (() => {
       { id: 'fp_exp', label: 'Expense Trend' },
     ]},
     { id: 'contacts', icon: '⊕', label: 'Contacts', type: 'item' },
+    '_spacer',
+    { id: 'settings', icon: '⚙', label: 'Settings', type: 'group', items: [
+      { id: 'st_alert', label: 'Alert Rules' },
+      { id: 'st_perm', label: 'Permissions' },
+      { id: 'st_audit', label: 'Audit Log' },
+    ]},
     '_spacer_double',
     { id: 'upload', icon: '↑', label: 'Upload', type: 'item' },
   ];
@@ -175,6 +181,9 @@ const App = (() => {
     tx_bill: 'js/scr_tx_fin.js', tx_return: 'js/scr_tx_fin.js',
     tx_bill_detail: 'js/scr_tx_fin.js', tx_sd: 'js/scr_tx_fin.js',
     tx_find: 'js/scr_tx_fin.js',
+    // Settings screens
+    st_alert: 'js/scr_settings_fin.js', st_perm: 'js/scr_settings_fin.js',
+    st_audit: 'js/scr_settings_fin.js',
   };
 
   // ═══════════════════════════
@@ -274,7 +283,7 @@ const App = (() => {
       <div class="gt-logo" onclick="App.go('dashboard')">SPG Finance</div>
       <div class="gt-r">
         <div class="gt-i" title="Help">?</div>
-        <div class="gt-i" title="Settings" onclick="App.go('ac_coa')">⚙</div>
+        <div class="gt-i" title="Settings" onclick="App.go('st_alert')">⚙</div>
         <div class="gt-u">
           <div class="gt-av">${esc(s.avatar || 'U')}</div>
           ${esc(s.display_name || 'User')}

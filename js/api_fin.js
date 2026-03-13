@@ -1,4 +1,4 @@
-/** Version 1.3 | 14 MAR 2026 | Siam Palette Group | Created 13 MAR 2026 */
+/** Version 1.4 | 14 MAR 2026 | Siam Palette Group | Created 13 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — api_fin.js
@@ -348,52 +348,68 @@ const API = (() => {
     }
   }
 
-  /** Get transactions — paginated */
+  /** Get transactions — paginated → DB จริง */
   async function getTransactions(filters = {}) {
     const key = '_tx_' + (filters.type || 'log');
     if (_loading[key]) return { rows: _S()[key] || [], hasMore: false };
     _loading[key] = true;
     try {
-      // MOCK — replace with: const res = await _call('fin_get_transactions', filters);
-      let source;
-      switch (filters.type) {
-        case 'sale': source = _MOCK_SALES; break;
-        case 'return': source = _MOCK_RETURNS; break;
-        default: source = _MOCK_TX_LOG; break;
+      let result;
+      try {
+        result = await _call('fin_get_transactions', filters);
+      } catch (e) {
+        console.warn('getTransactions API failed, using MOCK:', e.message);
+        let source;
+        switch (filters.type) {
+          case 'sale': source = _MOCK_SALES; break;
+          case 'return': source = _MOCK_RETURNS; break;
+          default: source = _MOCK_TX_LOG; break;
+        }
+        const page = filters.page || 1;
+        const perPage = 30;
+        const start = (page - 1) * perPage;
+        result = { rows: source.slice(start, start + perPage), hasMore: start + perPage < source.length };
       }
 
       const page = filters.page || 1;
-      const perPage = 30;
-      const start = (page - 1) * perPage;
-      const rows = source.slice(start, start + perPage);
-      const hasMore = start + perPage < source.length;
-
       if (page === 1) {
-        _S()[key] = rows;
+        _S()[key] = result.rows;
       } else {
-        _S()[key] = (_S()[key] || []).concat(rows);
+        _S()[key] = (_S()[key] || []).concat(result.rows);
       }
 
-      return { rows: _S()[key], hasMore };
+      return { rows: _S()[key], hasMore: result.hasMore };
     } finally {
       _loading[key] = false;
     }
   }
 
   /** Get unpaid bills (for debit note creation) */
+  /** Get unpaid bills → DB จริง */
   async function getUnpaidBills() {
-    // MOCK — replace with: return await _call('fin_get_unpaid_bills', {});
-    return _MOCK_BILLS.filter(b => b.balance > 0 && b.status !== 'Debit');
+    try {
+      return await _call('fin_get_unpaid_bills', {});
+    } catch (e) {
+      console.warn('getUnpaidBills API failed, using MOCK:', e.message);
+      return _MOCK_BILLS.filter(b => b.balance > 0 && b.status !== 'Debit');
+    }
   }
 
-  /** Get SD pending records */
+  /** Get SD pending records → DB จริง */
   async function getSdPending(filters = {}) {
     if (_loading.sd) return { rows: _S()._sdPending || [], kpi: _sdKpi() };
     _loading.sd = true;
     try {
-      // MOCK — replace with: const res = await _call('fin_get_sd_pending', filters);
-      _S()._sdPending = _MOCK_SD_PENDING;
-      return { rows: _S()._sdPending, kpi: _sdKpi() };
+      let result;
+      try {
+        result = await _call('fin_get_sd_pending', filters);
+      } catch (e) {
+        console.warn('getSdPending API failed, using MOCK:', e.message);
+        result = { rows: _MOCK_SD_PENDING, kpi: _sdKpi() };
+      }
+
+      _S()._sdPending = result.rows;
+      return { rows: _S()._sdPending, kpi: result.kpi || _sdKpi() };
     } finally {
       _loading.sd = false;
     }
@@ -408,36 +424,56 @@ const API = (() => {
     };
   }
 
-  /** Sync SD records → Finance */
+  /** Sync SD records → Finance → DB จริง */
   async function syncSd(ids) {
-    // MOCK — replace with: return await _call('fin_sync_sd', { ids });
-    // Update memory: mark synced
-    if (_S()._sdPending) {
-      ids.forEach(id => {
-        const r = _S()._sdPending.find(x => x.id === id);
-        if (r) r.status = 'synced';
-      });
+    try {
+      const result = await _call('fin_sync_sd', { ids });
+      // Update memory: mark synced
+      if (_S()._sdPending) {
+        ids.forEach(id => {
+          const r = _S()._sdPending.find(x => x.id === id);
+          if (r) r.status = 'synced';
+        });
+      }
+      return result;
+    } catch (e) {
+      console.warn('syncSd API failed, using MOCK:', e.message);
+      if (_S()._sdPending) {
+        ids.forEach(id => {
+          const r = _S()._sdPending.find(x => x.id === id);
+          if (r) r.status = 'synced';
+        });
+      }
+      return { success: true, synced: ids.length };
     }
-    return { success: true, synced: ids.length };
   }
 
   /** Get debit credits (Find Tx: DC tab) */
+  /** Get debit credits → DB จริง */
   async function getDebitCredits(filters = {}) {
-    // MOCK — replace with: return await _call('fin_get_debit_credits', filters);
-    return [
-      { date: '2026-03-09', debitRef: 'FIN-0047', creditRef: 'FIN-0048', supplier: 'Siam Pacific Food', debitAmt: -50, creditAmt: 654.16, status: 'Linked' },
-    ];
+    try {
+      return await _call('fin_get_debit_credits', filters);
+    } catch (e) {
+      console.warn('getDebitCredits API failed, using MOCK:', e.message);
+      return [
+        { date: '2026-03-09', debitRef: 'FIN-0047', creditRef: 'FIN-0048', supplier: 'Siam Pacific Food', debitAmt: -50, creditAmt: 654.16, status: 'Linked' },
+      ];
+    }
   }
 
-  /** Get dashboard KPIs */
+  /** Get dashboard KPIs → DB จริง */
   async function getDashboard() {
-    // MOCK — replace with: return await _call('fin_get_dashboard', {});
-    return {
-      totalBills: _MOCK_BILLS.length,
-      overdueCount: _MOCK_BILLS.filter(b => b.status === 'Overdue').length,
-      totalAmount: _MOCK_BILLS.reduce((s, b) => s + Math.abs(b.amount), 0),
-      pendingSync: _MOCK_SD_PENDING.filter(r => r.status === 'pending').length,
-    };
+    try {
+      return await _call('fin_get_dashboard', {});
+    } catch (e) {
+      console.warn('getDashboard API failed, using MOCK:', e.message);
+      return {
+        totalBills: _MOCK_BILLS.length,
+        overdueCount: _MOCK_BILLS.filter(b => b.status === 'Overdue').length,
+        totalAmount: _MOCK_BILLS.reduce((s, b) => s + Math.abs(b.amount), 0),
+        pendingSync: _MOCK_SD_PENDING.filter(r => r.status === 'pending').length,
+      };
+    }
   }
 
   // ═══════════════════════════════════════

@@ -1,4 +1,4 @@
-/** Version 1.4 | 13 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 1.5 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_input_fin.js
@@ -144,18 +144,58 @@
     gstEl.value = (val / 11).toFixed(2);
   }
 
-  function _saveSale(btnEl, mode) {
-    guardedSave(btnEl, () => {
-      App.toast('Sale saved');
+  async function _saveSale(btnEl, mode) {
+    if (!btnEl || btnEl.disabled) return;
+    const origText = btnEl.textContent;
+    btnEl.disabled = true;
+    btnEl.textContent = 'Saving...';
+
+    try {
+      // Validate
+      const amtEl = document.getElementById('cs_amount');
+      const amt = parseFloat((amtEl?.value || '').replace(/,/g, '')) || 0;
+      if (amt <= 0) {
+        App.toast('Please enter an amount');
+        btnEl.disabled = false;
+        btnEl.textContent = origText;
+        return;
+      }
+
+      // Collect form data
+      const data = {
+        brand: document.getElementById('cs_brand')?.value || '',
+        channel: document.getElementById('cs_channel')?.value || '',
+        amount: amt,
+        gst: parseFloat(document.getElementById('cs_gst')?.value || '0'),
+        date: document.getElementById('cs_date')?.value || App.today(),
+        bank_account_id: document.getElementById('cs_bank')?.value || null,
+      };
+
+      const result = await API.createSale(data);
+
+      App.toast('Sale saved — ' + (result.bill_no || ''));
+
       if (mode === 'next') {
-        const amt = document.getElementById('cs_amount');
-        const gst = document.getElementById('cs_gst');
-        if (amt) { amt.value = ''; amt.focus(); }
-        if (gst) gst.value = '';
+        // Clear form for next entry
+        if (amtEl) { amtEl.value = ''; amtEl.focus(); }
+        const gstEl = document.getElementById('cs_gst');
+        if (gstEl) gstEl.value = '';
+        // Add to recently saved table
+        const tbody = document.getElementById('cs_recent');
+        if (tbody) {
+          const row = document.createElement('tr');
+          row.innerHTML = `<td>${App.formatDate(data.date)}</td><td>${App.esc(data.channel)}</td><td>${App.esc(data.brand)}</td><td style="text-align:right;color:var(--g)">+${App.formatMoney(data.amount)}</td>`;
+          tbody.insertBefore(row, tbody.firstChild);
+        }
       } else {
         App.go('dashboard');
       }
-    });
+    } catch (e) {
+      App.toast('Error: ' + e.message);
+    } finally {
+      btnEl.disabled = false;
+      btnEl.textContent = origText;
+    }
   }
 
   // ══════════════════════════════════════════
@@ -253,11 +293,61 @@
     }
   }
 
-  function _saveTransfer(btnEl) {
-    guardedSave(btnEl, () => {
-      App.toast('Transfer recorded');
+  async function _saveTransfer(btnEl) {
+    if (!btnEl || btnEl.disabled) return;
+    const origText = btnEl.textContent;
+    btnEl.disabled = true;
+    btnEl.textContent = 'Saving...';
+
+    try {
+      // Validate
+      const amtEl = document.getElementById('ct_amount');
+      const amt = parseFloat((amtEl?.value || '').replace(/,/g, '')) || 0;
+      if (amt <= 0) {
+        App.toast('Please enter an amount');
+        btnEl.disabled = false;
+        btnEl.textContent = origText;
+        return;
+      }
+
+      // Get selected transfer type
+      const activeRadio = document.querySelector('.cr-radio-card.active input[name="ttype"]');
+      const allRadios = document.querySelectorAll('.cr-radio-card');
+      let transferType = 'Internal';
+      allRadios.forEach(label => {
+        if (label.classList.contains('active')) {
+          transferType = label.textContent.trim().split('(')[0].trim();
+        }
+      });
+
+      // Get bank account labels for line item description
+      const fromEl = document.getElementById('ct_from');
+      const toEl = document.getElementById('ct_to');
+      const fromLabel = fromEl?.selectedOptions?.[0]?.textContent || '';
+      const toLabel = toEl?.selectedOptions?.[0]?.textContent || '';
+
+      const data = {
+        amount: amt,
+        reference: document.getElementById('ct_ref')?.value || '',
+        description: document.getElementById('ct_desc')?.value || '',
+        date: document.getElementById('ct_date')?.value || App.today(),
+        transfer_type: transferType,
+        from_account_id: fromEl?.value || null,
+        to_account_id: toEl?.value || null,
+        from_label: fromLabel,
+        to_label: toLabel,
+      };
+
+      const result = await API.createTransfer(data);
+
+      App.toast('Transfer recorded — ' + (result.bill_no || ''));
       App.go('tx_log');
-    });
+    } catch (e) {
+      App.toast('Error: ' + e.message);
+    } finally {
+      btnEl.disabled = false;
+      btnEl.textContent = origText;
+    }
   }
 
   // ══════════════════════════════════════════
@@ -330,11 +420,55 @@
     };
   }
 
-  function _saveDebit(btnEl) {
-    guardedSave(btnEl, () => {
-      App.toast('Debit note created');
+  async function _saveDebit(btnEl) {
+    if (!btnEl || btnEl.disabled) return;
+    const origText = btnEl.textContent;
+    btnEl.disabled = true;
+    btnEl.textContent = 'Saving...';
+
+    try {
+      // Validate
+      const supplierEl = document.getElementById('cd_supplier');
+      if (!supplierEl || !supplierEl.value) {
+        App.toast('Please select a Supplier');
+        btnEl.disabled = false;
+        btnEl.textContent = origText;
+        return;
+      }
+
+      const amtEl = document.getElementById('cd_amount');
+      const amt = parseFloat((amtEl?.value || '').replace(/,/g, '')) || 0;
+      if (amt <= 0) {
+        App.toast('Please enter a debit amount');
+        btnEl.disabled = false;
+        btnEl.textContent = origText;
+        return;
+      }
+
+      // Get original bill reference from invoice dropdown
+      const invoiceEl = document.getElementById('cd_invoice');
+      const originalBillNo = invoiceEl?.value || '';
+
+      const data = {
+        vendor_id: null,
+        vendor_name: supplierEl.value,
+        inv_no: document.getElementById('cd_inv_no')?.value || '',
+        amount: amt,
+        date: document.getElementById('cd_date')?.value || App.today(),
+        notes: document.getElementById('cd_notes')?.value || '',
+        original_bill_no: originalBillNo,
+      };
+
+      const result = await API.createDebit(data);
+
+      App.toast('Debit note created — ' + (result.bill_no || ''));
       App.go('tx_return');
-    });
+    } catch (e) {
+      App.toast('Error: ' + e.message);
+    } finally {
+      btnEl.disabled = false;
+      btnEl.textContent = origText;
+    }
   }
 
   // ══════════════════════════════════════════

@@ -1,4 +1,4 @@
-/** Version 1.2 | 13 MAR 2026 | Siam Palette Group | Created 13 MAR 2026 */
+/** Version 1.3 | 14 MAR 2026 | Siam Palette Group | Created 13 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — api_fin.js
@@ -494,64 +494,119 @@ const API = (() => {
     }
   }
 
-  /** Create sale transaction */
+  /** Create sale transaction → DB จริง */
   async function createSale(data) {
-    await _mockDelay(300);
-    const newSale = {
-      id: 'S-' + Date.now(),
-      date: data.date || App.today(),
-      brand: data.brand,
-      channel: data.channel,
-      amount: data.amount,
-      gst: data.gst,
-      status: 'Received',
-      updated_at: new Date().toISOString(),
-    };
-    if (_S()._tx_sale) _S()._tx_sale.unshift(newSale);
-    _MOCK_SALES.unshift(newSale);
-    return newSale;
+    try {
+      const res = await _call('fin_create_sale', {
+        brand_id: data.brand,
+        channel: data.channel,
+        amount: data.amount,
+        gst: data.gst,
+        sale_date: data.date || App.today(),
+        bank_account_id: data.bank_account_id || null,
+      });
+
+      // Update memory — prepend to sales list
+      if (_S()._tx_sale) _S()._tx_sale.unshift(res);
+
+      return res;
+    } catch (e) {
+      console.warn('createSale API failed, using MOCK:', e.message);
+      await _mockDelay(300);
+      const newSale = {
+        id: 'S-' + Date.now(),
+        date: data.date || App.today(),
+        brand: data.brand,
+        channel: data.channel,
+        amount: data.amount,
+        gst: data.gst,
+        status: 'Closed',
+        updated_at: new Date().toISOString(),
+      };
+      if (_S()._tx_sale) _S()._tx_sale.unshift(newSale);
+      _MOCK_SALES.unshift(newSale);
+      return newSale;
+    }
   }
 
-  /** Create transfer */
+  /** Create transfer → DB จริง */
   async function createTransfer(data) {
-    await _mockDelay(300);
-    const newTx = {
-      id: 'T-' + Date.now(),
-      date: data.date || App.today(),
-      ref: 'TR' + String(Date.now()).slice(-6),
-      type: 'Transfer',
-      desc: data.description || 'Transfer',
-      brand: '',
-      contact: '',
-      amount: data.amount,
-      recon: '',
-      updated_at: new Date().toISOString(),
-    };
-    if (_S()._tx_log) _S()._tx_log.unshift(newTx);
-    _MOCK_TX_LOG.unshift(newTx);
-    return newTx;
+    try {
+      const res = await _call('fin_create_transfer', {
+        amount: data.amount,
+        reference: data.reference || null,
+        description: data.description || '',
+        transfer_date: data.date || App.today(),
+        transfer_type: data.transfer_type || 'Internal',
+        from_account_id: data.from_account_id || null,
+        to_account_id: data.to_account_id || null,
+        from_label: data.from_label || '',
+        to_label: data.to_label || '',
+      });
+
+      // Update memory — prepend to tx log
+      if (_S()._tx_log) _S()._tx_log.unshift(res);
+
+      return res;
+    } catch (e) {
+      console.warn('createTransfer API failed, using MOCK:', e.message);
+      await _mockDelay(300);
+      const newTx = {
+        id: 'T-' + Date.now(),
+        date: data.date || App.today(),
+        ref: 'TR' + String(Date.now()).slice(-6),
+        type: 'Transfer',
+        desc: data.description || 'Transfer',
+        brand: '',
+        contact: '',
+        amount: data.amount,
+        recon: '',
+        updated_at: new Date().toISOString(),
+      };
+      if (_S()._tx_log) _S()._tx_log.unshift(newTx);
+      _MOCK_TX_LOG.unshift(newTx);
+      return newTx;
+    }
   }
 
-  /** Create debit note */
+  /** Create debit note → DB จริง */
   async function createDebit(data) {
-    await _mockDelay(300);
-    const newDebit = {
-      id: 'B-' + Date.now(),
-      date: data.date || App.today(),
-      bill_no: 'FIN-' + String((_MOCK_BILLS.length + 50 + 1)).padStart(4, '0'),
-      supplier_id: data.supplier_id,
-      supplier_name: data.supplier_name || 'Unknown',
-      inv_no: data.inv_no || '',
-      amount: -(Math.abs(data.amount)),
-      balance: -(Math.abs(data.amount)),
-      due_date: data.due_date || '',
-      has_file: false,
-      status: 'Debit',
-      updated_at: new Date().toISOString(),
-    };
-    if (_S()._bills) _S()._bills.unshift(newDebit);
-    _MOCK_BILLS.unshift(newDebit);
-    return newDebit;
+    try {
+      const res = await _call('fin_create_debit', {
+        vendor_id: data.vendor_id || null,
+        vendor_name: data.vendor_name || '',
+        supplier_inv_no: data.inv_no || '',
+        amount: Math.abs(data.amount),
+        debit_date: data.date || App.today(),
+        notes: data.notes || '',
+        original_bill_no: data.original_bill_no || '',
+      });
+
+      // Update memory — prepend to bills list
+      if (_S()._bills) _S()._bills.unshift(res);
+
+      return res;
+    } catch (e) {
+      console.warn('createDebit API failed, using MOCK:', e.message);
+      await _mockDelay(300);
+      const newDebit = {
+        id: 'B-' + Date.now(),
+        date: data.date || App.today(),
+        bill_no: 'MOCK-' + Date.now(),
+        supplier_id: data.vendor_id,
+        supplier_name: data.vendor_name || 'Unknown',
+        inv_no: data.inv_no || '',
+        amount: -(Math.abs(data.amount)),
+        balance: -(Math.abs(data.amount)),
+        due_date: '',
+        has_file: false,
+        status: 'Debit',
+        updated_at: new Date().toISOString(),
+      };
+      if (_S()._bills) _S()._bills.unshift(newDebit);
+      _MOCK_BILLS.unshift(newDebit);
+      return newDebit;
+    }
   }
 
   // ═══════════════════════════════════════

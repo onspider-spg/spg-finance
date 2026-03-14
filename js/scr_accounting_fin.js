@@ -1,21 +1,20 @@
-/** Version 1.5 | 14 MAR 2026 | Siam Palette Group */
+/** Version 1.8 | 14 MAR 2026 | Siam Palette Group */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_accounting_fin.js
- * Accounting screens: COA List, Create, Edit, Tax Codes,
- * Bank Rules, Banking Hub
+ * Accounting screens: COA, Tax, Bank Rules, Banking Hub,
+ * Bank Map, Linked Categories
  * ═══════════════════════════════════════════
  *
  * SCREENS:
  *   ac_coa        — Categories (Chart of Accounts) full list
  *   ac_coa_create — Create Category form
- *   ac_coa_edit   — Edit Category form (+ bank details if type=Bank)
+ *   ac_coa_edit   — Edit Category form
  *   ac_tax        — Tax Codes list + inline edit
  *   ac_rules      — Bank Rules list + Create/Edit modal (E3a)
  *   ac_hub        — Banking Hub — accounts + balance overview (E3a)
- *
- * ALL screens connect to DB via API (no MOCK fallback needed).
- * Concurrency: 4 ACC simultaneous — list views always fresh, save has stale check.
+ *   ac_map        — Bank Mapping — 3 tabs (E3b)
+ *   ac_linked     — Linked Categories (E3b)
  * ═══════════════════════════════════════════
  */
 
@@ -896,6 +895,325 @@
   }
 
   // ══════════════════════════════════════════
+  // 7. BANK MAP (ac_map) — 3 Tabs ★ E3b
+  // ══════════════════════════════════════════
+
+  let _bmTab = 'mapping';
+  let _bmData = null;
+  let _bmBridgeSettings = [];
+  let _bmSaving = false;
+
+  function _bmTabs(active) {
+    const tabs = [
+      { id: 'mapping', label: 'Bank Mapping' },
+      { id: 'channels', label: 'Bank Channel' },
+      { id: 'settings', label: 'SD Bridge Settings' },
+    ];
+    return '<div style="display:flex;gap:0;border-bottom:1px solid var(--bd);margin-bottom:16px">'
+      + tabs.map(t => `<div class="tab${t.id === active ? ' a' : ''}" onclick="ScrAccounting._bmSetTab('${t.id}')">${esc(t.label)}</div>`).join('')
+      + '</div>';
+  }
+
+  function renderBankMap() {
+    _bmTab = 'mapping';
+    return {
+      tb: `<div class="tb"><div class="tb-t">Bank Mapping</div><button class="bs" id="bm_save_btn" onclick="ScrAccounting._bmSave()">Save Changes</button></div>`,
+      ct: `<div style="max-width:1100px;margin:0 auto" id="bm_wrap"><div id="bm_tabs">${_bmTabs('mapping')}</div><div id="bm_content">${_skeleton(1).replace('<tr><td', '<div style="text-align:center;padding:40px;color:var(--t3)"><div class="fin-spinner" style="margin:0 auto 8px"></div>').replace('</td></tr>', '</div>')}</div></div>`,
+    };
+  }
+
+  async function _bmLoad() {
+    const tabsEl = document.getElementById('bm_tabs');
+    if (tabsEl) tabsEl.innerHTML = _bmTabs(_bmTab);
+
+    if (_bmTab === 'settings') {
+      await _bmLoadSettings();
+    } else {
+      await _bmLoadMapping();
+    }
+  }
+
+  async function _bmLoadMapping() {
+    const el = document.getElementById('bm_content');
+    if (!el) return;
+    try {
+      _bmData = await API.call('fin_get_bank_mapping', {});
+      if (_bmTab === 'channels') _bmRenderChannels(el);
+      else _bmRenderMapping(el);
+    } catch (e) {
+      el.innerHTML = `<div style="padding:20px;color:var(--r)">Error: ${esc(e.message)}</div>`;
+    }
+  }
+
+  function _bmRenderMapping(el) {
+    const d = _bmData;
+    if (!d) return;
+    const stores = d.stores || {};
+    const banks = d.bankAccounts || [];
+    const stats = d.stats || {};
+
+    let bankOpts = '<option value="">— Select bank account —</option>';
+    banks.forEach(b => { bankOpts += `<option value="${b.id}">${esc(b.account_label)}</option>`; });
+
+    // Stats bar
+    let html = `<div style="display:flex;gap:24px;margin-bottom:16px;font-size:var(--fs-sm);color:var(--t2);align-items:center">
+      <div><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--g);margin-right:4px"></span><span style="font-weight:700;font-size:14px">${stats.mapped || 0}</span> mapped</div>
+      <div><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--o);margin-right:4px"></span><span style="font-weight:700;font-size:14px;color:var(--o)">${stats.unmapped || 0}</span> unmapped</div>
+    </div>`;
+
+    const storeIds = Object.keys(stores);
+    if (storeIds.length === 0) {
+      html += '<div class="empty" style="padding:40px">No channel mappings found. Channels are populated from Sale Daily module.</div>';
+      el.innerHTML = html;
+      return;
+    }
+
+    storeIds.forEach((sid, idx) => {
+      const channels = stores[sid] || [];
+      const mappedCount = channels.filter(c => c.is_mapped).length;
+      const allMapped = mappedCount === channels.length;
+      const statusBadge = allMapped ? '<span class="sts sts-c">All mapped</span>' : `<span class="sts sts-p">${channels.length - mappedCount} unmapped</span>`;
+      const open = idx === 0 ? '' : ' style="display:none"';
+
+      html += `<div style="border:1px solid var(--bd);border-radius:8px;margin-bottom:12px;overflow:hidden">
+        <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--bg2);cursor:pointer" onclick="var b=document.getElementById('bm_s_${idx}');b.style.display=b.style.display==='none'?'':'none'">
+          <span style="font-size:var(--fs-xs);color:var(--t3)">▾</span>
+          <span style="font-size:var(--fs-body);font-weight:600;flex:1">${esc(sid)}</span>
+          <span style="font-size:var(--fs-xs);color:var(--t3)">${channels.length} mappings</span>
+          ${statusBadge}
+        </div>
+        <div id="bm_s_${idx}"${open}>
+          <table class="tbl" style="font-size:var(--fs-sm)"><thead><tr><th style="width:4%">#</th><th style="width:22%">Channel</th><th style="width:9%">Type</th><th style="width:8%">Dir</th><th style="width:30%">Bank Account</th><th style="width:18%">Category</th><th style="width:6%"></th></tr></thead><tbody>`;
+
+      channels.forEach((c, ci) => {
+        const typeCls = c.channel_type === 'revenue' ? 'background:var(--gbg);color:var(--g)' : c.channel_type === 'expense' ? 'background:var(--rbg);color:var(--r)' : 'background:var(--bbg);color:var(--b)';
+        const dirCls = c.direction === 'in' ? 'color:var(--g)' : c.direction === 'out' ? 'color:var(--r)' : 'color:var(--b)';
+        const warn = c.is_mapped ? '' : 'style="background:rgba(217,119,6,.04)"';
+        const dot = c.is_mapped ? 'background:var(--g)' : 'background:var(--o)';
+
+        // Bank select with current value
+        let selectHtml = '<option value="">— Select —</option>';
+        banks.forEach(b => { selectHtml += `<option value="${b.id}" ${b.id === c.bank_account_id ? 'selected' : ''}>${esc(b.account_label)}</option>`; });
+
+        html += `<tr ${warn}>
+          <td style="color:var(--t4)">${ci + 1}</td>
+          <td style="font-weight:500">${esc(c.channel_label)}${!c.is_mapped ? '<span style="font-size:9px;color:var(--o);font-weight:600;margin-left:4px">NEW</span>' : ''}</td>
+          <td><span style="font-size:9px;font-weight:600;padding:2px 8px;border-radius:3px;${typeCls}">${esc(c.channel_type)}</span></td>
+          <td><span style="font-size:var(--fs-xxs);font-weight:500;${dirCls}">${esc(c.direction.toUpperCase())}</span></td>
+          <td><select class="fl" style="width:100%;font-size:var(--fs-xs);padding:5px 8px" data-map-id="${c.id}" onchange="ScrAccounting._bmMarkDirty()">${selectHtml}</select></td>
+          <td style="font-size:var(--fs-xxs);color:var(--t2)">${esc(c.auto_category || '')}</td>
+          <td><span style="display:inline-block;width:7px;height:7px;border-radius:50%;${dot}"></span></td>
+        </tr>`;
+      });
+
+      html += '</tbody></table></div></div>';
+    });
+
+    html += `<div style="font-size:var(--fs-xxs);color:var(--t3);padding:8px 12px;background:var(--bg2);border-radius:8px;margin-top:8px">Bank accounts come from Chart of Accounts. To add a new bank account, go to Accounting → Categories (COA).</div>`;
+    el.innerHTML = html;
+  }
+
+  function _bmRenderChannels(el) {
+    const d = _bmData;
+    if (!d) return;
+    const stores = d.stores || {};
+    const banks = d.bankAccounts || [];
+
+    // Aggregate: which bank account → how many channels
+    const bankCount = {};
+    Object.values(stores).forEach((channels) => {
+      (channels).forEach(c => {
+        if (c.bank_account_id) {
+          if (!bankCount[c.bank_account_id]) bankCount[c.bank_account_id] = { label: '', count: 0 };
+          bankCount[c.bank_account_id].count++;
+        }
+      });
+    });
+    banks.forEach(b => { if (bankCount[b.id]) bankCount[b.id].label = b.account_label; });
+
+    let html = `<div style="font-size:var(--fs-xs);color:var(--t3);margin-bottom:14px">Overview of all bank accounts used in SD Bridge mapping, and how many channels are assigned to each.</div>
+      <table class="tbl"><thead><tr><th>Account Name</th><th>Bank</th><th>Type</th><th>Channels</th></tr></thead><tbody>`;
+
+    banks.forEach(b => {
+      const cnt = bankCount[b.id]?.count || 0;
+      html += `<tr><td style="font-weight:600">${esc(b.account_label)}</td><td>${esc(b.bank_name || '—')}</td><td>${esc(b.account_type || 'Bank')}</td><td style="font-weight:500;color:var(--acc)">${cnt}</td></tr>`;
+    });
+
+    html += '</tbody></table><div style="font-size:var(--fs-xxs);color:var(--t3);margin-top:12px">To add or edit bank accounts, go to Accounting → Categories (COA).</div>';
+    el.innerHTML = html;
+  }
+
+  async function _bmLoadSettings() {
+    const el = document.getElementById('bm_content');
+    if (!el) return;
+    try {
+      const result = await API.call('fin_get_bridge_settings', {});
+      _bmBridgeSettings = result.settings || [];
+      _bmRenderSettings(el);
+    } catch (e) {
+      el.innerHTML = `<div style="padding:20px;color:var(--r)">Error: ${esc(e.message)}</div>`;
+    }
+  }
+
+  function _bmRenderSettings(el) {
+    const rev = _bmBridgeSettings.filter(s => s.data_type.startsWith('revenue'));
+    const exp = _bmBridgeSettings.filter(s => !s.data_type.startsWith('revenue'));
+
+    const settingLabels = {
+      revenue_cash: { title: 'In-store Cash', desc: 'Auto-create sale transaction when SD records cash revenue' },
+      revenue_card: { title: 'Card channels', desc: 'Eftpos, Prepaid, Union Pay' },
+      revenue_platform: { title: 'Platform payouts', desc: 'UberEats, Easi, Hungry Panda, DoorDash' },
+      expense_cash: { title: 'Expenses (Cash paid)', desc: 'Auto-create bill when SD records a cash expense' },
+      invoice_paid: { title: 'Invoices (Paid)', desc: 'Auto-create bill for paid invoices from SD' },
+      invoice_unpaid: { title: 'Invoices (Unpaid)', desc: 'Create as Awaiting Payment in Finance' },
+    };
+
+    function settingRow(s) {
+      const info = settingLabels[s.data_type] || { title: s.data_type, desc: '' };
+      const checked = s.is_enabled ? 'checked' : '';
+      return `<div style="display:flex;align-items:center;padding:12px 16px;border-bottom:1px solid var(--bd2);gap:12px">
+        <div style="flex:1"><div style="font-size:var(--fs-sm);font-weight:600">${esc(info.title)}</div><div style="font-size:var(--fs-xxs);color:var(--t3)">${esc(info.desc)}</div></div>
+        <label class="br-tgl"><input type="checkbox" ${checked} data-bridge-id="${s.bridge_id}" onchange="ScrAccounting._bmMarkDirty()"><span class="br-sl"></span></label>
+      </div>`;
+    }
+
+    let html = `<div style="font-size:var(--fs-xs);color:var(--t3);margin-bottom:14px">Control which data types sync automatically from Sale Daily to Finance.</div>`;
+    html += `<div style="font-size:var(--fs-sm);font-weight:700;margin-bottom:8px">Revenue Auto-sync</div><div style="border:1px solid var(--bd);border-radius:8px;margin-bottom:16px">${rev.map(settingRow).join('')}</div>`;
+    html += `<div style="font-size:var(--fs-sm);font-weight:700;margin-bottom:8px">Expense Auto-sync</div><div style="border:1px solid var(--bd);border-radius:8px;margin-bottom:16px">${exp.map(settingRow).join('')}</div>`;
+    html += `<div style="font-size:var(--fs-xxs);color:var(--t3);padding:8px 12px;background:var(--bg2);border-radius:8px">Expense auto-sync is currently off. It is recommended that ACC reviews expenses before syncing.</div>`;
+    el.innerHTML = html;
+  }
+
+  function _bmSetTab(tab) {
+    _bmTab = tab;
+    _bmLoad();
+  }
+
+  function _bmMarkDirty() {
+    const btn = document.getElementById('bm_save_btn');
+    if (btn) { btn.style.background = 'var(--acc)'; btn.textContent = 'Save Changes ●'; }
+  }
+
+  async function _bmSave() {
+    if (_bmSaving) return;
+    const btn = document.getElementById('bm_save_btn');
+    _bmSaving = true;
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+
+    try {
+      if (_bmTab === 'settings') {
+        // Collect toggle states
+        const toggles = [];
+        document.querySelectorAll('[data-bridge-id]').forEach(input => {
+          toggles.push({ bridge_id: input.dataset.bridgeId, is_enabled: input.checked });
+        });
+        await API.call('fin_save_bridge_settings', { settings: toggles });
+      } else {
+        // Collect bank mapping selections
+        const mappings = [];
+        document.querySelectorAll('[data-map-id]').forEach(sel => {
+          mappings.push({ id: sel.dataset.mapId, bank_account_id: sel.value || null });
+        });
+        if (mappings.length > 0) await API.call('fin_save_bank_mapping', { mappings });
+      }
+      App.toast('Saved');
+      if (btn) { btn.style.background = ''; btn.textContent = 'Save Changes'; }
+      _bmLoad(); // refresh
+    } catch (e) {
+      App.toast(e.message || 'Save failed');
+    } finally {
+      _bmSaving = false;
+      if (btn) { btn.disabled = false; }
+    }
+  }
+
+  // ══════════════════════════════════════════
+  // 8. LINKED CATEGORIES (ac_linked) ★ E3b
+  // ══════════════════════════════════════════
+
+  let _lcRows = [];
+
+  function renderLinkedCats() {
+    return {
+      tb: `<div class="tb"><div class="tb-t">Linked Categories</div><button class="bs" onclick="ScrAccounting._lcAdd()">+ Add Link</button></div>`,
+      ct: `<div class="card" style="max-width:900px;margin:0 auto">
+        <div style="font-size:var(--fs-xs);color:var(--t3);margin-bottom:8px">Link related categories so transactions auto-update paired accounts (e.g. Super expense → Super payable on Balance Sheet)</div>
+        <table class="tbl" id="lc_tbl">
+          <thead><tr><th>Source Category</th><th style="width:30px">→</th><th>Linked Account</th><th>Effect</th><th>Status</th><th style="width:40px"></th></tr></thead>
+          <tbody id="lc_tbody">${_skeleton(6)}</tbody>
+        </table>
+      </div>`,
+    };
+  }
+
+  async function _lcLoad() {
+    try {
+      const result = await API.call('fin_get_linked_cats', {});
+      _lcRows = result.rows || [];
+      _lcRender();
+    } catch (e) {
+      const tbody = document.getElementById('lc_tbody');
+      if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--r)">Error: ${esc(e.message)}</td></tr>`;
+    }
+  }
+
+  function _lcRender() {
+    const tbody = document.getElementById('lc_tbody');
+    if (!tbody) return;
+    if (_lcRows.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--t3)">No linked categories</td></tr>';
+      return;
+    }
+    tbody.innerHTML = _lcRows.map(r => `<tr>
+      <td>${esc(r.source_label)}</td>
+      <td style="font-size:16px;color:var(--acc)">→</td>
+      <td>${esc(r.linked_label)}</td>
+      <td style="font-size:var(--fs-xxs);color:var(--t3)">${esc(r.effect || '')}</td>
+      <td><span class="sts ${r.is_active ? 'sts-c' : 'sts-o'}">${r.is_active ? 'Active' : 'Inactive'}</span></td>
+      <td><button class="bg" style="color:var(--acc);font-size:var(--fs-xs)" onclick="ScrAccounting._lcEdit('${r.id}')">Edit</button></td>
+    </tr>`).join('');
+  }
+
+  function _lcAdd() {
+    _lcShowDialog(null);
+  }
+
+  function _lcEdit(id) {
+    const row = _lcRows.find(r => r.id === id);
+    if (row) _lcShowDialog(row);
+  }
+
+  function _lcShowDialog(row) {
+    const isEdit = !!row;
+    const r = row || {};
+    App.showDialog({
+      title: isEdit ? 'Edit Linked Category' : 'Add Linked Category',
+      message: `<div style="text-align:left">
+        <div class="fg"><label class="lb">Source Category *</label><input class="inp" id="dlg_lc_src" value="${esc(r.source_label || '')}" placeholder="e.g. Expense: Payroll → Superannuation"></div>
+        <div class="fg"><label class="lb">Linked Account *</label><input class="inp" id="dlg_lc_lnk" value="${esc(r.linked_label || '')}" placeholder="e.g. Liability: Super Payable"></div>
+        <div class="fg"><label class="lb">Effect</label><input class="inp" id="dlg_lc_eff" value="${esc(r.effect || '')}" placeholder="Describe what happens"></div>
+      </div>`,
+      confirmText: isEdit ? 'Save' : 'Add',
+      onConfirm: async () => {
+        const src = document.getElementById('dlg_lc_src')?.value?.trim();
+        const lnk = document.getElementById('dlg_lc_lnk')?.value?.trim();
+        const eff = document.getElementById('dlg_lc_eff')?.value?.trim();
+        if (!src || !lnk) { App.toast('Source and Linked are required'); return; }
+        try {
+          await API.call('fin_save_linked_cat', {
+            id: isEdit ? r.id : undefined,
+            source_label: src, linked_label: lnk, effect: eff,
+          });
+          App.toast(isEdit ? 'Updated' : 'Added');
+          _lcLoad();
+        } catch (e) {
+          App.toast(e.message || 'Save failed');
+        }
+      },
+    });
+  }
+
+  // ══════════════════════════════════════════
   // REGISTER ROUTES
   // ══════════════════════════════════════════
   App.registerRoutes({
@@ -905,6 +1223,8 @@
     ac_tax:        { render: renderTaxCodes, onLoad: _loadTax },
     ac_rules:      { render: renderBankRules, onLoad: _brLoad },
     ac_hub:        { render: renderBankingHub, onLoad: _hubLoad },
+    ac_map:        { render: renderBankMap, onLoad: _bmLoad },
+    ac_linked:     { render: renderLinkedCats, onLoad: _lcLoad },
   });
 
   // ══════════════════════════════════════════
@@ -933,6 +1253,13 @@
     _brDelete,
     _brOnVendorChange,
     _brUpdateSubCats,
+    // E3b: Bank Map
+    _bmSetTab,
+    _bmMarkDirty,
+    _bmSave,
+    // E3b: Linked Categories
+    _lcAdd,
+    _lcEdit,
   };
 
 })();

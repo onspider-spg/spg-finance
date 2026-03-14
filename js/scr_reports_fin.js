@@ -1,8 +1,8 @@
-/** Version 1.0 | 15 MAR 2026 | Siam Palette Group */
+/** Version 1.1 | 15 MAR 2026 | Siam Palette Group */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_reports_fin.js
- * Reports: P&L Dashboard, Brand Comparison, Profit Flow, Full P&L
+ * Reports: P&L (4), Balance Sheet, Cash Flow
  * Lazy-loaded by app_fin.js on first visit to rp_* routes
  * ═══════════════════════════════════════════
  */
@@ -18,6 +18,8 @@
   let _fullData = null;       // full P&L statement data
   let _filters = { month: '', brand: 'All' };
   let _fullFilters = { period: 'Monthly', from: '', to: '', brand: 'All', compare: 'None' };
+  let _bsData = null;        // balance sheet data
+  let _cfData = null;         // cash flow data
 
   // ── Helpers ──
 
@@ -723,6 +725,243 @@
   }
 
   // ══════════════════════════════════════════
+  // rp_bs: BALANCE SHEET
+  // ══════════════════════════════════════════
+  function renderBalanceSheet() {
+    if (!_filters.month) _filters.month = _curMonth();
+    return {
+      tb: '<div class="tb"><div class="tb-t">Balance Sheet</div>' +
+          '<select class="fl" id="rp_bs_brand" onchange="ScrReports._onBsFilter()" style="width:140px">' + _brandOpts(_filters.brand) + '</select>' +
+          '<select class="fl" id="rp_bs_month" onchange="ScrReports._onBsFilter()" style="width:110px">' + _monthOpts(_filters.month) + '</select></div>',
+      ct: `<div style="max-width:1000px;margin:0 auto">
+        <div id="rp_bs_content"><div class="empty" style="padding:40px"><div class="fin-spinner" style="margin:0 auto 8px"></div>Loading Balance Sheet...</div></div>
+      </div>`,
+    };
+  }
+
+  async function _loadBalanceSheet() {
+    const el = document.getElementById('rp_bs_content');
+    if (!el) return;
+
+    try {
+      _bsData = await API.getBalanceSheet({
+        month: _filters.month,
+        brand: _filters.brand === 'All' ? null : _filters.brand,
+      });
+    } catch (e) {
+      console.warn('getBalanceSheet failed, using mock:', e.message);
+      _bsData = _mockBalanceSheet();
+    }
+
+    const d = _bsData;
+    const totalAssets = d.total_assets || 0;
+    const totalLiabilities = d.total_liabilities || 0;
+    const equity = d.equity || 0;
+    const balanced = Math.abs(totalAssets - (totalLiabilities + equity)) < 1;
+
+    // KPI bar
+    let html = `<div class="kpi" style="flex-wrap:nowrap">
+      <div class="kpi-c"><div class="kpi-l">Total Assets</div><div class="kpi-v">${fm(totalAssets, 0)}</div></div>
+      <div class="kpi-c"><div class="kpi-l">Total Liabilities</div><div class="kpi-v" style="color:var(--r)">${fm(totalLiabilities, 0)}</div></div>
+      <div class="kpi-c"><div class="kpi-l">Equity</div><div class="kpi-v" style="color:${equity >= 0 ? 'var(--g)' : 'var(--r)'}">${fm(equity, 0)}</div></div>
+    </div>`;
+
+    // P&L hierarchical layout
+    const cols = d.columns || [_monthLabel(_filters.month)];
+    const prevCol = d.prev_column || null;
+    const gridCols = prevCol ? '1fr 100px 100px' : '1fr 100px';
+
+    html += '<div class="pl">';
+    // Header
+    html += `<div class="pl-hd" style="grid-template-columns:${gridCols}"><div>Account</div>`;
+    cols.forEach(c => { html += `<div style="text-align:right">${esc(c)}</div>`; });
+    if (prevCol) html += `<div style="text-align:right">${esc(prevCol)}</div>`;
+    html += '</div>';
+
+    // Sections
+    (d.sections || []).forEach(sec => {
+      // Section header
+      html += `<div class="pl-r cat" style="grid-template-columns:${gridCols}"><div>${esc(sec.label)}</div></div>`;
+      // Items
+      (sec.items || []).forEach(item => {
+        html += `<div class="pl-r sub" style="grid-template-columns:${gridCols}"><div>${esc(item.label)}</div>`;
+        html += `<div class="pl-v">${_fmTbl(item.current)}</div>`;
+        if (prevCol) html += `<div class="pl-v" style="color:var(--t3)">${_fmTbl(item.previous)}</div>`;
+        html += '</div>';
+      });
+      // Section total
+      html += `<div class="pl-r total" style="grid-template-columns:${gridCols}"><div>${esc(sec.total_label || 'Total ' + sec.label)}</div>`;
+      html += `<div class="pl-v"${sec.total_color ? ' style="color:' + sec.total_color + '"' : ''}>${_fmTbl(sec.total_current)}</div>`;
+      if (prevCol) html += `<div class="pl-v" style="color:var(--t3)">${_fmTbl(sec.total_previous)}</div>`;
+      html += '</div>';
+    });
+
+    // L + E grand total
+    if (d.le_total) {
+      html += `<div class="pl-r grand" style="grid-template-columns:${gridCols}"><div>L + E</div>`;
+      html += `<div class="pl-v">${_fmTbl(d.le_total.current)}</div>`;
+      if (prevCol) html += `<div class="pl-v" style="color:var(--t3)">${_fmTbl(d.le_total.previous)}</div>`;
+      html += '</div>';
+    }
+
+    html += '</div>';
+
+    // Balanced badge
+    html += `<div style="margin-top:6px;padding:8px;background:${balanced ? 'var(--gbg)' : 'var(--rbg)'};border-radius:var(--rd);text-align:center">
+      <span style="font-size:11px;font-weight:700;color:${balanced ? 'var(--g)' : 'var(--r)'}">${balanced ? '✓ Balanced' : '✗ Not Balanced'}</span>
+      <span style="font-size:10px;color:var(--t3)">Assets ${fm(totalAssets, 0)} ${balanced ? '=' : '≠'} L + E ${fm(totalLiabilities + equity, 0)}</span>
+    </div>`;
+
+    el.innerHTML = html;
+  }
+
+  function _onBsFilter() {
+    _filters.month = document.getElementById('rp_bs_month')?.value || _filters.month;
+    _filters.brand = document.getElementById('rp_bs_brand')?.value || 'All';
+    _bsData = null;
+    _loadBalanceSheet();
+  }
+
+  // ══════════════════════════════════════════
+  // rp_cf: CASH FLOW STATEMENT
+  // ══════════════════════════════════════════
+  function renderCashFlow() {
+    if (!_filters.month) _filters.month = _curMonth();
+    return {
+      tb: '<div class="tb"><div class="tb-t">Cash Flow Statement</div>' +
+          '<select class="fl" id="rp_cf_month" onchange="ScrReports._onCfFilter()" style="width:110px">' + _monthOpts(_filters.month) + '</select>' +
+          '<select class="fl" id="rp_cf_brand" onchange="ScrReports._onCfFilter()" style="width:140px">' + _brandOpts(_filters.brand) + '</select></div>',
+      ct: `<div style="max-width:1000px;margin:0 auto">
+        <div id="rp_cf_content"><div class="empty" style="padding:40px"><div class="fin-spinner" style="margin:0 auto 8px"></div>Loading Cash Flow...</div></div>
+      </div>`,
+    };
+  }
+
+  async function _loadCashFlow() {
+    const el = document.getElementById('rp_cf_content');
+    if (!el) return;
+
+    try {
+      _cfData = await API.getCashFlow({
+        month: _filters.month,
+        brand: _filters.brand === 'All' ? null : _filters.brand,
+      });
+    } catch (e) {
+      console.warn('getCashFlow failed, using mock:', e.message);
+      _cfData = _mockCashFlow();
+    }
+
+    const d = _cfData;
+
+    // KPI bar
+    let html = `<div class="kpi" style="flex-wrap:nowrap">
+      <div class="kpi-c"><div class="kpi-l">Operating</div><div class="kpi-v" style="color:${(d.operating || 0) >= 0 ? 'var(--g)' : 'var(--r)'}">${_fmK(d.operating)}</div></div>
+      <div class="kpi-c"><div class="kpi-l">Investing</div><div class="kpi-v" style="color:${(d.investing || 0) >= 0 ? 'var(--g)' : 'var(--r)'}">${_fmK(d.investing)}</div></div>
+      <div class="kpi-c"><div class="kpi-l">Financing</div><div class="kpi-v" style="color:${(d.financing || 0) >= 0 ? 'var(--g)' : 'var(--r)'}">${_fmK(d.financing)}</div></div>
+      <div class="kpi-c"><div class="kpi-l">Net Cash</div><div class="kpi-v" style="color:${(d.net_cash || 0) >= 0 ? 'var(--g)' : 'var(--r)'}">${_fmK(d.net_cash)}</div></div>
+    </div>`;
+
+    // P&L layout
+    const gridCols = '1fr 100px 100px';
+    html += '<div class="pl">';
+    html += `<div class="pl-hd" style="grid-template-columns:${gridCols}"><div>Item</div><div style="text-align:right">This Month</div><div style="text-align:right">YTD</div></div>`;
+
+    (d.sections || []).forEach(sec => {
+      // Section header
+      html += `<div class="pl-r cat" style="grid-template-columns:${gridCols}"><div>${esc(sec.label)}</div></div>`;
+      // Items
+      (sec.items || []).forEach(item => {
+        html += `<div class="pl-r sub" style="grid-template-columns:${gridCols}"><div>${esc(item.label)}</div>`;
+        const mColor = item.month >= 0 ? 'var(--g)' : 'var(--r)';
+        html += `<div class="pl-v" style="color:${mColor}">${item.month >= 0 ? _fmTbl(item.month) : '(' + _fmTbl(Math.abs(item.month)) + ')'}</div>`;
+        html += `<div class="pl-v" style="color:var(--t3)">${item.ytd >= 0 ? _fmTbl(item.ytd) : '(' + _fmTbl(Math.abs(item.ytd)) + ')'}</div>`;
+        html += '</div>';
+      });
+      // Section total
+      if (sec.total_label) {
+        const tColor = (sec.total_month || 0) >= 0 ? 'var(--g)' : 'var(--r)';
+        html += `<div class="pl-r total" style="grid-template-columns:${gridCols}"><div>${esc(sec.total_label)}</div>`;
+        html += `<div class="pl-v" style="color:${tColor}">${_fmTbl(sec.total_month)}</div>`;
+        html += `<div class="pl-v" style="color:var(--t3)">${_fmTbl(sec.total_ytd)}</div>`;
+        html += '</div>';
+      }
+    });
+
+    // Grand total
+    const netColor = (d.net_cash || 0) >= 0 ? 'var(--g)' : 'var(--r)';
+    html += `<div class="pl-r grand" style="grid-template-columns:${gridCols}"><div>Net Cash Change</div>`;
+    html += `<div class="pl-v" style="color:${netColor}">${_fmTbl(d.net_cash)}</div>`;
+    html += `<div class="pl-v" style="color:var(--t3)">${_fmTbl(d.net_cash_ytd)}</div>`;
+    html += '</div></div>';
+
+    el.innerHTML = html;
+  }
+
+  function _onCfFilter() {
+    _filters.month = document.getElementById('rp_cf_month')?.value || _filters.month;
+    _filters.brand = document.getElementById('rp_cf_brand')?.value || 'All';
+    _cfData = null;
+    _loadCashFlow();
+  }
+
+  // ══════════════════════════════════════════
+  // MOCK: Balance Sheet
+  // ══════════════════════════════════════════
+  function _mockBalanceSheet() {
+    return {
+      total_assets: 311319, total_liabilities: 436820, equity: -125501,
+      columns: [_monthLabel(_filters.month)],
+      prev_column: _monthLabel(_prevMonthStr(_filters.month)),
+      sections: [
+        { label: 'Assets', total_label: 'Total Assets', total_current: 311319, total_previous: 185675, items: [
+          { label: 'Cash & Bank', current: 225611, previous: 49345 },
+          { label: 'Accounts Receivable', current: 71205, previous: 120828 },
+          { label: 'Fixed Assets (net)', current: 14503, previous: 15502 },
+        ]},
+        { label: 'Liabilities', total_label: 'Total Liabilities', total_current: 436820, total_previous: 339840, total_color: 'var(--r)', items: [
+          { label: 'Accounts Payable', current: 302982, previous: 272107 },
+          { label: 'PAYG + Super + GST Payable', current: 133838, previous: 67733 },
+        ]},
+        { label: 'Equity', total_label: 'Total Equity', total_current: -125501, total_previous: -154165, total_color: 'var(--r)', items: [
+          { label: 'Share Capital + Retained Earnings', current: 95983, previous: 95983 },
+          { label: 'Current Year P&L', current: -221483, previous: -250148 },
+        ]},
+      ],
+      le_total: { current: 311319, previous: 185675 },
+    };
+  }
+
+  /** Helper: prev month string */
+  function _prevMonthStr(ym) {
+    if (!ym) return '';
+    const [y, m] = ym.split('-').map(Number);
+    const d = new Date(y, m - 2, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  }
+
+  // ══════════════════════════════════════════
+  // MOCK: Cash Flow
+  // ══════════════════════════════════════════
+  function _mockCashFlow() {
+    return {
+      operating: 44987, investing: -12000, financing: -8000, net_cash: 24987, net_cash_ytd: 108381,
+      sections: [
+        { label: 'Operating Activities', total_label: 'Net Operating', total_month: 44987, total_ytd: 168381, items: [
+          { label: 'Cash from Sales', month: 604695, ytd: 1806267 },
+          { label: 'Cash paid to Suppliers', month: -484708, ytd: -1412886 },
+          { label: 'Cash paid for Wages', month: -75000, ytd: -225000 },
+        ]},
+        { label: 'Investing', items: [
+          { label: 'Equipment Purchase', month: -12000, ytd: -36000 },
+        ]},
+        { label: 'Financing', items: [
+          { label: 'Loan Repayment', month: -8000, ytd: -24000 },
+        ]},
+      ],
+    };
+  }
+
+  // ══════════════════════════════════════════
   // REGISTER ROUTES
   // ══════════════════════════════════════════
   App.registerRoutes({
@@ -730,6 +969,8 @@
     rp_pnl_brand: { render: renderPnlBrand,     onLoad: _loadPnlBrand },
     rp_pnl_flow:  { render: renderPnlFlow,      onLoad: _loadPnlFlow },
     rp_pnl_full:  { render: renderPnlFull,       onLoad: _loadPnlFull },
+    rp_bs:        { render: renderBalanceSheet,  onLoad: _loadBalanceSheet },
+    rp_cf:        { render: renderCashFlow,      onLoad: _loadCashFlow },
   });
 
   // ══════════════════════════════════════════
@@ -740,6 +981,8 @@
     _onBrandFilter,
     _onFlowFilter,
     _loadPnlFull,
+    _onBsFilter,
+    _onCfFilter,
     _exportPdf,
     _exportCsv,
   };

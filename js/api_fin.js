@@ -1,4 +1,4 @@
-/** Version 1.5.6 | 15 MAR 2026 | Siam Palette Group | Created 13 MAR 2026 */
+/** Version 1.5.8 | 15 MAR 2026 | Siam Palette Group | Created 13 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — api_fin.js
@@ -781,6 +781,11 @@ const API = (() => {
     approvePayRun: (data) => _call('fin_approve_pay_run', data),
     markPayRunPaid: (data) => _call('fin_mark_pay_run_paid', data),
     getNextPayRunNo: () => _call('fin_get_next_pay_run_no', {}),
+    // E6b: Reports — thin wrappers using _call
+    getPnlSummary: (filters) => _call('fin_get_pnl_summary', filters || {}),
+    getPnlBrandCompare: (filters) => _call('fin_get_pnl_brand_compare', filters || {}),
+    getProfitFlow: (filters) => _call('fin_get_profit_flow', filters || {}),
+    getPnlFull: (filters) => _call('fin_get_pnl_full', filters || {}),
   };
 
 })();

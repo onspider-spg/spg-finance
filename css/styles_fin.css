@@ -1,4 +1,4 @@
-/* Version 1.7 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/* Version 1.7.1 | 15 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /* ═══════════════════════════════════════════
    SPG Finance Module — styles_fin.css
    Desktop-first · System Font · MYOB Purple
@@ -824,7 +824,81 @@ html, body {
 .br-fr .fg { display: flex; flex-direction: column; gap: 3px; margin-bottom: 0; flex: 1; }
 .br-fr .fg label { font-size: var(--fs-xxs); font-weight: 600; color: var(--t3); }
 
-/* ═══ 24. RESPONSIVE ═══ */
+/* ═══ 24. REPORT: P&L + PILL TABS + WATERFALL ═══ */
+
+/* Pill sub-nav tabs (Reports P&L, etc.) */
+.rp-pills { display: flex; gap: 6px; padding: 10px 0; margin-bottom: 12px; border-bottom: 1px solid var(--bd2); }
+.rp-pill {
+  padding: 6px 16px; border-radius: 20px; font-size: 11px; font-weight: 500;
+  color: var(--t2); cursor: pointer; border: 1px solid var(--bd); background: none;
+  font-family: inherit; transition: all .15s;
+}
+.rp-pill:hover { border-color: var(--acc); color: var(--acc); }
+.rp-pill.a { background: var(--acc); color: #fff; border-color: var(--acc); font-weight: 600; cursor: default; }
+
+/* P&L hierarchical layout (Balance Sheet, Cash Flow, Full P&L) */
+.pl { border: 1px solid var(--bd); border-radius: var(--rd-lg); overflow: hidden; }
+.pl-hd {
+  display: grid; padding: 10px 16px; font-size: var(--fs-xs); font-weight: 700;
+  color: var(--t1); background: var(--bg); border-bottom: 2px solid var(--bd);
+}
+.pl-r { display: grid; padding: 8px 16px; font-size: var(--fs-body); border-bottom: 1px solid var(--bd2); }
+.pl-r.cat { font-weight: 700; font-size: var(--fs-sm); background: var(--bg2); padding-top: 10px; color: var(--t1); }
+.pl-r.sub { padding-left: 32px; }
+.pl-r.total { font-weight: 700; background: var(--bg2); border-top: 1px solid var(--bd); }
+.pl-r.grand { font-weight: 700; font-size: 13px; background: var(--acc2); border-top: 2px solid var(--acc); }
+.pl-v { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Waterfall row */
+.wf-row {
+  display: flex; align-items: center; gap: 10px; padding: 6px 0;
+  border-bottom: 1px solid var(--bd2);
+}
+.wf-row.sub { background: rgba(0,0,0,.015); border: none; margin: 2px 0; padding: 8px 16px; }
+.wf-lbl { font-size: 11px; font-weight: 500; width: 150px; flex-shrink: 0; }
+.wf-row.sub .wf-lbl { font-size: 13px; font-weight: 700; }
+.wf-bar { flex: 1; height: 22px; position: relative; }
+.wf-bar-fill { height: 100%; border-radius: 3px; }
+.wf-row.sub .wf-bar-fill { opacity: 1; }
+.wf-val { font-size: 11px; font-weight: 600; min-width: 100px; text-align: right; }
+.wf-row.sub .wf-val { font-size: 12px; font-weight: 700; }
+
+/* Donut chart (CSS only) */
+.rp-donut {
+  width: 110px; height: 110px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.rp-donut-inner {
+  width: 65px; height: 65px; border-radius: 50%; background: #fff;
+  display: flex; align-items: center; justify-content: center; flex-direction: column;
+}
+
+/* Mini bar chart (Revenue vs Expense) */
+.rp-bars { display: flex; align-items: flex-end; gap: 12px; height: 100px; padding: 10px 0; }
+.rp-bar-group { flex: 1; text-align: center; }
+.rp-bar-pair { display: flex; gap: 2px; justify-content: center; align-items: flex-end; height: 80px; }
+.rp-bar {
+  width: 35%; border-radius: 3px 3px 0 0; min-height: 4px;
+}
+.rp-bar-lbl { font-size: 9px; color: var(--t3); margin-top: 4px; }
+.rp-legend { display: flex; gap: 16px; font-size: 10px; color: var(--t2); margin-top: 4px; }
+.rp-legend-dot {
+  display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px;
+}
+
+/* Filter bar for reports */
+.rp-filters { display: flex; gap: 8px; align-items: flex-end; margin-bottom: 14px; flex-wrap: wrap; }
+.rp-fl-group { display: flex; flex-direction: column; gap: 2px; }
+.rp-fl-label { font-size: 10px; color: var(--t3); font-weight: 500; }
+
+/* Change badge (▲/▼ vs last month) */
+.rp-chg {
+  font-size: 10px; padding: 1px 6px; border-radius: 3px; display: inline-block;
+}
+.rp-chg-up { background: var(--gbg); color: var(--g); }
+.rp-chg-dn { background: var(--rbg); color: var(--r); }
+
+/* ═══ 25. RESPONSIVE ═══ */
 @media (max-width: 900px) {
   .sd { width: var(--sidebar-w-cl); min-width: var(--sidebar-w-cl); }
   .sd .sg-head span:not(.sg-ico) { display: none; }

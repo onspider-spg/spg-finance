@@ -1,4 +1,4 @@
-/** Version 1.5.4 | 14 MAR 2026 | Siam Palette Group | Created 13 MAR 2026 */
+/** Version 1.5.5 | 14 MAR 2026 | Siam Palette Group | Created 13 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — api_fin.js
@@ -766,6 +766,13 @@ const API = (() => {
     getPaymentHistory: (filters) => _call('fin_get_payment_history', filters || {}),
     getRemittanceList: (filters) => _call('fin_get_remittance_list', filters || {}),
     sendRemittance: (data) => _call('fin_send_remittance', data),
+    // E5c: Reconciliation — thin wrappers using _call
+    uploadStatement: (data) => _call('fin_upload_statement', data),
+    getBankRecon: (filters) => _call('fin_get_bank_recon', filters || {}),
+    autoMatch: (data) => _call('fin_auto_match', data),
+    confirmMatch: (data) => _call('fin_confirm_match', data),
+    getCashRecon: (filters) => _call('fin_get_cash_recon', filters || {}),
+    recordCashCollection: (data) => _call('fin_record_cash_collection', data),
   };
 
 })();

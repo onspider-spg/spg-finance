@@ -1,4 +1,4 @@
-/** Version 1.5 | 14 MAR 2026 | Siam Palette Group | Created 13 MAR 2026 */
+/** Version 1.5.1 | 14 MAR 2026 | Siam Palette Group | Created 13 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — api_fin.js
@@ -171,6 +171,7 @@ const API = (() => {
           channels: _MOCK_MASTER.channels,
           bankAccounts: _MOCK_MASTER.bankAccounts,
           taxCodes: _MOCK_MASTER.taxCodes,
+          accountTypes: [],
         };
       }
 
@@ -179,6 +180,7 @@ const API = (() => {
       _S().channels = res.channels || [];
       _S().bankAccounts = res.bankAccounts || [];
       _S().taxCodes = res.taxCodes || [];
+      _S().accountTypes = res.accountTypes || [];
 
       return res;
     } finally {

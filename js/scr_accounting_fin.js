@@ -1,4 +1,4 @@
-/** Version 1.0.1 | 14 MAR 2026 | Siam Palette Group */
+/** Version 1.0.2 | 14 MAR 2026 | Siam Palette Group */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_accounting_fin.js
@@ -28,34 +28,51 @@
   let _editingCat = null;  // category being edited (full object)
   let _taxRows = [];
 
-  // ── Category type options (from wireframe) ──
-  const CAT_TYPES = [
-    'Bank', 'Account receivable', 'Other current asset', 'Fixed asset', 'Other asset',
-    'Credit card', 'Account payable', 'Other current liability', 'Long term liability',
-    'Equity', 'Income', 'Cost of sales', 'Expense', 'Other income', 'Other expense',
+  // ── Category type options — loaded from DB via App.S.accountTypes ──
+  // Fallback hard code in case DB hasn't loaded yet
+  const _FALLBACK_TYPES = [
+    { name: 'Bank', classification: 'Asset' },
+    { name: 'Account receivable', classification: 'Asset' },
+    { name: 'Other current asset', classification: 'Asset' },
+    { name: 'Fixed asset', classification: 'Asset' },
+    { name: 'Other asset', classification: 'Asset' },
+    { name: 'Credit card', classification: 'Liability' },
+    { name: 'Account payable', classification: 'Liability' },
+    { name: 'Other current liability', classification: 'Liability' },
+    { name: 'Long term liability', classification: 'Liability' },
+    { name: 'Equity', classification: 'Equity' },
+    { name: 'Income', classification: 'Income' },
+    { name: 'Cost of sales', classification: 'Cost of Sales' },
+    { name: 'Expense', classification: 'Expense' },
+    { name: 'Other income', classification: 'Other Income' },
+    { name: 'Other expense', classification: 'Other Expense' },
   ];
 
-  // Map account_type → transaction_type (classification)
-  const TYPE_TO_CLASS = {
-    'Bank': 'Asset', 'Account receivable': 'Asset', 'Other current asset': 'Asset',
-    'Fixed asset': 'Asset', 'Other asset': 'Asset',
-    'Credit card': 'Liability', 'Account payable': 'Liability',
-    'Other current liability': 'Liability', 'Long term liability': 'Liability',
-    'Equity': 'Equity', 'Income': 'Income', 'Cost of sales': 'Cost of Sales',
-    'Expense': 'Expense', 'Other income': 'Other Income', 'Other expense': 'Other Expense',
-  };
+  /** Get account types — DB first, fallback if not loaded */
+  function _getAccountTypes() {
+    const fromDB = App.S.accountTypes;
+    return (fromDB && fromDB.length > 0) ? fromDB : _FALLBACK_TYPES;
+  }
+
+  /** Build TYPE_TO_CLASS map dynamically from account types */
+  function _buildTypeToClass() {
+    const map = {};
+    _getAccountTypes().forEach(t => { map[t.name] = t.classification; });
+    return map;
+  }
 
   /** Infer account_type from transaction_type for old records that don't have account_type set */
   function _inferAccountType(txType) {
     if (!txType) return '';
-    const map = {
-      'Income': 'Income', 'Expense': 'Expense', 'Asset Purchase': 'Fixed asset',
-      'Transfer': 'Bank', 'Loan': 'Long term liability',
-      'Asset': 'Other current asset', 'Liability': 'Other current liability',
-      'Equity': 'Equity', 'Cost of Sales': 'Cost of sales',
-      'Other Income': 'Other income', 'Other Expense': 'Other expense',
+    // Try to find an account type whose classification matches this transaction_type
+    const types = _getAccountTypes();
+    const match = types.find(t => t.classification === txType);
+    if (match) return match.name;
+    // Fallback mapping for legacy transaction_types
+    const legacy = {
+      'Asset Purchase': 'Fixed asset', 'Transfer': 'Bank', 'Loan': 'Long term liability',
     };
-    return map[txType] || '';
+    return legacy[txType] || '';
   }
 
   // Tab filter options
@@ -262,12 +279,13 @@
     const c = cat || {};
 
     // Resolve account_type: use stored value, or infer from transaction_type for old records
+    const TYPE_TO_CLASS = _buildTypeToClass();
     const resolvedAccountType = c.account_type || _inferAccountType(c.transaction_type) || '';
     const isBank = (resolvedAccountType === 'Bank');
 
-    // Category type options — match resolved type
-    const typeOpts = CAT_TYPES.map(t =>
-      `<option value="${t}"${t === resolvedAccountType ? ' selected' : ''}>${t}</option>`
+    // Category type options — from DB
+    const typeOpts = _getAccountTypes().map(t =>
+      `<option value="${t.name}"${t.name === resolvedAccountType ? ' selected' : ''}>${t.name}</option>`
     ).join('');
 
     // Tax code options
@@ -371,6 +389,7 @@
 
   function _onTypeChange(val) {
     // Update classification display
+    const TYPE_TO_CLASS = _buildTypeToClass();
     const clEl = document.getElementById('cat_class');
     if (clEl) clEl.textContent = TYPE_TO_CLASS[val] || '—';
     _populateParentHeaders();
@@ -380,6 +399,7 @@
   function _populateParentHeaders() {
     const sel = document.getElementById('cat_parent');
     if (!sel) return;
+    const TYPE_TO_CLASS = _buildTypeToClass();
     const typeEl = document.getElementById('cat_type');
     const selectedType = typeEl ? typeEl.value : '';
     const classification = TYPE_TO_CLASS[selectedType] || '';
@@ -440,7 +460,7 @@
     try {
       const level = parseInt(document.querySelector('input[name="cat_level"]:checked')?.value || '2');
       const account_type = document.getElementById('cat_type')?.value || '';
-      const classification = TYPE_TO_CLASS[account_type] || account_type;
+      const classification = _buildTypeToClass()[account_type] || account_type;
       const main_category = document.getElementById('cat_parent')?.value || classification;
       const account_code = document.getElementById('cat_code')?.value?.trim() || '';
       const sub_category = document.getElementById('cat_name')?.value?.trim() || '';

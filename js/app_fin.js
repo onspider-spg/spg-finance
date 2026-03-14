@@ -1,4 +1,4 @@
-/** Version 2.0 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 2.0.1 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — app_fin.js
@@ -39,6 +39,7 @@ const App = (() => {
     channels: [],
     bankAccounts: [],
     taxCodes: [],
+    accountTypes: [],
     // Detail data (populated by API.initMaster in background)
     vendors: [],
     categories: [],
@@ -342,7 +343,7 @@ const App = (() => {
 
     // Footer
     html += `<div class="sf">
-      <div style="font-size:9px;color:var(--t4);padding:2px 0;margin-bottom:4px">v2.0 | 14 Mar 2026 AEDT</div>
+      <div style="font-size:9px;color:var(--t4);padding:2px 0;margin-bottom:4px">v2.0.1 | 14 Mar 2026 AEDT</div>
       <a href="https://onspider-spg.github.io/spg/#dashboard"><span style="font-size:12px">←</span><span class="sit"> Back to Home</span></a>
       <a href="https://onspider-spg.github.io/spg/#logout" class="danger"><span style="font-size:12px">→</span><span class="sit"> Log out</span></a>
     </div>`;
@@ -549,6 +550,7 @@ const App = (() => {
     S.channels = [];
     S.bankAccounts = [];
     S.taxCodes = [];
+    S.accountTypes = [];
     S.vendors = [];
     S.categories = [];
     S.vendorRules = [];

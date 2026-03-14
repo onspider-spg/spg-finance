@@ -1,4 +1,4 @@
-/** Version 1.6 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 1.6.1 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_tx_fin.js
@@ -6,11 +6,9 @@
  * Bill Detail, SD Bridge, Find Transactions
  * ═══════════════════════════════════════════
  *
- * CHANGED v1.5.2 → v1.6:
- * - SD Bridge: MOCK hardcoded → API.getSdPending() + dynamic render + onLoad
- * - SD Bridge: group by date+store, collapsible cards, real KPIs
- * - SD Bridge: checkbox select + Sync selected calls API.syncSd()
- * - SD Bridge: filter (All/Pending/Done), month picker
+ * CHANGED v1.6 → v1.6.1:
+ * - SD Bridge items: show vendor_name, doc_type badge, doc_number, description, payment_status
+ * - SD Bridge KPI: use syncedCount from backend
  * ═══════════════════════════════════════════
  */
 (() => {
@@ -519,12 +517,11 @@ async function _loadSdBridge() {
     // Render KPI
     const kpiEl = document.getElementById('sd_kpi');
     if (kpiEl) {
-      const syncedCount = rows.filter(r => r.status === 'synced').length;
       kpiEl.innerHTML = `
         <div class="kpi-c" style="background:#fff"><div class="kpi-v" style="color:var(--g)">${fm(kpi.revenue || 0)}</div><div class="kpi-l">Total Revenue</div></div>
         <div class="kpi-c" style="background:#fff"><div class="kpi-v" style="color:var(--r)">${fm(kpi.expenses || 0)}</div><div class="kpi-l">Total Expenses</div></div>
         <div class="kpi-c" style="background:#fff"><div class="kpi-v">${kpi.pendingCount || 0}</div><div class="kpi-l">Pending items</div></div>
-        <div class="kpi-c" style="background:#fff"><div class="kpi-v" style="color:var(--g)">${syncedCount}</div><div class="kpi-l">Synced</div></div>`;
+        <div class="kpi-c" style="background:#fff"><div class="kpi-v" style="color:var(--g)">${kpi.syncedCount || 0}</div><div class="kpi-l">Synced</div></div>`;
     }
 
     // Update filter button counts
@@ -596,11 +593,27 @@ async function _loadSdBridge() {
       g.items.forEach(r => {
         const isPending = r.status === 'pending';
         const isRev = r.type === 'revenue';
-        const icon = isRev ? '💰' : '📦';
+        const icon = isRev ? '💰' : (r.doc_type === 'Invoice' ? '📄' : '📦');
         const amtColor = isRev ? 'var(--g)' : 'var(--r)';
         const amtSign = isRev ? '+' : '-';
         const rowBg = isPending ? 'rgba(217,119,6,.03)' : '';
         const rowOpacity = isPending ? '' : 'opacity:.7';
+
+        // Doc type badge
+        const docBadge = r.doc_type === 'Invoice' ? '<span style="font-size:9px;padding:1px 6px;border-radius:3px;background:var(--obg);color:var(--o)">Invoice</span>'
+          : r.doc_type === 'Bill' ? '<span style="font-size:9px;padding:1px 6px;border-radius:3px;background:var(--rbg);color:var(--r)">Bill</span>'
+          : r.doc_type === 'None' ? '<span style="font-size:9px;padding:1px 6px;border-radius:3px;background:var(--gbg);color:var(--g)">Revenue</span>'
+          : '';
+
+        // Payment status badge
+        const payBadge = r.payment_status === 'Paid' ? '<span style="font-size:9px;padding:1px 6px;border-radius:3px;background:var(--gbg);color:var(--g)">Paid</span>'
+          : r.payment_status === 'Unpaid' ? '<span style="font-size:9px;padding:1px 6px;border-radius:3px;background:var(--rbg);color:var(--r)">Unpaid</span>'
+          : r.payment_status === 'Pending' ? '<span style="font-size:9px;padding:1px 6px;border-radius:3px;background:var(--obg);color:var(--o)">Pending</span>'
+          : '';
+
+        // Display name: vendor for expense, channel description for revenue
+        const displayName = isRev ? (r.description || 'Revenue') : (r.vendor_name || r.description || '—');
+        const subInfo = r.doc_number ? r.doc_number : '';
 
         html += `<div style="display:flex;align-items:center;padding:8px 16px;gap:10px;border-bottom:1px solid var(--bd2);font-size:12px;background:${rowBg};${rowOpacity}">`;
         if (isPending) {
@@ -609,9 +622,10 @@ async function _loadSdBridge() {
           html += `<input type="checkbox" disabled checked style="accent-color:var(--acc)">`;
         }
         html += `<span style="font-size:15px;width:22px;text-align:center">${icon}</span>`;
-        html += `<div style="flex:1"><div style="font-weight:500">${esc(r.channel || r.type)}</div></div>`;
+        html += `<div style="flex:1;min-width:0"><div style="font-weight:500">${esc(displayName)}</div><div style="font-size:10px;color:var(--t3);display:flex;gap:6px;align-items:center;margin-top:1px">${docBadge}${subInfo ? '<span>' + esc(subInfo) + '</span>' : ''}${r.description && !isRev && r.vendor_name ? '<span>' + esc(r.description) + '</span>' : ''}</div></div>`;
         html += `<div style="font-weight:700;min-width:80px;text-align:right;color:${amtColor}">${amtSign}${fm(Math.abs(r.amount || 0))}</div>`;
-        html += `<div style="min-width:70px;text-align:center">${isPending ? '<span class="sts sts-p">Pending</span>' : '<span class="sts sts-c">✓</span>'}</div>`;
+        html += `<div style="min-width:60px;text-align:center">${payBadge}</div>`;
+        html += `<div style="min-width:60px;text-align:center">${isPending ? '<span class="sts sts-p">Pending</span>' : '<span class="sts sts-c">✓ Synced</span>'}</div>`;
         html += `</div>`;
       });
 

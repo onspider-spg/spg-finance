@@ -1,4 +1,4 @@
-/** Version 1.4 | 15 MAR 2026 | Siam Palette Group */
+/** Version 1.4.1 | 15 MAR 2026 | Siam Palette Group */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_reports_fin.js
@@ -1037,7 +1037,7 @@
         </div></div>`;
       return;
     }
-    let html = '<table class="tbl"><thead><tr><th>Supplier</th><th style="text-align:right">Current</th><th style="text-align:right">1-30 days</th><th style="text-align:right">31-60 days</th><th style="text-align:right">60+ days</th><th style="text-align:right">Total</th></tr></thead><tbody>';
+    let html = '<table class="tbl" id="rp_aging_tbl"><thead><tr>' + App.sth('Supplier','supplier','rp_aging_tbl') + App.sthR('Current','current','rp_aging_tbl') + App.sthR('1-30 days','d30','rp_aging_tbl') + App.sthR('31-60 days','d60','rp_aging_tbl') + App.sthR('60+ days','d60p','rp_aging_tbl') + App.sthR('Total','total','rp_aging_tbl') + '</tr></thead><tbody>';
     if (rows.length === 0) {
       html += `<tr><td colspan="6" style="text-align:center;color:var(--t3);padding:20px">No ${_aparTab === 'ar' ? 'receivables' : 'payables'} found</td></tr>`;
     }
@@ -1088,7 +1088,7 @@
       <div class="kpi-c"><div class="kpi-l">Accumulated Dep.</div><div class="kpi-v" style="color:var(--r)">${fm(d.total_dep || 0, 0)}</div></div>
       <div class="kpi-c"><div class="kpi-l">Net Book Value</div><div class="kpi-v" style="color:var(--g)">${fm(d.total_nbv || 0, 0)}</div></div>
     </div>`;
-    html += '<table class="tbl"><thead><tr><th>Asset ID</th><th>Name</th><th>Category</th><th>Brand</th><th>Purchase Date</th><th style="text-align:right">Cost</th><th style="text-align:right">NBV</th><th>Status</th></tr></thead><tbody>';
+    html += '<table class="tbl" id="rp_asset_tbl"><thead><tr>' + App.sth('Asset ID','id','rp_asset_tbl') + App.sth('Name','name','rp_asset_tbl') + App.sth('Category','cat','rp_asset_tbl') + App.sth('Brand','brand','rp_asset_tbl') + App.sth('Purchase Date','date','rp_asset_tbl') + App.sthR('Cost','cost','rp_asset_tbl') + App.sthR('NBV','nbv','rp_asset_tbl') + App.sth('Status','status','rp_asset_tbl') + '</tr></thead><tbody>';
     (d.rows || []).forEach(r => {
       html += `<tr><td><a class="lk">${esc(r.asset_id)}</a></td><td>${esc(r.name)}</td><td>${esc(r.category)}</td><td>${esc(r.brand)}</td><td>${esc(r.purchase_date)}</td>
         <td style="text-align:right">${fm(r.cost)}</td><td style="text-align:right">${fm(r.nbv)}</td>
@@ -1124,7 +1124,7 @@
       _bankData = _mockBank();
     }
     const d = _bankData;
-    let html = '<table class="tbl"><thead><tr><th>Account</th><th>Brand</th><th style="text-align:right">SPG Balance</th><th style="text-align:right">Bank Balance</th><th style="text-align:right">Difference</th><th>Reconciled?</th><th>Last reconciled</th></tr></thead><tbody>';
+    let html = '<table class="tbl" id="rp_bank_tbl"><thead><tr>' + App.sth('Account','acct','rp_bank_tbl') + App.sth('Brand','brand','rp_bank_tbl') + App.sthR('SPG Balance','spg','rp_bank_tbl') + App.sthR('Bank Balance','bank','rp_bank_tbl') + App.sthR('Difference','diff','rp_bank_tbl') + App.sth('Reconciled?','recon','rp_bank_tbl') + App.sth('Last reconciled','last','rp_bank_tbl') + '</tr></thead><tbody>';
     (d.rows || []).forEach(r => {
       const diff = (r.spg_balance || 0) - (r.bank_balance || 0);
       const diffColor = Math.abs(diff) < 0.01 ? 'var(--g)' : (Math.abs(diff) > 500 ? 'var(--r)' : 'var(--o)');
@@ -1169,7 +1169,7 @@
       console.warn('getCashSummary failed, using mock:', e.message);
       _cashData = _mockCash();
     }
-    let html = '<table class="tbl"><thead><tr><th>Account</th><th>Brand</th><th style="text-align:right">System Balance</th><th style="text-align:right">Last Count</th><th style="text-align:right">Difference</th><th>Last counted</th><th>Status</th></tr></thead><tbody>';
+    let html = '<table class="tbl" id="rp_cash_tbl"><thead><tr>' + App.sth('Account','acct','rp_cash_tbl') + App.sth('Brand','brand','rp_cash_tbl') + App.sthR('System Balance','sys','rp_cash_tbl') + App.sthR('Last Count','count','rp_cash_tbl') + App.sthR('Difference','diff','rp_cash_tbl') + App.sth('Last counted','last','rp_cash_tbl') + App.sth('Status','status','rp_cash_tbl') + '</tr></thead><tbody>';
     (_cashData.rows || []).forEach(r => {
       const diff = (r.system || 0) - (r.count || 0);
       const diffColor = Math.abs(diff) < 0.01 ? 'var(--g)' : 'var(--r)';
@@ -1248,7 +1248,7 @@
       html += '</div>';
     } else if (_loanTab === 'director') {
       html += '<div class="card" style="margin:0 0 10px"><div style="font-size:11px;font-weight:700;margin-bottom:6px">Director Loans Summary</div>';
-      html += '<table class="tbl"><thead><tr><th>Director</th><th>Entity</th><th style="text-align:right">Lent</th><th style="text-align:right">Repaid</th><th style="text-align:right">Outstanding</th><th>Is Capital?</th></tr></thead><tbody>';
+      html += '<table class="tbl" id="rp_dir_tbl"><thead><tr>' + App.sth('Director','director','rp_dir_tbl') + App.sth('Entity','entity','rp_dir_tbl') + App.sthR('Lent','lent','rp_dir_tbl') + App.sthR('Repaid','repaid','rp_dir_tbl') + App.sthR('Outstanding','outstanding','rp_dir_tbl') + App.sth('Is Capital?','capital','rp_dir_tbl') + '</tr></thead><tbody>';
       (d.director_loans || []).forEach(r => {
         html += `<tr><td>${esc(r.director)}</td><td>${esc(r.entity)}</td>
           <td style="text-align:right">${fm(r.lent)}</td><td style="text-align:right">${fm(r.repaid)}</td>
@@ -1258,7 +1258,7 @@
     } else {
       // Capital structure
       html += '<div class="card" style="margin:0 0 10px"><div style="font-size:11px;font-weight:700;margin-bottom:6px">Capital Structure</div>';
-      html += '<table class="tbl"><thead><tr><th>Entity</th><th style="text-align:right">Share Capital</th><th style="text-align:right">Director Loans</th><th style="text-align:right">Retained Earnings</th><th style="text-align:right">Total Equity</th></tr></thead><tbody>';
+      html += '<table class="tbl" id="rp_equity_tbl"><thead><tr>' + App.sth('Entity','entity','rp_equity_tbl') + App.sthR('Share Capital','share','rp_equity_tbl') + App.sthR('Director Loans','loans','rp_equity_tbl') + App.sthR('Retained Earnings','retained','rp_equity_tbl') + App.sthR('Total Equity','total','rp_equity_tbl') + '</tr></thead><tbody>';
       (d.capital_structure || []).forEach(r => {
         html += `<tr><td style="font-weight:600">${esc(r.entity)}</td>
           <td style="text-align:right">${fm(r.share_capital)}</td><td style="text-align:right">${fm(r.director_loans)}</td>
@@ -1442,7 +1442,7 @@
       <div class="kpi-c"><div class="kpi-l">Budget Revenue</div><div class="kpi-v" style="color:var(--t3)">${_fmK(d.budget_rev)}</div></div>
       <div class="kpi-c"><div class="kpi-l">Achievement</div><div class="kpi-v" style="color:${Number(achievement) >= 100 ? 'var(--g)' : 'var(--r)'}">${achievement}%</div></div>
     </div>`;
-    html += '<table class="tbl"><thead><tr><th>Category</th><th style="text-align:right">Budget</th><th style="text-align:right">Actual</th><th style="text-align:right">Variance</th><th style="text-align:right">%</th></tr></thead><tbody>';
+    html += '<table class="tbl" id="rp_budget_tbl"><thead><tr>' + App.sth('Category','cat','rp_budget_tbl') + App.sthR('Budget','budget','rp_budget_tbl') + App.sthR('Actual','actual','rp_budget_tbl') + App.sthR('Variance','variance','rp_budget_tbl') + App.sthR('%','pct','rp_budget_tbl') + '</tr></thead><tbody>';
     (d.rows || []).forEach(r => {
       const variance = (r.actual || 0) - (r.budget || 0);
       const isExpense = r.category !== 'Revenue';
@@ -1496,7 +1496,7 @@
       <div class="kpi-c"><div class="kpi-l">Delivery</div><div class="kpi-v" style="color:var(--o)">${_fmK(d.delivery)}</div></div>
       <div class="kpi-c"><div class="kpi-l">Other</div><div class="kpi-v" style="color:var(--acc)">${_fmK(d.other)}</div></div>
     </div>`;
-    html += '<table class="tbl"><thead><tr><th>Channel</th><th style="text-align:right">This Month</th><th style="text-align:right">Last Month</th><th style="text-align:right">Change</th><th style="text-align:right">% of Total</th></tr></thead><tbody>';
+    html += '<table class="tbl" id="rp_rev_tbl"><thead><tr>' + App.sth('Channel','channel','rp_rev_tbl') + App.sthR('This Month','this','rp_rev_tbl') + App.sthR('Last Month','last','rp_rev_tbl') + App.sthR('Change','change','rp_rev_tbl') + App.sthR('% of Total','pct','rp_rev_tbl') + '</tr></thead><tbody>';
     (d.rows || []).forEach(r => {
       const chg = r.prev ? (((r.amount - r.prev) / r.prev) * 100) : 0;
       const pctTotal = d.total ? ((r.amount / d.total) * 100).toFixed(1) : '0';
@@ -1550,7 +1550,7 @@
       <div class="kpi-c"><div class="kpi-l">MoM Change</div><div class="kpi-v" style="color:var(--o)">${Number(momChg) >= 0 ? '+' : ''}${momChg}%</div></div>
       <div class="kpi-c"><div class="kpi-l">Largest: ${esc(largest.category || '')}</div><div class="kpi-v">${_fmK(largest.amount)}</div></div>
     </div>`;
-    html += '<table class="tbl"><thead><tr><th>Category</th><th style="text-align:right">This Month</th><th style="text-align:right">Last Month</th><th style="text-align:right">Change</th><th style="text-align:right">% of Revenue</th></tr></thead><tbody>';
+    html += '<table class="tbl" id="rp_exp_tbl"><thead><tr>' + App.sth('Category','cat','rp_exp_tbl') + App.sthR('This Month','this','rp_exp_tbl') + App.sthR('Last Month','last','rp_exp_tbl') + App.sthR('Change','change','rp_exp_tbl') + App.sthR('% of Revenue','pct','rp_exp_tbl') + '</tr></thead><tbody>';
     (d.rows || []).forEach(r => {
       const chg = r.prev ? (((r.amount - r.prev) / r.prev) * 100) : 0;
       const revPct = d.revenue ? ((r.amount / d.revenue) * 100).toFixed(1) : '0';

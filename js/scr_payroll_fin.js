@@ -1,4 +1,4 @@
-/** Version 1.2 | 15 MAR 2026 | Siam Palette Group */
+/** Version 1.2.1 | 15 MAR 2026 | Siam Palette Group */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_payroll_fin.js
@@ -88,12 +88,12 @@
           <div><div class="fl-l">Date to</div><input class="fl" type="date" id="pr_fl_to" style="width:120px" onchange="ScrPayroll._applyFilter()"></div>
         </div>
         <div class="card" style="padding:0;overflow:hidden">
-          <table class="tbl"><thead><tr>
-            <th>Pay Run</th><th>Work Period</th><th>Pay Date</th>
+          <table class="tbl" id="pr_runs_tbl"><thead><tr>
+            ${App.sth('Pay Run','run','pr_runs_tbl')}${App.sth('Work Period','period','pr_runs_tbl')}${App.sth('Pay Date','paydate','pr_runs_tbl')}
             <th style="text-align:center">Brands</th><th style="text-align:center">Employees</th>
-            <th style="text-align:right">Payroll $</th><th style="text-align:right">TAX</th>
-            <th style="text-align:right">SUPER</th><th style="text-align:right;font-weight:700">Total $</th>
-            <th>Alloc?</th><th>Status</th>
+            ${App.sthR('Payroll $','payroll','pr_runs_tbl')}${App.sthR('TAX','tax','pr_runs_tbl')}
+            ${App.sthR('SUPER','super','pr_runs_tbl')}${App.sthR('Total $','total','pr_runs_tbl')}
+            ${App.sth('Alloc?','alloc','pr_runs_tbl')}${App.sth('Status','status','pr_runs_tbl')}
           </tr></thead><tbody id="pr_runs_body"><tr><td colspan="11" style="text-align:center;padding:20px;color:var(--t3)">Loading...</td></tr></tbody></table>
         </div>
       </div>`,
@@ -708,9 +708,9 @@
           <div><div class="fl-l">Status</div><select class="fl" id="pr_emp_fl_status" onchange="ScrPayroll._applyEmpFilter()"><option>Active</option><option>Casual</option><option>Inactive</option><option>All</option></select></div>
           <div><div class="fl-l">Search</div><input class="fl" id="pr_emp_fl_search" placeholder="Name..." style="width:140px" oninput="ScrPayroll._applyEmpFilter()"></div>
         </div>
-        <table class="tbl"><thead><tr>
-          <th>Name</th><th>Nickname</th><th>Department</th><th>Brand</th>
-          <th style="text-align:right">Hourly Rate</th><th style="text-align:right">Cash Rate</th><th>Status</th>
+        <table class="tbl" id="pr_emp_tbl"><thead><tr>
+          ${App.sth('Name','name','pr_emp_tbl')}${App.sth('Nickname','nick','pr_emp_tbl')}${App.sth('Department','dept','pr_emp_tbl')}${App.sth('Brand','brand','pr_emp_tbl')}
+          ${App.sthR('Hourly Rate','hourly','pr_emp_tbl')}${App.sthR('Cash Rate','cash','pr_emp_tbl')}${App.sth('Status','status','pr_emp_tbl')}
         </tr></thead><tbody id="pr_emp_body"><tr><td colspan="7" style="text-align:center;padding:20px;color:var(--t3)">Loading...</td></tr></tbody></table>
       </div>`,
     };
@@ -905,10 +905,10 @@
         </div>
       </div>
       <div style="font-size:12px;font-weight:700;margin-bottom:6px">PAYG + Super Breakdown</div>
-      <table class="tbl"><thead><tr>
-        <th>Pay Run</th><th>Work Period</th><th style="text-align:right">Gross</th>
-        <th style="text-align:right;color:var(--r)">PAYG</th><th style="text-align:right;color:var(--o)">Super</th>
-        <th>PAYG Status</th><th>Super Status</th>
+      <table class="tbl" id="pr_empbal_tbl"><thead><tr>
+        ${App.sth('Pay Run','run','pr_empbal_tbl')}${App.sth('Work Period','period','pr_empbal_tbl')}${App.sthR('Gross','gross','pr_empbal_tbl')}
+        ${App.sthR('PAYG','payg','pr_empbal_tbl')}${App.sthR('Super','super','pr_empbal_tbl')}
+        ${App.sth('PAYG Status','paygsts','pr_empbal_tbl')}${App.sth('Super Status','supersts','pr_empbal_tbl')}
       </tr></thead><tbody>${_empBalanceRows()}</tbody>
       <tfoot><tr style="border-top:2px solid var(--bd);font-weight:700">
         <td colspan="2">Total</td>
@@ -949,12 +949,12 @@
       return;
     }
 
-    el.innerHTML = `<table class="tbl"><thead><tr>
-      <th>Pay Run</th><th>Work Period</th><th>Brand</th>
-      <th style="text-align:right">Payroll Hrs</th><th style="text-align:right">Cash Hrs</th>
-      <th style="text-align:right">Cash Pay</th><th style="text-align:right">Transfer</th>
-      <th style="text-align:right;color:var(--r)">TAX</th><th style="text-align:right;color:var(--o)">SUPER</th>
-      <th style="text-align:right;font-weight:700">Total</th><th>Status</th>
+    el.innerHTML = `<table class="tbl" id="pr_emphist_tbl"><thead><tr>
+      ${App.sth('Pay Run','run','pr_emphist_tbl')}${App.sth('Work Period','period','pr_emphist_tbl')}${App.sth('Brand','brand','pr_emphist_tbl')}
+      ${App.sthR('Payroll Hrs','phrs','pr_emphist_tbl')}${App.sthR('Cash Hrs','chrs','pr_emphist_tbl')}
+      ${App.sthR('Cash Pay','cpay','pr_emphist_tbl')}${App.sthR('Transfer','xfer','pr_emphist_tbl')}
+      ${App.sthR('TAX','tax','pr_emphist_tbl')}${App.sthR('SUPER','super','pr_emphist_tbl')}
+      ${App.sthR('Total','total','pr_emphist_tbl')}${App.sth('Status','status','pr_emphist_tbl')}
     </tr></thead><tbody>${history.slice(0, 50).map(h => `<tr>
       <td><a class="lk">${esc(h.pay_run_no)}</a></td>
       <td>${_fmtPeriod(h.period_start, h.period_end)}</td>

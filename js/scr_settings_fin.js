@@ -1,4 +1,4 @@
-/** Version 1.0 | 14 MAR 2026 | Siam Palette Group */
+/** Version 1.0.1 | 15 MAR 2026 | Siam Palette Group */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_settings_fin.js
@@ -39,10 +39,10 @@
             <button class="bs" onclick="ScrSettings._addAlert()">+ Add New</button>
           </div>
           <div class="card" style="padding:0;overflow:hidden">
-            <table class="tbl" style="margin:0">
+            <table class="tbl" id="st_alert_tbl" style="margin:0">
               <thead><tr>
-                <th>Rule Name</th><th>Metric</th><th>Threshold</th>
-                <th>Severity</th><th>Action</th><th>Status</th>
+                ${App.sth('Rule Name','rule','st_alert_tbl')}${App.sth('Metric','metric','st_alert_tbl')}${App.sth('Threshold','threshold','st_alert_tbl')}
+                ${App.sth('Severity','severity','st_alert_tbl')}${App.sth('Action','action','st_alert_tbl')}${App.sth('Status','status','st_alert_tbl')}
               </tr></thead>
               <tbody id="st_alert_body">
                 <tr>
@@ -94,10 +94,10 @@
             <button class="bs" onclick="ScrSettings._addUser()">+ Add User</button>
           </div>
           <div class="card" style="padding:0;overflow:hidden">
-            <table class="tbl" style="margin:0">
+            <table class="tbl" id="st_perm_tbl" style="margin:0">
               <thead><tr>
-                <th>User</th><th>Email</th><th>Role</th>
-                <th>Access Level</th><th>Last Login</th><th>Status</th>
+                ${App.sth('User','user','st_perm_tbl')}${App.sth('Email','email','st_perm_tbl')}${App.sth('Role','role','st_perm_tbl')}
+                ${App.sth('Access Level','access','st_perm_tbl')}${App.sth('Last Login','login','st_perm_tbl')}${App.sth('Status','status','st_perm_tbl')}
               </tr></thead>
               <tbody id="st_perm_body">
                 <tr>
@@ -158,9 +158,9 @@
             <button class="btn bo" onclick="ScrSettings._exportAudit()">Export</button>
           </div>
           <div class="card" style="padding:0;overflow:hidden">
-            <table class="tbl" style="margin:0">
+            <table class="tbl" id="st_audit_tbl" style="margin:0">
               <thead><tr>
-                <th>Timestamp</th><th>User</th><th>Action</th><th>Details</th>
+                ${App.sth('Timestamp','time','st_audit_tbl')}${App.sth('User','user','st_audit_tbl')}${App.sth('Action','action','st_audit_tbl')}${App.sth('Details','details','st_audit_tbl')}
               </tr></thead>
               <tbody id="st_audit_body">
                 <tr>

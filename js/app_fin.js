@@ -1,4 +1,4 @@
-/** Version 2.6.1 | 15 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 2.6.2 | 15 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — app_fin.js
@@ -173,6 +173,8 @@ const App = (() => {
 
   // Route → script file mapping
   const ROUTE_FILE = {
+    // Dashboard (E6d — override built-in after scr_reports loads)
+    dashboard: 'js/scr_reports_fin.js',
     // Create screens
     cr_sale: 'js/scr_input_fin.js', cr_bill: 'js/scr_input_fin.js',
     cr_transfer: 'js/scr_input_fin.js', cr_debit: 'js/scr_input_fin.js',

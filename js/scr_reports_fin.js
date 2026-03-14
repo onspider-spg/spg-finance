@@ -1,9 +1,9 @@
-/** Version 1.3 | 15 MAR 2026 | Siam Palette Group */
+/** Version 1.4 | 15 MAR 2026 | Siam Palette Group */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_reports_fin.js
- * Reports (11) + Performance (4) = 15 screens total
- * Lazy-loaded by app_fin.js on first visit to rp_*/fp_* routes
+ * Reports (11) + Performance (4) + Dashboard (1) = 16 screens total
+ * Lazy-loaded by app_fin.js on first visit to rp_*/fp_*/dashboard routes
  * ═══════════════════════════════════════════
  */
 
@@ -31,6 +31,7 @@
   let _fpBudgetData = null;   // performance: budget vs actual
   let _fpRevData = null;      // performance: revenue analysis
   let _fpExpData = null;      // performance: expense trend
+  let _dashData = null;       // CFO dashboard data
 
   // ── Helpers ──
 
@@ -1624,9 +1625,180 @@
   }
 
   // ══════════════════════════════════════════
+  // dashboard: CFO BRIEF (E6d)
+  // ══════════════════════════════════════════
+  function renderDashboard() {
+    if (!_filters.month) _filters.month = _curMonth();
+    return {
+      tb: '<div class="tb"><div class="tb-t">Financial Dashboard</div>' +
+          '<select class="fl" id="dash_month" onchange="ScrReports._onDashFilter()" style="width:110px">' + _monthOpts(_filters.month) + '</select>' +
+          '<select class="fl" id="dash_brand" onchange="ScrReports._onDashFilter()" style="width:140px">' + _brandOpts(_filters.brand) + '</select>' +
+          '<button class="btn bo" onclick="ScrReports._onDashFilter()" style="padding:5px 10px;font-size:11px">↻ Refresh</button></div>',
+      ct: `<div style="max-width:1100px;margin:0 auto">
+        <div id="dash_content"><div class="empty" style="padding:40px"><div class="fin-spinner" style="margin:0 auto 8px"></div>Loading CFO Brief...</div></div>
+      </div>`,
+    };
+  }
+
+  async function _loadDashboard() {
+    const el = document.getElementById('dash_content');
+    if (!el) return;
+
+    try {
+      _dashData = await API.getCfoDashboard({
+        month: _filters.month,
+        brand: _filters.brand === 'All' ? null : _filters.brand,
+      });
+    } catch (e) {
+      console.warn('getCfoDashboard failed, using mock:', e.message);
+      _dashData = _mockDashboard();
+    }
+
+    const d = _dashData;
+    let h = '';
+
+    // ── Brand Scoreboard ──
+    h += '<div style="display:flex;gap:8px;margin-bottom:14px">';
+    (d.brands || []).forEach(b => {
+      const dotColor = b.net >= 0 ? 'var(--g)' : 'var(--r)';
+      const borderColor = b.net >= 0 ? 'var(--g)' : (b.rev_chg < -5 ? 'var(--r)' : 'var(--o)');
+      h += `<div class="card" style="flex:1;margin:0;border-top:3px solid ${borderColor};padding:10px 12px;cursor:pointer" onclick="App.go('rp_pnl_brand')">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-size:11px;font-weight:700">${esc(b.name)}</span><span style="width:8px;height:8px;border-radius:50%;background:${dotColor}"></span></div>
+        <div style="font-size:16px;font-weight:800">${_fmK(b.revenue)}</div>
+        <div style="font-size:9px;color:var(--t3)">Revenue · ${b.rev_chg >= 0 ? '▲' : '▼'} ${Math.abs(b.rev_chg || 0).toFixed(1)}%</div>
+        <div style="font-size:11px;font-weight:600;color:${b.net >= 0 ? 'var(--g)' : 'var(--r)'};margin-top:4px">Net ${b.net >= 0 ? '+' : ''}${fm(b.net, 0)} (${(b.net_pct || 0).toFixed(1)}%)</div>
+      </div>`;
+    });
+    h += '</div>';
+
+    // ── Mini Indicator Badges ──
+    h += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap">';
+    (d.indicators || []).forEach(ind => {
+      const color = ind.color || 'var(--t3)';
+      const bg = ind.bg || 'transparent';
+      h += `<div style="display:flex;align-items:center;gap:5px;padding:5px 12px;border-radius:20px;font-size:10px;font-weight:500;border:1px solid ${color};background:${bg}"><span style="width:6px;height:6px;border-radius:50%;background:${color}"></span><span style="color:${color}">${esc(ind.label)}</span></div>`;
+    });
+    h += '</div>';
+
+    // ── Grid Row 1: Cash / P&L / AP ──
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">';
+
+    // Cash Position
+    const cp = d.cash_position || {};
+    h += `<div class="card" style="margin:0"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-size:11px;font-weight:700">Cash Position</span><a class="lk" onclick="App.go('ac_hub')">Banking Hub →</a></div>
+      <div style="font-size:24px;font-weight:800;margin-bottom:6px">${fm(cp.total || 0, 0)}</div>
+      <div style="font-size:10px;color:var(--t2)">${esc(cp.breakdown || '')}</div></div>`;
+
+    // P&L Snapshot
+    const pnl = d.pnl_snapshot || {};
+    h += `<div class="card" style="margin:0"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-size:11px;font-weight:700">P&L Snapshot</span><a class="lk" onclick="App.go('rp_pnl')">Full P&L →</a></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:11px">
+        <div><div style="color:var(--t3);font-size:9px">Revenue</div><div style="font-weight:600">${_fmK(pnl.revenue)} ${pnl.rev_chg ? '<span style="color:var(--g);font-size:9px">▲' + pnl.rev_chg + '%</span>' : ''}</div></div>
+        <div><div style="color:var(--t3);font-size:9px">GP%</div><div style="font-weight:600;color:var(--g)">${(pnl.gp_pct || 0).toFixed(1)}%</div></div>
+        <div><div style="color:var(--t3);font-size:9px">EBITDA</div><div style="font-weight:600">${_fmK(pnl.ebitda)}</div></div>
+        <div><div style="color:var(--t3);font-size:9px">Net Profit</div><div style="font-weight:600;color:${(pnl.net || 0) >= 0 ? 'var(--g)' : 'var(--r)'}">${fm(pnl.net || 0, 0)}</div></div>
+      </div></div>`;
+
+    // Accounts Payable
+    const ap = d.ap || {};
+    h += `<div class="card" style="margin:0"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-size:11px;font-weight:700">Accounts Payable</span><a class="lk" onclick="App.go('rp_apar')">AP/AR →</a></div>
+      <div style="display:flex;gap:8px;margin-bottom:6px"><div><div style="font-size:16px;font-weight:700;color:var(--r)">${fm(ap.total || 0, 0)}</div><div style="font-size:9px;color:var(--t3)">total payable</div></div>
+      <div><div style="font-size:16px;font-weight:700;color:var(--r)">${fm(ap.overdue || 0, 0)}</div><div style="font-size:9px;color:var(--t3)">overdue</div></div></div>
+      ${ap.note ? '<div style="font-size:10px;color:var(--r)">' + esc(ap.note) + '</div>' : ''}</div>`;
+
+    h += '</div>';
+
+    // ── Grid Row 2: Recon / Loans / Tax ──
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">';
+
+    // Reconciliation
+    const rc = d.reconciliation || {};
+    h += `<div class="card" style="margin:0"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-size:11px;font-weight:700">Reconciliation</span><a class="lk" onclick="App.go('rc_bank')">Reconcile →</a></div>
+      <div style="display:flex;gap:8px;margin-bottom:6px"><div><div style="font-size:16px;font-weight:700;color:var(--g)">${esc(rc.days_done || '0/0')}</div><div style="font-size:9px;color:var(--t3)">days done</div></div>
+      <div><div style="font-size:16px;font-weight:700;color:var(--o)">${fm(rc.unmatched || 0, 0)}</div><div style="font-size:9px;color:var(--t3)">unmatched</div></div></div>
+      ${rc.note ? '<div style="font-size:10px;color:var(--o)">' + esc(rc.note) + '</div>' : ''}</div>`;
+
+    // Loans
+    const ln = d.loans || {};
+    h += `<div class="card" style="margin:0"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-size:11px;font-weight:700">Loans & Intercompany</span><a class="lk" onclick="App.go('ac_loan')">Loans →</a></div>
+      <div style="font-size:11px;line-height:1.8">
+        <div style="display:flex;justify-content:space-between"><span>Loans outstanding</span><span style="font-weight:600;color:var(--r)">${_fmK(ln.outstanding)}</span></div>
+        <div style="display:flex;justify-content:space-between"><span>Intercompany owing</span><span style="font-weight:600;color:var(--o)">${_fmK(ln.interco)}</span></div>
+        <div style="display:flex;justify-content:space-between"><span>Next repayment</span><span style="font-weight:600">${esc(ln.next_repayment || 'N/A')}</span></div>
+      </div></div>`;
+
+    // Tax
+    const tx = d.tax || {};
+    h += `<div class="card" style="margin:0"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-size:11px;font-weight:700">Tax & Obligations</span><a class="lk" onclick="App.go('pr_super')">Obligations →</a></div>
+      <div style="font-size:11px;line-height:1.8">
+        <div style="display:flex;justify-content:space-between"><span>GST refund</span><span style="font-weight:600;color:var(--g)">${fm(tx.gst || 0, 0)}</span></div>
+        <div style="display:flex;justify-content:space-between"><span>Super payable</span><span style="font-weight:600">${fm(tx.super || 0, 0)}</span></div>
+        <div style="display:flex;justify-content:space-between"><span>PAYG</span><span style="font-weight:600">${fm(tx.payg || 0, 0)}</span></div>
+      </div></div>`;
+
+    h += '</div>';
+
+    // ── Action Items ──
+    const actions = d.actions || [];
+    if (actions.length > 0) {
+      h += `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-size:11px;font-weight:700">Action Items</span><span style="font-size:10px;color:var(--t3)">${actions.length} items</span></div>`;
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">';
+      actions.forEach(a => {
+        const bgMap = { High: 'var(--rbg)', Med: 'var(--obg)', Low: 'var(--bg3)' };
+        const colorMap = { High: 'var(--r)', Med: 'var(--o)', Low: 'var(--t3)' };
+        h += `<div style="padding:5px 10px;border-radius:var(--rd);font-size:11px;display:flex;align-items:center;gap:6px;background:${bgMap[a.priority] || 'var(--bg3)'}">
+          <span style="color:${colorMap[a.priority] || 'var(--t3)'};font-weight:600;min-width:36px">${esc(a.priority)}</span> ${esc(a.text)}</div>`;
+      });
+      h += '</div></div>';
+    }
+
+    el.innerHTML = h;
+  }
+
+  function _onDashFilter() {
+    _filters.month = document.getElementById('dash_month')?.value || _filters.month;
+    _filters.brand = document.getElementById('dash_brand')?.value || 'All';
+    _dashData = null;
+    _loadDashboard();
+  }
+
+  function _mockDashboard() {
+    return {
+      brands: [
+        { name: 'Mango Coco', revenue: 86200, rev_chg: 3.1, net: 5010, net_pct: 5.8 },
+        { name: 'Flying Tigress', revenue: 52800, rev_chg: 1.8, net: 2350, net_pct: 4.5 },
+        { name: 'Issho Cafe', revenue: 38400, rev_chg: -2.4, net: 120, net_pct: 0.3 },
+        { name: 'Red Wok', revenue: 22100, rev_chg: 8.5, net: 1460, net_pct: 6.6 },
+        { name: 'Cheese Culture', revenue: 11500, rev_chg: -12.3, net: -470, net_pct: -4.1 },
+      ],
+      indicators: [
+        { label: 'SD Bridge: 9/12 synced', color: 'var(--g)', bg: 'var(--gbg)' },
+        { label: '5 pending · 1 needs fix', color: 'var(--o)', bg: 'var(--obg)' },
+        { label: 'BAS due: 28 Apr', color: 'var(--t3)', bg: '' },
+        { label: 'Loan: 15 Apr $2,083', color: 'var(--o)', bg: 'var(--obg)' },
+      ],
+      cash_position: { total: 66297, breakdown: 'Mango $42K · FT $18K · CBA $5K · Cash $1K' },
+      pnl_snapshot: { revenue: 211000, rev_chg: 4.6, gp_pct: 32.4, ebitda: 10600, net: 9470 },
+      ap: { total: 24580, overdue: 560, note: 'B&E Foods $257 · 4 days overdue' },
+      reconciliation: { days_done: '10/12', unmatched: 3858, note: 'FT: 2 transactions unmatched' },
+      loans: { outstanding: 120000, interco: 24100, next_repayment: '15 Apr · $2,083' },
+      tax: { gst: 6426, super: 17012, payg: 19218 },
+      actions: [
+        { priority: 'High', text: 'Chase B&E invoice — $257 overdue 4 days' },
+        { priority: 'Med', text: 'Reconcile FT bank — 2 unmatched ($3,858)' },
+        { priority: 'Med', text: 'ANZ Loan repayment due 15 Apr — $2,083' },
+        { priority: 'Med', text: 'SD Bridge — fix 1 missing category' },
+        { priority: 'Low', text: 'Review Cheese Culture — revenue ▼12.3%, net loss' },
+        { priority: 'Low', text: 'Settle FT → MC intercompany $23.9K' },
+      ],
+    };
+  }
+
+  // ══════════════════════════════════════════
   // REGISTER ROUTES
   // ══════════════════════════════════════════
   App.registerRoutes({
+    dashboard:    { render: renderDashboard,     onLoad: _loadDashboard },
     rp_pnl:       { render: renderPnlDashboard, onLoad: _loadPnlDashboard },
     rp_pnl_brand: { render: renderPnlBrand,     onLoad: _loadPnlBrand },
     rp_pnl_flow:  { render: renderPnlFlow,      onLoad: _loadPnlFlow },
@@ -1664,6 +1836,7 @@
     _onFpBudgetFilter,
     _onFpRevFilter,
     _onFpExpFilter,
+    _onDashFilter,
     _exportPdf,
     _exportCsv,
   };

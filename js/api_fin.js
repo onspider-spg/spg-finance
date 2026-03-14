@@ -1,4 +1,4 @@
-/** Version 1.6.1 | 15 MAR 2026 | Siam Palette Group | Created 13 MAR 2026 */
+/** Version 1.6.2 | 15 MAR 2026 | Siam Palette Group | Created 13 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — api_fin.js
@@ -800,6 +800,8 @@ const API = (() => {
     getBudgetVsActual: (filters) => _call('fin_get_budget_vs_actual', filters || {}),
     getRevenueAnalysis: (filters) => _call('fin_get_revenue_analysis', filters || {}),
     getExpenseTrend: (filters) => _call('fin_get_expense_trend', filters || {}),
+    // E6d: Dashboard
+    getCfoDashboard: (filters) => _call('fin_get_cfo_dashboard', filters || {}),
   };
 
 })();

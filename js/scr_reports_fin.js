@@ -1,8 +1,8 @@
-/** Version 1.1 | 15 MAR 2026 | Siam Palette Group */
+/** Version 1.2 | 15 MAR 2026 | Siam Palette Group */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_reports_fin.js
- * Reports: P&L (4), Balance Sheet, Cash Flow
+ * Reports: P&L (4), Balance Sheet, Cash Flow, AP/AR, Assets, Bank, Cash, Loan
  * Lazy-loaded by app_fin.js on first visit to rp_* routes
  * ═══════════════════════════════════════════
  */
@@ -20,6 +20,13 @@
   let _fullFilters = { period: 'Monthly', from: '', to: '', brand: 'All', compare: 'None' };
   let _bsData = null;        // balance sheet data
   let _cfData = null;         // cash flow data
+  let _aparData = null;       // AP/AR tracker data
+  let _aparTab = 'ap';        // active tab: ap / ar / aging
+  let _assetData = null;      // fixed assets data
+  let _bankData = null;       // bank summary data
+  let _cashData = null;       // cash summary data
+  let _loanData = null;       // loan & equity data
+  let _loanTab = 'interco';   // active tab: interco / director / capital
 
   // ── Helpers ──
 
@@ -962,6 +969,370 @@
   }
 
   // ══════════════════════════════════════════
+  // rp_apar: AP/AR TRACKER
+  // ══════════════════════════════════════════
+  function renderApar() {
+    return {
+      tb: '<div class="tb"><div class="tb-t">AP/AR Tracker</div>' +
+          '<select class="fl" id="rp_apar_brand" onchange="ScrReports._onAparFilter()" style="width:140px">' + _brandOpts(_filters.brand) + '</select></div>',
+      ct: `<div style="max-width:1000px;margin:0 auto">
+        <div id="rp_apar_kpi"></div>
+        <div class="tabs" id="rp_apar_tabs">
+          <div class="tab a" onclick="ScrReports._aparTab('ap')">Accounts Payable</div>
+          <div class="tab" onclick="ScrReports._aparTab('ar')">Accounts Receivable</div>
+          <div class="tab" onclick="ScrReports._aparTab('aging')">Aging Summary</div>
+        </div>
+        <div id="rp_apar_content"><div class="empty" style="padding:30px"><div class="fin-spinner" style="margin:0 auto 8px"></div>Loading...</div></div>
+      </div>`,
+    };
+  }
+
+  async function _loadApar() {
+    try {
+      _aparData = await API.getApArTracker({ brand: _filters.brand === 'All' ? null : _filters.brand });
+    } catch (e) {
+      console.warn('getApArTracker failed, using mock:', e.message);
+      _aparData = _mockApar();
+    }
+    _renderAparKpi();
+    _renderAparTable();
+  }
+
+  function _renderAparKpi() {
+    const el = document.getElementById('rp_apar_kpi');
+    if (!el || !_aparData) return;
+    const d = _aparData;
+    el.innerHTML = `<div class="kpi" style="flex-wrap:nowrap">
+      <div class="kpi-c"><div class="kpi-l">Total AP</div><div class="kpi-v" style="color:var(--r)">${_fmK(d.total_ap)}</div></div>
+      <div class="kpi-c"><div class="kpi-l">Overdue AP</div><div class="kpi-v" style="color:var(--r)">${_fmK(d.overdue_ap)}</div></div>
+      <div class="kpi-c"><div class="kpi-l">Total AR</div><div class="kpi-v" style="color:var(--g)">${_fmK(d.total_ar)}</div></div>
+      <div class="kpi-c"><div class="kpi-l">Overdue AR</div><div class="kpi-v" style="color:var(--g)">${_fmK(d.overdue_ar)}</div></div>
+    </div>`;
+  }
+
+  function _renderAparTable() {
+    const el = document.getElementById('rp_apar_content');
+    if (!el || !_aparData) return;
+    // Update tab highlight
+    document.querySelectorAll('#rp_apar_tabs .tab').forEach(t => t.classList.remove('a'));
+    const tabMap = { ap: 0, ar: 1, aging: 2 };
+    const tabs = document.querySelectorAll('#rp_apar_tabs .tab');
+    if (tabs[tabMap[_aparTab]]) tabs[tabMap[_aparTab]].classList.add('a');
+
+    const rows = _aparTab === 'ar' ? (_aparData.ar_rows || []) : (_aparData.ap_rows || []);
+    if (_aparTab === 'aging') {
+      // Aging summary
+      const aging = _aparData.aging || {};
+      el.innerHTML = `<div class="card" style="padding:16px"><div style="font-size:11px;font-weight:700;margin-bottom:10px">AP Aging Summary</div>
+        <div style="display:flex;gap:10px;margin-bottom:10px">
+          <div style="flex:1;padding:10px;background:var(--gbg);border-radius:var(--rd);text-align:center"><div style="font-size:10px;color:var(--t3)">Current</div><div style="font-size:16px;font-weight:700">${fm(aging.current || 0, 0)}</div></div>
+          <div style="flex:1;padding:10px;background:var(--obg);border-radius:var(--rd);text-align:center"><div style="font-size:10px;color:var(--t3)">1-30 days</div><div style="font-size:16px;font-weight:700">${fm(aging.d30 || 0, 0)}</div></div>
+          <div style="flex:1;padding:10px;background:var(--rbg);border-radius:var(--rd);text-align:center"><div style="font-size:10px;color:var(--t3)">31-60 days</div><div style="font-size:16px;font-weight:700">${fm(aging.d60 || 0, 0)}</div></div>
+          <div style="flex:1;padding:10px;background:var(--rbg);border-radius:var(--rd);text-align:center"><div style="font-size:10px;color:var(--t3)">60+ days</div><div style="font-size:16px;font-weight:700;color:var(--r)">${fm(aging.d90 || 0, 0)}</div></div>
+        </div></div>`;
+      return;
+    }
+    let html = '<table class="tbl"><thead><tr><th>Supplier</th><th style="text-align:right">Current</th><th style="text-align:right">1-30 days</th><th style="text-align:right">31-60 days</th><th style="text-align:right">60+ days</th><th style="text-align:right">Total</th></tr></thead><tbody>';
+    if (rows.length === 0) {
+      html += `<tr><td colspan="6" style="text-align:center;color:var(--t3);padding:20px">No ${_aparTab === 'ar' ? 'receivables' : 'payables'} found</td></tr>`;
+    }
+    rows.forEach(r => {
+      const hasOverdue = (r.d30 || 0) + (r.d60 || 0) + (r.d90 || 0) > 0;
+      html += `<tr><td>${esc(r.name)}</td>
+        <td style="text-align:right">${_fmTbl(r.current)}</td>
+        <td style="text-align:right">${_fmTbl(r.d30)}</td>
+        <td style="text-align:right">${_fmTbl(r.d60)}</td>
+        <td style="text-align:right">${_fmTbl(r.d90)}</td>
+        <td style="text-align:right;font-weight:600${hasOverdue ? ';color:var(--r)' : ''}">${_fmTbl(r.total)}</td></tr>`;
+    });
+    html += '</tbody></table>';
+    el.innerHTML = html;
+  }
+
+  function _aparTabSwitch(tab) { _aparTab = tab; _renderAparTable(); }
+  function _onAparFilter() {
+    _filters.brand = document.getElementById('rp_apar_brand')?.value || 'All';
+    _aparData = null; _loadApar();
+  }
+
+  // ══════════════════════════════════════════
+  // rp_asset: FIXED ASSET MANAGEMENT
+  // ══════════════════════════════════════════
+  function renderAsset() {
+    return {
+      tb: '<div class="tb"><div class="tb-t">Fixed Asset Management</div><button class="bs" onclick="ScrReports._addAsset()">+ Register Asset</button></div>',
+      ct: `<div style="max-width:1000px;margin:0 auto">
+        <div id="rp_asset_content"><div class="empty" style="padding:30px"><div class="fin-spinner" style="margin:0 auto 8px"></div>Loading...</div></div>
+      </div>`,
+    };
+  }
+
+  async function _loadAsset() {
+    const el = document.getElementById('rp_asset_content');
+    if (!el) return;
+    try {
+      _assetData = await API.getAssetSummary({});
+    } catch (e) {
+      console.warn('getAssetSummary failed, using mock:', e.message);
+      _assetData = _mockAsset();
+    }
+    const d = _assetData;
+    let html = `<div class="kpi" style="flex-wrap:nowrap">
+      <div class="kpi-c"><div class="kpi-l">Total Assets</div><div class="kpi-v">${d.count || 0}</div></div>
+      <div class="kpi-c"><div class="kpi-l">Original Cost</div><div class="kpi-v">${fm(d.total_cost || 0, 0)}</div></div>
+      <div class="kpi-c"><div class="kpi-l">Accumulated Dep.</div><div class="kpi-v" style="color:var(--r)">${fm(d.total_dep || 0, 0)}</div></div>
+      <div class="kpi-c"><div class="kpi-l">Net Book Value</div><div class="kpi-v" style="color:var(--g)">${fm(d.total_nbv || 0, 0)}</div></div>
+    </div>`;
+    html += '<table class="tbl"><thead><tr><th>Asset ID</th><th>Name</th><th>Category</th><th>Brand</th><th>Purchase Date</th><th style="text-align:right">Cost</th><th style="text-align:right">NBV</th><th>Status</th></tr></thead><tbody>';
+    (d.rows || []).forEach(r => {
+      html += `<tr><td><a class="lk">${esc(r.asset_id)}</a></td><td>${esc(r.name)}</td><td>${esc(r.category)}</td><td>${esc(r.brand)}</td><td>${esc(r.purchase_date)}</td>
+        <td style="text-align:right">${fm(r.cost)}</td><td style="text-align:right">${fm(r.nbv)}</td>
+        <td>${r.nbv <= 0 ? '<span class="sts sts-o">Fully Dep.</span>' : '<span class="sts sts-c">Active</span>'}</td></tr>`;
+    });
+    html += '</tbody></table>';
+    el.innerHTML = html;
+  }
+
+  function _addAsset() { App.toast('Register Asset — coming soon'); }
+
+  // ══════════════════════════════════════════
+  // rp_bank: BANK ACCOUNT SUMMARY
+  // ══════════════════════════════════════════
+  function renderBank() {
+    return {
+      tb: '<div class="tb"><div class="tb-t">Bank Account Summary</div>' +
+          '<select class="fl" id="rp_bank_brand" onchange="ScrReports._onBankFilter()" style="width:140px">' + _brandOpts(_filters.brand) + '</select></div>',
+      ct: `<div style="max-width:1000px;margin:0 auto">
+        <div style="font-size:11px;color:var(--t3);margin-bottom:8px">Book balance (SPG) vs Bank statement balance — shows reconciliation status</div>
+        <div id="rp_bank_content"><div class="empty" style="padding:30px"><div class="fin-spinner" style="margin:0 auto 8px"></div>Loading...</div></div>
+      </div>`,
+    };
+  }
+
+  async function _loadBank() {
+    const el = document.getElementById('rp_bank_content');
+    if (!el) return;
+    try {
+      _bankData = await API.getBankSummary({ brand: _filters.brand === 'All' ? null : _filters.brand });
+    } catch (e) {
+      console.warn('getBankSummary failed, using mock:', e.message);
+      _bankData = _mockBank();
+    }
+    const d = _bankData;
+    let html = '<table class="tbl"><thead><tr><th>Account</th><th>Brand</th><th style="text-align:right">SPG Balance</th><th style="text-align:right">Bank Balance</th><th style="text-align:right">Difference</th><th>Reconciled?</th><th>Last reconciled</th></tr></thead><tbody>';
+    (d.rows || []).forEach(r => {
+      const diff = (r.spg_balance || 0) - (r.bank_balance || 0);
+      const diffColor = Math.abs(diff) < 0.01 ? 'var(--g)' : (Math.abs(diff) > 500 ? 'var(--r)' : 'var(--o)');
+      const reconBadge = Math.abs(diff) < 0.01 ? '<span class="sts sts-c">Yes</span>' : (Math.abs(diff) > 500 ? '<span class="sts sts-r">No</span>' : '<span class="sts sts-p">Partial</span>');
+      html += `<tr><td style="font-weight:600">${esc(r.account)}</td><td>${esc(r.brand)}</td>
+        <td style="text-align:right">${fm(r.spg_balance)}</td>
+        <td style="text-align:right">${fm(r.bank_balance)}</td>
+        <td style="text-align:right;color:${diffColor};font-weight:600">${fm(diff)}</td>
+        <td>${reconBadge}</td><td>${esc(r.last_reconciled || '')}</td></tr>`;
+    });
+    html += '</tbody></table>';
+    const totalSpg = (d.rows || []).reduce((s, r) => s + (r.spg_balance || 0), 0);
+    html += `<div style="text-align:right;font-size:12px;margin-top:8px"><b>Total SPG Balance: ${fm(totalSpg)}</b></div>`;
+    el.innerHTML = html;
+  }
+
+  function _onBankFilter() {
+    _filters.brand = document.getElementById('rp_bank_brand')?.value || 'All';
+    _bankData = null; _loadBank();
+  }
+
+  // ══════════════════════════════════════════
+  // rp_cash: CASH ACCOUNT SUMMARY
+  // ══════════════════════════════════════════
+  function renderCash() {
+    return {
+      tb: '<div class="tb"><div class="tb-t">Cash Account Summary</div>' +
+          '<select class="fl" id="rp_cash_brand" onchange="ScrReports._onCashFilter()" style="width:140px">' + _brandOpts(_filters.brand) + '</select></div>',
+      ct: `<div style="max-width:1000px;margin:0 auto">
+        <div style="font-size:11px;color:var(--t3);margin-bottom:8px">Cash-in-hand accounts — must match physical cash count</div>
+        <div id="rp_cash_content"><div class="empty" style="padding:30px"><div class="fin-spinner" style="margin:0 auto 8px"></div>Loading...</div></div>
+      </div>`,
+    };
+  }
+
+  async function _loadCash() {
+    const el = document.getElementById('rp_cash_content');
+    if (!el) return;
+    try {
+      _cashData = await API.getCashSummary({ brand: _filters.brand === 'All' ? null : _filters.brand });
+    } catch (e) {
+      console.warn('getCashSummary failed, using mock:', e.message);
+      _cashData = _mockCash();
+    }
+    let html = '<table class="tbl"><thead><tr><th>Account</th><th>Brand</th><th style="text-align:right">System Balance</th><th style="text-align:right">Last Count</th><th style="text-align:right">Difference</th><th>Last counted</th><th>Status</th></tr></thead><tbody>';
+    (_cashData.rows || []).forEach(r => {
+      const diff = (r.system || 0) - (r.count || 0);
+      const diffColor = Math.abs(diff) < 0.01 ? 'var(--g)' : 'var(--r)';
+      const badge = Math.abs(diff) < 0.01 ? '<span class="sts sts-c">Matched</span>' : '<span class="sts sts-r">Short</span>';
+      html += `<tr><td style="font-weight:600">${esc(r.account)}</td><td>${esc(r.brand)}</td>
+        <td style="text-align:right">${fm(r.system)}</td><td style="text-align:right">${fm(r.count)}</td>
+        <td style="text-align:right;color:${diffColor};font-weight:600">${diff >= 0 ? fm(diff) : '-' + fm(Math.abs(diff))}</td>
+        <td>${esc(r.last_counted || '')}</td><td>${badge}</td></tr>`;
+    });
+    html += '</tbody></table>';
+    el.innerHTML = html;
+  }
+
+  function _onCashFilter() {
+    _filters.brand = document.getElementById('rp_cash_brand')?.value || 'All';
+    _cashData = null; _loadCash();
+  }
+
+  // ══════════════════════════════════════════
+  // rp_loan: LOAN & EQUITY REPORT
+  // ══════════════════════════════════════════
+  function renderLoan() {
+    return {
+      tb: '<div class="tb"><div class="tb-t">Loan & Equity Report</div>' +
+          '<select class="fl" id="rp_loan_brand" style="width:140px">' + _brandOpts('All') + '</select></div>',
+      ct: `<div style="max-width:1000px;margin:0 auto">
+        <div class="tabs" id="rp_loan_tabs">
+          <div class="tab a" onclick="ScrReports._loanTab('interco')">Intercompany Matrix</div>
+          <div class="tab" onclick="ScrReports._loanTab('director')">Director Loans</div>
+          <div class="tab" onclick="ScrReports._loanTab('capital')">Capital Structure</div>
+        </div>
+        <div id="rp_loan_content"><div class="empty" style="padding:30px"><div class="fin-spinner" style="margin:0 auto 8px"></div>Loading...</div></div>
+      </div>`,
+    };
+  }
+
+  async function _loadLoan() {
+    try {
+      _loanData = await API.getLoanReport({});
+    } catch (e) {
+      console.warn('getLoanReport failed, using mock:', e.message);
+      _loanData = _mockLoan();
+    }
+    _renderLoanTab();
+  }
+
+  function _renderLoanTab() {
+    const el = document.getElementById('rp_loan_content');
+    if (!el || !_loanData) return;
+    // Update tab highlight
+    document.querySelectorAll('#rp_loan_tabs .tab').forEach(t => t.classList.remove('a'));
+    const tabMap = { interco: 0, director: 1, capital: 2 };
+    const tabs = document.querySelectorAll('#rp_loan_tabs .tab');
+    if (tabs[tabMap[_loanTab]]) tabs[tabMap[_loanTab]].classList.add('a');
+
+    const d = _loanData;
+    let html = '';
+
+    if (_loanTab === 'interco') {
+      const matrix = d.intercompany_matrix || {};
+      const brands = d.brand_names || [];
+      html += '<div class="card" style="margin:0 0 10px"><div style="font-size:11px;font-weight:700;margin-bottom:6px">Intercompany Loan Matrix</div>';
+      html += '<table class="tbl"><thead><tr><th>From \\ To</th>';
+      brands.forEach(b => { html += `<th style="text-align:right">${esc(b.substring(0, 8))}</th>`; });
+      html += '</tr></thead><tbody>';
+      (d.intercompany_rows || []).forEach(row => {
+        html += `<tr><td style="font-weight:600">${esc(row.from)}</td>`;
+        (row.amounts || []).forEach(a => {
+          const color = a > 100000 ? ';color:var(--r);font-weight:700' : (a > 10000 ? ';color:var(--g)' : '');
+          html += `<td style="text-align:right${color}">${a === null ? '—' : _fmTbl(a)}</td>`;
+        });
+        html += '</tr>';
+      });
+      html += '</tbody></table>';
+      if (d.interco_note) html += `<div style="font-size:10px;color:var(--t3);margin-top:6px">${esc(d.interco_note)}</div>`;
+      html += '</div>';
+    } else if (_loanTab === 'director') {
+      html += '<div class="card" style="margin:0 0 10px"><div style="font-size:11px;font-weight:700;margin-bottom:6px">Director Loans Summary</div>';
+      html += '<table class="tbl"><thead><tr><th>Director</th><th>Entity</th><th style="text-align:right">Lent</th><th style="text-align:right">Repaid</th><th style="text-align:right">Outstanding</th><th>Is Capital?</th></tr></thead><tbody>';
+      (d.director_loans || []).forEach(r => {
+        html += `<tr><td>${esc(r.director)}</td><td>${esc(r.entity)}</td>
+          <td style="text-align:right">${fm(r.lent)}</td><td style="text-align:right">${fm(r.repaid)}</td>
+          <td style="text-align:right;font-weight:600">${fm(r.outstanding)}</td><td>${esc(r.is_capital)}</td></tr>`;
+      });
+      html += '</tbody></table></div>';
+    } else {
+      // Capital structure
+      html += '<div class="card" style="margin:0 0 10px"><div style="font-size:11px;font-weight:700;margin-bottom:6px">Capital Structure</div>';
+      html += '<table class="tbl"><thead><tr><th>Entity</th><th style="text-align:right">Share Capital</th><th style="text-align:right">Director Loans</th><th style="text-align:right">Retained Earnings</th><th style="text-align:right">Total Equity</th></tr></thead><tbody>';
+      (d.capital_structure || []).forEach(r => {
+        html += `<tr><td style="font-weight:600">${esc(r.entity)}</td>
+          <td style="text-align:right">${fm(r.share_capital)}</td><td style="text-align:right">${fm(r.director_loans)}</td>
+          <td style="text-align:right">${fm(r.retained)}</td><td style="text-align:right;font-weight:700">${fm(r.total_equity)}</td></tr>`;
+      });
+      html += '</tbody></table></div>';
+    }
+    el.innerHTML = html;
+  }
+
+  function _loanTabSwitch(tab) { _loanTab = tab; _renderLoanTab(); }
+
+  // ══════════════════════════════════════════
+  // MOCK DATA: E6b-3 screens
+  // ══════════════════════════════════════════
+  function _mockApar() {
+    return {
+      total_ap: 14200, overdue_ap: 560, total_ar: 3800, overdue_ar: 0,
+      ap_rows: [
+        { name: 'Pro Bros Providore', current: 318.65, d30: 128.10, d60: 0, d90: 0, total: 446.75 },
+        { name: 'Siam Pacific Food', current: 740.60, d30: 0, d60: 0, d90: 0, total: 740.60 },
+        { name: 'B&E Food Distributors', current: 0, d30: 212, d60: 0, d90: 0, total: 212 },
+      ],
+      ar_rows: [],
+      aging: { current: 1059.25, d30: 340.10, d60: 0, d90: 0 },
+    };
+  }
+
+  function _mockAsset() {
+    return {
+      count: 12, total_cost: 86400, total_dep: 31200, total_nbv: 55200,
+      rows: [
+        { asset_id: 'AST-001', name: 'Commercial Oven', category: 'Kitchen Equipment', brand: 'Mango Coco', purchase_date: '01/07/2023', cost: 15000, nbv: 9643 },
+        { asset_id: 'AST-002', name: 'POS System x2', category: 'POS System', brand: 'Mango Coco', purchase_date: '15/03/2024', cost: 4800, nbv: 2800 },
+        { asset_id: 'AST-003', name: 'Renovation Fit-out', category: 'Leasehold Improvement', brand: 'Flying Tigress', purchase_date: '01/11/2025', cost: 45000, nbv: 42000 },
+        { asset_id: 'AST-004', name: 'Old Fridge', category: 'Kitchen Equipment', brand: 'Mango Coco', purchase_date: '01/01/2020', cost: 3200, nbv: 0 },
+      ],
+    };
+  }
+
+  function _mockBank() {
+    return { rows: [
+      { account: '680 #4429', brand: 'Flying Tigress', spg_balance: 68011.31, bank_balance: 64153.50, last_reconciled: '28/02/2026' },
+      { account: '682 Petty Cash #1997', brand: 'Flying Tigress', spg_balance: 2414.83, bank_balance: 2143.08, last_reconciled: '05/03/2026' },
+      { account: '7134 Westpac', brand: 'Mango Coco', spg_balance: 22360.99, bank_balance: 22360.99, last_reconciled: '10/03/2026' },
+      { account: '5976 Westpac', brand: 'Issho Cafe', spg_balance: 45890.00, bank_balance: 45890.00, last_reconciled: '10/03/2026' },
+    ]};
+  }
+
+  function _mockCash() {
+    return { rows: [
+      { account: '4410 PettyCash', brand: 'Mango Coco', system: 1250, count: 1250, last_counted: '08/03/2026' },
+      { account: '9392 PettyCash', brand: 'Red Wok', system: 800, count: 732, last_counted: '05/03/2026' },
+      { account: '5941 PettyCash', brand: 'Issho Cafe', system: 500, count: 500, last_counted: '07/03/2026' },
+    ]};
+  }
+
+  function _mockLoan() {
+    return {
+      brand_names: ['Mango', 'Flying', 'Issho', 'Cheese', 'Redwork', 'SPG'],
+      intercompany_rows: [
+        { from: 'Mango', amounts: [null, 13570, 12, 0, 749, 172] },
+        { from: 'Issho', amounts: [244775, 210432, null, 0, 0, 0] },
+        { from: 'Cheese', amounts: [17067, 0, 0, null, 0, 0] },
+      ],
+      interco_note: 'Red = high concentration risk · Issho is the largest lender ($455K outstanding)',
+      director_loans: [
+        { director: 'Khun Or', entity: 'Mango Coco', lent: 50000, repaid: 5000, outstanding: 45000, is_capital: 'Partial ($20K flagged)' },
+        { director: 'Khun Or', entity: 'Flying Tigress', lent: 30000, repaid: 0, outstanding: 30000, is_capital: 'Yes — Capital Injection' },
+      ],
+      capital_structure: [
+        { entity: 'Mango Coco', share_capital: 10000, director_loans: 45000, retained: -50000, total_equity: 5000 },
+        { entity: 'Flying Tigress', share_capital: 5000, director_loans: 30000, retained: -80000, total_equity: -45000 },
+        { entity: 'Issho Cafe', share_capital: 5000, director_loans: 0, retained: 20000, total_equity: 25000 },
+      ],
+    };
+  }
+
+  // ══════════════════════════════════════════
   // REGISTER ROUTES
   // ══════════════════════════════════════════
   App.registerRoutes({
@@ -971,6 +1342,11 @@
     rp_pnl_full:  { render: renderPnlFull,       onLoad: _loadPnlFull },
     rp_bs:        { render: renderBalanceSheet,  onLoad: _loadBalanceSheet },
     rp_cf:        { render: renderCashFlow,      onLoad: _loadCashFlow },
+    rp_apar:      { render: renderApar,          onLoad: _loadApar },
+    rp_asset:     { render: renderAsset,         onLoad: _loadAsset },
+    rp_bank:      { render: renderBank,          onLoad: _loadBank },
+    rp_cash:      { render: renderCash,          onLoad: _loadCash },
+    rp_loan:      { render: renderLoan,          onLoad: _loadLoan },
   });
 
   // ══════════════════════════════════════════
@@ -983,6 +1359,12 @@
     _loadPnlFull,
     _onBsFilter,
     _onCfFilter,
+    _aparTab: _aparTabSwitch,
+    _onAparFilter,
+    _addAsset,
+    _onBankFilter,
+    _onCashFilter,
+    _loanTab: _loanTabSwitch,
     _exportPdf,
     _exportCsv,
   };

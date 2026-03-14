@@ -1,4 +1,4 @@
-/** Version 1.5.9 | 15 MAR 2026 | Siam Palette Group | Created 13 MAR 2026 */
+/** Version 1.6 | 15 MAR 2026 | Siam Palette Group | Created 13 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — api_fin.js
@@ -789,6 +789,12 @@ const API = (() => {
     // E6b-2: Balance Sheet + Cash Flow
     getBalanceSheet: (filters) => _call('fin_get_balance_sheet', filters || {}),
     getCashFlow: (filters) => _call('fin_get_cash_flow', filters || {}),
+    // E6b-3: Tracker + Summary Reports
+    getApArTracker: (filters) => _call('fin_get_ap_ar_tracker', filters || {}),
+    getAssetSummary: (filters) => _call('fin_get_asset_summary', filters || {}),
+    getBankSummary: (filters) => _call('fin_get_bank_summary', filters || {}),
+    getCashSummary: (filters) => _call('fin_get_cash_summary', filters || {}),
+    getLoanReport: (filters) => _call('fin_get_loan_report', filters || {}),
   };
 
 })();

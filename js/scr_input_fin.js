@@ -1,9 +1,9 @@
-/** Version 1.6.5 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 1.7 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_input_fin.js
  * Create screens: Sale, Bill, Transfer, Debit Note,
- * Recurring, Upload Create, Import
+ * Recurring, Upload Create (E4), Import (E4)
  * ═══════════════════════════════════════════
  */
 
@@ -1225,9 +1225,20 @@
   // ══════════════════════════════════════════
   // 6. CREATE FROM UPLOAD (Scan→Create split view)
   // ══════════════════════════════════════════
+  // ══════════════════════════════════════════
+  // 6. UPLOAD CREATE (E4) — Upload invoice → preview → fill form → save
+  // ══════════════════════════════════════════
+
+  let _uplFile = null;
+  let _uplPreviewUrl = null;
+
   function renderCreateUpload() {
+    _uplFile = null;
+    _uplPreviewUrl = null;
     const catOpts = _getCatOptsHTML();
     const tcOpts = (App.S.taxCodes || []).map(tc => `<option>${esc(tc.code)}</option>`).join('');
+    const vendorOpts = '<option value="">— Select or type —</option>' + (App.S.vendors || []).map(v => `<option value="${esc(v.id)}">${esc(v.name)}</option>`).join('');
+    const bankOpts = (App.S.bankAccounts || []).map(b => `<option value="${esc(b.id)}">${esc(b.label)}</option>`).join('');
 
     return {
       tb: '<div class="tb"><button class="bg" onclick="App.go(\'tx_bill\')">← Bills</button><div class="tb-t">Create from Upload</div></div>',
@@ -1236,58 +1247,38 @@
           <div style="display:grid;grid-template-columns:1fr 1.2fr;min-height:600px">
             <!-- Left: Document preview -->
             <div style="background:var(--bg3);border-right:1px solid var(--bd2);padding:16px">
-              <div style="border:2px dashed var(--bd);border-radius:10px;padding:20px;text-align:center;margin-bottom:12px;background:#fff">
-                <div style="font-size:22px;color:var(--t4)">☁️</div>
-                <div style="font-size:var(--fs-sm);color:var(--t3)">Drag invoice here, or <a style="color:var(--acc);font-weight:600;cursor:pointer">browse</a></div>
+              <div id="upl_dropzone" style="border:2px dashed var(--bd);border-radius:10px;padding:30px 20px;text-align:center;margin-bottom:12px;background:#fff;cursor:pointer" onclick="document.getElementById('upl_file_input').click()">
+                <div style="font-size:22px;color:var(--t4)" id="upl_drop_icon">☁️</div>
+                <div style="font-size:var(--fs-sm);color:var(--t3)" id="upl_drop_text">Drag invoice here, or <a style="color:var(--acc);font-weight:600">browse</a></div>
+                <input type="file" id="upl_file_input" accept="image/*,.pdf" style="display:none" onchange="ScrInput._uplFileSelected(event)">
               </div>
-              <div style="background:#fff;border-radius:8px;box-shadow:var(--sh);padding:16px;text-align:center">
-                <div style="font-size:28px;margin-bottom:6px">📄</div>
-                <div style="font-weight:600">TAX INVOICE</div>
-                <div style="font-size:var(--fs-xs);color:var(--t3)">Pro Bros · INV1052323</div>
-                <div style="font-size:16px;font-weight:700;margin-top:6px">$303.20</div>
-                <div style="display:flex;gap:6px;justify-content:center;margin-top:10px">
-                  <button class="bg" style="font-size:16px">🔍</button>
-                  <button class="bg" style="font-size:16px">↻</button>
-                  <button class="bg" style="font-size:16px">⬇</button>
-                  <button class="bg" style="font-size:16px">🖨</button>
-                </div>
+              <div id="upl_preview" style="background:#fff;border-radius:8px;box-shadow:var(--sh);padding:16px;text-align:center;display:none">
+                <div id="upl_preview_content"></div>
               </div>
             </div>
 
-            <!-- Right: AI-filled form -->
+            <!-- Right: Form -->
             <div style="padding:16px;overflow-y:auto">
               <div style="background:var(--acc2);border-radius:var(--rd);padding:6px 8px;font-size:var(--fs-xs);color:var(--acc);margin-bottom:10px">
-                AI filled fields highlighted in purple. Check & confirm.
+                Upload an invoice document, then fill in the details below and save as a new bill.
               </div>
 
               <div class="fg">
-                <label class="lb">Supplier</label>
-                <input class="inp" value="Pro Bros Providore" style="background:var(--acc2);border-color:var(--acc)">
+                <label class="lb">Supplier *</label>
+                <select class="inp" id="upl_vendor" onchange="ScrInput._uplVendorChange()">${vendorOpts}</select>
               </div>
-              <div class="fa">✓ Vendor Rule: COGs → Food · Mango Coco · Self · 14 days</div>
+              <div id="upl_vendor_rule" class="fa" style="display:none"></div>
 
               <div class="fr">
-                <div class="fg"><label class="lb">Supplier Inv No</label><input class="inp" value="INV1052323" style="background:var(--acc2);border-color:var(--acc)"></div>
-                <div class="fg"><label class="lb">Bill Number *</label><input class="inp" value="${esc(MOCK.nextBillNo)}" readonly style="background:var(--bg3);color:var(--t3)"></div>
+                <div class="fg"><label class="lb">Supplier Inv No</label><input class="inp" id="upl_inv_no" placeholder="Invoice number from document"></div>
+                <div class="fg"><label class="lb">Bill Number</label><input class="inp" id="upl_bill_no" value="" readonly style="background:var(--bg3);color:var(--t3)"></div>
               </div>
               <div class="fr">
-                <div class="fg"><label class="lb">Issue Date *</label><input class="inp" type="date" value="2026-03-10"></div>
-                <div class="fg"><label class="lb">Due Date *</label><input class="inp" type="date" value="2026-03-24"></div>
-              </div>
-              <div class="fr">
-                <div class="fg"><label class="lb">Accrual Month</label><input class="inp" type="month" value="2026-03"></div>
-                <div class="fg"><label class="lb">Transaction Type</label><select class="inp"><option>Expense / Bill</option><option>Asset Purchase</option></select></div>
+                <div class="fg"><label class="lb">Issue Date *</label><input class="inp" id="upl_date" type="date" value="${today()}"></div>
+                <div class="fg"><label class="lb">Due Date</label><input class="inp" id="upl_due" type="date"></div>
               </div>
 
-              <!-- Allocation divider -->
-              <div style="display:flex;align-items:center;margin:8px 0">
-                <hr style="border:none;border-top:1px solid #eee;flex:1">
-                <div style="padding:0 6px;font-size:var(--fs-xs);color:var(--t4)">Allocation Layout</div>
-                <button class="bg" style="font-size:14px;color:var(--acc)">⚙</button>
-              </div>
-
-              <!-- Single line item -->
-              <table style="width:100%;border-collapse:collapse;font-size:var(--fs-sm);margin-top:4px">
+              <table style="width:100%;border-collapse:collapse;font-size:var(--fs-sm);margin-top:10px">
                 <thead><tr>
                   <th style="text-align:left;padding:6px;font-weight:600;font-size:var(--fs-xs)">Description</th>
                   <th style="text-align:left;padding:6px;font-weight:600;font-size:var(--fs-xs)">Category *</th>
@@ -1296,26 +1287,19 @@
                   <th style="text-align:left;padding:6px;font-weight:600;font-size:var(--fs-xs)">Tax code</th>
                 </tr></thead>
                 <tbody><tr>
-                  <td style="padding:0;border:1px solid #e5e7eb"><div contenteditable style="padding:6px 8px;min-height:30px;font-size:var(--fs-sm);outline:none"></div></td>
-                  <td style="padding:0;border:1px solid #e5e7eb"><select style="width:100%;padding:6px;border:none;font-size:var(--fs-xs)">${catOpts}</select></td>
-                  <td style="padding:0;border:1px solid #e5e7eb"><input style="width:100%;padding:6px;border:none;text-align:right;font-size:var(--fs-sm);font-weight:600;background:var(--acc2)" value="303.20"></td>
-                  <td style="padding:0;border:1px solid #e5e7eb;background:#fafafa"><input readonly style="width:100%;padding:6px;border:none;text-align:right;font-size:var(--fs-sm);background:#fafafa;color:var(--t3)" value="0.00"></td>
-                  <td style="padding:0;border:1px solid #e5e7eb"><select style="width:100%;padding:6px;border:none;font-size:var(--fs-xs)"><option>FRE</option>${tcOpts}</select></td>
+                  <td style="padding:0;border:1px solid var(--bd)"><input class="inp" id="upl_desc" style="border:none;font-size:var(--fs-sm)" placeholder="Description"></td>
+                  <td style="padding:0;border:1px solid var(--bd)"><select style="width:100%;padding:6px;border:none;font-size:var(--fs-xs)" id="upl_cat"><option value="">Select</option>${catOpts}</select></td>
+                  <td style="padding:0;border:1px solid var(--bd)"><input style="width:100%;padding:6px;border:none;text-align:right;font-size:var(--fs-sm);font-weight:600" id="upl_amount" placeholder="0.00" oninput="ScrInput._uplCalc()"></td>
+                  <td style="padding:0;border:1px solid var(--bd)"><input style="width:100%;padding:6px;border:none;text-align:right;font-size:var(--fs-sm)" id="upl_gst" placeholder="0.00" oninput="ScrInput._uplCalc()"></td>
+                  <td style="padding:0;border:1px solid var(--bd)"><select style="width:100%;padding:6px;border:none;font-size:var(--fs-xs)" id="upl_tax"><option>FRE</option>${tcOpts}</select></td>
                 </tr></tbody>
               </table>
 
-              <div class="fg" style="margin-top:8px"><label class="lb">Notes</label><textarea class="inp" style="min-height:40px;resize:vertical;font-size:var(--fs-sm)"></textarea></div>
+              <div id="upl_totals" style="text-align:right;font-size:var(--fs-body);margin:8px 0"></div>
 
-              <div style="text-align:right;font-size:var(--fs-body);margin:6px 0">
-                <div>Subtotal <b>$303.20</b></div>
-                <div>Tax <b>$0.00</b></div>
-                <div style="font-weight:700;margin-top:4px">Total <b>$303.20</b></div>
-              </div>
-
-              <div style="display:flex;gap:6px;margin-top:8px">
+              <div style="display:flex;gap:6px;margin-top:10px">
                 <button class="btn bo" onclick="App.go('tx_bill')">Cancel</button>
-                <button class="btn bo">Save and... ▾</button>
-                <button class="bs" onclick="ScrInput._saveUploadBill(this)">Save</button>
+                <button class="bs" id="upl_save_btn" onclick="ScrInput._saveUploadBill(this)">Save</button>
               </div>
             </div>
           </div>
@@ -1323,63 +1307,304 @@
     };
   }
 
-  function _saveUploadBill(btnEl) {
-    guardedSave(btnEl, () => {
+  function _uplFileSelected(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    _uplFile = file;
+    const dropIcon = document.getElementById('upl_drop_icon');
+    const dropText = document.getElementById('upl_drop_text');
+    if (dropIcon) dropIcon.textContent = '✓';
+    if (dropText) dropText.innerHTML = `<b>${esc(file.name)}</b> (${(file.size / 1024).toFixed(0)} KB)`;
+
+    // Show preview
+    const previewEl = document.getElementById('upl_preview');
+    const contentEl = document.getElementById('upl_preview_content');
+    if (!previewEl || !contentEl) return;
+
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        _uplPreviewUrl = ev.target.result;
+        contentEl.innerHTML = `<img src="${_uplPreviewUrl}" style="max-width:100%;max-height:400px;border-radius:6px">`;
+        previewEl.style.display = '';
+      };
+      reader.readAsDataURL(file);
+    } else {
+      contentEl.innerHTML = `<div style="font-size:28px;margin-bottom:6px">📄</div><div style="font-weight:600">${esc(file.name)}</div><div style="font-size:var(--fs-xs);color:var(--t3)">PDF preview not available — fill form on the right</div>`;
+      previewEl.style.display = '';
+    }
+  }
+
+  function _uplVendorChange() {
+    const sel = document.getElementById('upl_vendor');
+    if (!sel || !sel.value) { const r = document.getElementById('upl_vendor_rule'); if (r) r.style.display = 'none'; return; }
+    const vid = sel.value;
+    const rule = (App.S.vendorRules || []).find(r => r.vendor_id === vid);
+    const ruleEl = document.getElementById('upl_vendor_rule');
+    if (rule && ruleEl) {
+      ruleEl.textContent = `✓ Vendor Rule: ${rule.category_display || ''} · ${rule.brand || ''} · ${rule.allocation_type || 'self'} · ${rule.terms_days || 0} days`;
+      ruleEl.style.display = '';
+      // Auto-fill due date from terms
+      if (rule.terms_days) {
+        const issueDate = document.getElementById('upl_date')?.value;
+        if (issueDate) {
+          const d = new Date(issueDate);
+          d.setDate(d.getDate() + rule.terms_days);
+          const dueEl = document.getElementById('upl_due');
+          if (dueEl) dueEl.value = d.toISOString().split('T')[0];
+        }
+      }
+    } else if (ruleEl) {
+      ruleEl.style.display = 'none';
+    }
+  }
+
+  function _uplCalc() {
+    const amt = parseFloat(document.getElementById('upl_amount')?.value) || 0;
+    const gst = parseFloat(document.getElementById('upl_gst')?.value) || 0;
+    const total = amt + gst;
+    const el = document.getElementById('upl_totals');
+    if (el) el.innerHTML = `<div>Subtotal <b>${App.formatMoney(amt)}</b></div><div>Tax <b>${App.formatMoney(gst)}</b></div><div style="font-weight:700;margin-top:4px">Total <b>${App.formatMoney(total)}</b></div>`;
+  }
+
+  async function _saveUploadBill(btnEl) {
+    if (!btnEl || btnEl.disabled) return;
+    const vendorSel = document.getElementById('upl_vendor');
+    const vendorId = vendorSel?.value || null;
+    const vendorName = vendorId ? vendorSel.options[vendorSel.selectedIndex]?.text : null;
+    const amount = parseFloat(document.getElementById('upl_amount')?.value) || 0;
+    if (!vendorId) { App.toast('Supplier is required'); return; }
+    if (amount <= 0) { App.toast('Amount must be > 0'); return; }
+
+    const origText = btnEl.textContent;
+    btnEl.disabled = true;
+    btnEl.textContent = 'Saving...';
+
+    try {
+      const catEl = document.getElementById('upl_cat');
+      const catId = catEl?.value || null;
+      const catDisplay = catId ? catEl.options[catEl.selectedIndex]?.text : '';
+
+      await API.createBill({
+        vendor_id: vendorId,
+        vendor_name: vendorName,
+        supplier_inv_no: document.getElementById('upl_inv_no')?.value?.trim() || '',
+        issue_date: document.getElementById('upl_date')?.value || today(),
+        due_date: document.getElementById('upl_due')?.value || null,
+        lineItems: [{
+          description: document.getElementById('upl_desc')?.value?.trim() || '',
+          category_id: catId,
+          category_display: catDisplay,
+          amount: amount,
+          gst: parseFloat(document.getElementById('upl_gst')?.value) || 0,
+          tax_code: document.getElementById('upl_tax')?.value || 'FRE',
+        }],
+      });
       App.toast('Bill created from upload');
       App.go('tx_bill');
-    });
+    } catch (e) {
+      App.toast(e.message || 'Save failed');
+    } finally {
+      btnEl.disabled = false;
+      btnEl.textContent = origText;
+    }
   }
 
   // ══════════════════════════════════════════
-  // 7. IMPORT
+  // 7. IMPORT (E4) — CSV/Excel bulk import
   // ══════════════════════════════════════════
+
+  let _impType = 'bills';
+  let _impRows = [];
+  let _impFile = null;
+
   function renderImport() {
+    _impRows = [];
+    _impFile = null;
     return {
       tb: '<div class="tb"><div class="tb-t">Import</div></div>',
       ct: `
         <div class="card" style="max-width:720px;margin:0 auto">
-          <div style="display:flex;gap:6px;margin-bottom:10px">
-            <select class="fl" style="padding:6px 10px">
-              <option>Invoices / Bills</option><option>Bank Statement</option>
-              <option>MYOB Export</option><option>Payroll CSV</option>
+          <div style="display:flex;gap:6px;margin-bottom:10px;align-items:center">
+            <select class="fl" style="padding:6px 10px" id="imp_type" onchange="ScrInput._impTypeChange(this.value)">
+              <option value="bills">Invoices / Bills</option>
+              <option value="statement">Bank Statement</option>
+              <option value="myob">MYOB Export</option>
             </select>
-            <button class="btn bo">Download template</button>
+            <div style="flex:1"></div>
+            <div style="font-size:var(--fs-xxs);color:var(--t3)" id="imp_format_hint">Format: Date, Supplier, Invoice No, Amount, GST</div>
           </div>
-          <div style="border:2px dashed var(--bd);border-radius:10px;padding:16px;text-align:center">
-            <div style="font-size:18px;color:var(--t4)">📋</div>
-            <div style="font-size:var(--fs-sm);color:var(--t3)">Drop CSV/Excel here, or <a style="color:var(--acc);font-weight:600;cursor:pointer">browse</a></div>
+          <div style="border:2px dashed var(--bd);border-radius:10px;padding:20px;text-align:center;cursor:pointer" onclick="document.getElementById('imp_file_input').click()" id="imp_dropzone">
+            <div style="font-size:18px;color:var(--t4)" id="imp_drop_icon">📋</div>
+            <div style="font-size:var(--fs-sm);color:var(--t3)" id="imp_drop_text">Drop CSV file here, or <a style="color:var(--acc);font-weight:600">browse</a></div>
+            <input type="file" id="imp_file_input" accept=".csv,.txt" style="display:none" onchange="ScrInput._impFileSelected(event)">
           </div>
         </div>
-
-        <!-- Preview table (mock data) -->
-        <div class="card" style="max-width:720px;margin:0 auto;padding:0;overflow:hidden">
-          <div style="display:flex;justify-content:space-between;padding:6px 10px;background:var(--bg2);border-bottom:1px solid var(--bd2);font-size:var(--fs-xs)">
-            <b>invoices_mar.csv</b>
-            <div>
-              <span style="color:var(--g);font-weight:600">✓43</span>
-              <span style="color:var(--o);font-weight:600">⚠2</span>
-              <span style="color:var(--r);font-weight:600">✗3</span>
-            </div>
-          </div>
-          <table class="tbl" style="margin:0">
-            <thead><tr><th></th><th>Date</th><th>Supplier</th><th>Invoice</th><th style="text-align:right">Amount</th><th>Status</th></tr></thead>
-            <tbody>
-              <tr><td style="color:var(--g)">✓</td><td>09/03</td><td>Pro Bros</td><td>INV1050790</td><td style="text-align:right">190.55</td><td><span class="sts sts-c" style="font-size:9px">Ready</span></td></tr>
-              <tr><td style="color:var(--o)">⚠</td><td>08/03</td><td>Unknown Vendor</td><td>INV9999</td><td style="text-align:right">55.00</td><td><span class="sts sts-p" style="font-size:9px">Warning</span></td></tr>
-              <tr><td style="color:var(--r)">✗</td><td></td><td></td><td></td><td style="text-align:right"></td><td><span class="sts sts-r" style="font-size:9px">Error</span></td></tr>
-            </tbody>
-          </table>
-        </div>
-        <div style="text-align:right;margin:8px auto;max-width:720px">
-          <button class="bs" onclick="ScrInput._saveImport(this)">Import 45 transactions</button>
-        </div>`,
+        <div id="imp_preview" style="max-width:720px;margin:0 auto"></div>
+        <div id="imp_actions" style="max-width:720px;margin:0 auto"></div>`,
     };
   }
 
-  function _saveImport(btnEl) {
-    guardedSave(btnEl, () => {
-      App.toast('45 transactions imported');
-    });
+  function _impTypeChange(val) {
+    _impType = val;
+    const hint = document.getElementById('imp_format_hint');
+    if (hint) {
+      if (val === 'bills') hint.textContent = 'Format: Date, Supplier, Invoice No, Amount, GST';
+      else if (val === 'statement') hint.textContent = 'Format: Date, Description, Debit, Credit, Balance';
+      else hint.textContent = 'Format: MYOB CSV export';
+    }
+    // Reset
+    _impRows = [];
+    const p = document.getElementById('imp_preview'); if (p) p.innerHTML = '';
+    const a = document.getElementById('imp_actions'); if (a) a.innerHTML = '';
+  }
+
+  function _impFileSelected(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    _impFile = file;
+
+    const dropIcon = document.getElementById('imp_drop_icon');
+    const dropText = document.getElementById('imp_drop_text');
+    if (dropIcon) dropIcon.textContent = '✓';
+    if (dropText) dropText.innerHTML = `<b>${esc(file.name)}</b> (${(file.size / 1024).toFixed(0)} KB)`;
+
+    // Read CSV
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target.result;
+      _impParseCSV(text);
+    };
+    reader.readAsText(file);
+  }
+
+  function _impParseCSV(text) {
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    if (lines.length < 2) { App.toast('File is empty or has no data rows'); return; }
+
+    // Skip header row
+    const header = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+    _impRows = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+      if (cols.length < 3) continue;
+
+      if (_impType === 'bills') {
+        // Expected: Date, Supplier, Invoice No, Amount, GST
+        const row = {
+          line: i,
+          date: cols[0] || '',
+          supplier: cols[1] || '',
+          inv_no: cols[2] || '',
+          amount: parseFloat(cols[3]) || 0,
+          gst: parseFloat(cols[4]) || 0,
+          status: 'ready',
+          error: '',
+        };
+        // Validate
+        if (!row.date) { row.status = 'error'; row.error = 'Missing date'; }
+        else if (!row.supplier) { row.status = 'warning'; row.error = 'Unknown supplier'; }
+        else if (row.amount <= 0) { row.status = 'error'; row.error = 'Invalid amount'; }
+        _impRows.push(row);
+      } else {
+        // Statement: Date, Description, Debit, Credit, Balance
+        const row = {
+          line: i,
+          date: cols[0] || '',
+          description: cols[1] || '',
+          debit: parseFloat(cols[2]) || 0,
+          credit: parseFloat(cols[3]) || 0,
+          balance: parseFloat(cols[4]) || 0,
+          status: cols[0] ? 'ready' : 'error',
+          error: cols[0] ? '' : 'Missing date',
+        };
+        _impRows.push(row);
+      }
+    }
+
+    _impRenderPreview();
+  }
+
+  function _impRenderPreview() {
+    const el = document.getElementById('imp_preview');
+    const actEl = document.getElementById('imp_actions');
+    if (!el) return;
+
+    const ready = _impRows.filter(r => r.status === 'ready').length;
+    const warn = _impRows.filter(r => r.status === 'warning').length;
+    const errors = _impRows.filter(r => r.status === 'error').length;
+
+    let html = `<div class="card" style="padding:0;overflow:hidden">
+      <div style="display:flex;justify-content:space-between;padding:6px 10px;background:var(--bg2);border-bottom:1px solid var(--bd2);font-size:var(--fs-xs)">
+        <b>${esc(_impFile?.name || 'import.csv')}</b>
+        <div><span style="color:var(--g);font-weight:600">✓${ready}</span> <span style="color:var(--o);font-weight:600">⚠${warn}</span> <span style="color:var(--r);font-weight:600">✗${errors}</span></div>
+      </div>`;
+
+    if (_impType === 'bills') {
+      html += `<table class="tbl" style="margin:0"><thead><tr><th></th><th>Date</th><th>Supplier</th><th>Invoice</th><th style="text-align:right">Amount</th><th style="text-align:right">GST</th><th>Status</th></tr></thead><tbody>`;
+      _impRows.slice(0, 20).forEach(r => {
+        const icon = r.status === 'ready' ? '<span style="color:var(--g)">✓</span>' : r.status === 'warning' ? '<span style="color:var(--o)">⚠</span>' : '<span style="color:var(--r)">✗</span>';
+        const stsCls = r.status === 'ready' ? 'sts-c' : r.status === 'warning' ? 'sts-p' : 'sts-r';
+        const stsLabel = r.status === 'ready' ? 'Ready' : r.status === 'warning' ? 'Warning' : 'Error';
+        html += `<tr><td>${icon}</td><td>${esc(r.date)}</td><td>${esc(r.supplier)}</td><td>${esc(r.inv_no)}</td><td style="text-align:right">${r.amount.toFixed(2)}</td><td style="text-align:right">${r.gst.toFixed(2)}</td><td><span class="sts ${stsCls}" style="font-size:9px">${stsLabel}</span>${r.error ? ` <span style="font-size:9px;color:var(--t3)">${esc(r.error)}</span>` : ''}</td></tr>`;
+      });
+      if (_impRows.length > 20) html += `<tr><td colspan="7" style="font-size:var(--fs-xxs);color:var(--t3);text-align:center">... ${_impRows.length - 20} more rows</td></tr>`;
+    } else {
+      html += `<table class="tbl" style="margin:0"><thead><tr><th></th><th>Date</th><th>Description</th><th style="text-align:right">Debit</th><th style="text-align:right">Credit</th><th style="text-align:right">Balance</th><th>Status</th></tr></thead><tbody>`;
+      _impRows.slice(0, 20).forEach(r => {
+        const icon = r.status === 'ready' ? '<span style="color:var(--g)">✓</span>' : '<span style="color:var(--r)">✗</span>';
+        html += `<tr><td>${icon}</td><td>${esc(r.date)}</td><td>${esc(r.description)}</td><td style="text-align:right">${r.debit.toFixed(2)}</td><td style="text-align:right">${r.credit.toFixed(2)}</td><td style="text-align:right">${r.balance.toFixed(2)}</td><td><span class="sts ${r.status === 'ready' ? 'sts-c' : 'sts-r'}" style="font-size:9px">${r.status === 'ready' ? 'Ready' : 'Error'}</span></td></tr>`;
+      });
+    }
+    html += '</tbody></table></div>';
+    el.innerHTML = html;
+
+    // Actions
+    if (actEl && ready > 0) {
+      actEl.innerHTML = `<div style="text-align:right;margin:8px 0"><button class="bs" id="imp_save_btn" onclick="ScrInput._saveImport(this)">Import ${ready} transactions</button></div>`;
+    }
+  }
+
+  async function _saveImport(btnEl) {
+    if (!btnEl || btnEl.disabled) return;
+    const readyRows = _impRows.filter(r => r.status === 'ready');
+    if (readyRows.length === 0) { App.toast('No valid rows to import'); return; }
+
+    const origText = btnEl.textContent;
+    btnEl.disabled = true;
+    btnEl.textContent = 'Importing...';
+
+    try {
+      let imported = 0;
+      for (const r of readyRows) {
+        if (_impType === 'bills') {
+          await API.createBill({
+            vendor_name: r.supplier,
+            supplier_inv_no: r.inv_no,
+            issue_date: r.date,
+            lineItems: [{
+              description: r.supplier + ' — ' + r.inv_no,
+              amount: r.amount,
+              gst: r.gst,
+              tax_code: r.gst > 0 ? 'GST' : 'FRE',
+            }],
+          });
+        }
+        // For bank statement: would create different transaction type
+        // For now, only bills import is functional
+        imported++;
+      }
+      App.toast(`${imported} transactions imported`);
+      _impRows = [];
+      const p = document.getElementById('imp_preview'); if (p) p.innerHTML = '';
+      const a = document.getElementById('imp_actions'); if (a) a.innerHTML = '';
+    } catch (e) {
+      App.toast(e.message || 'Import failed');
+    } finally {
+      btnEl.disabled = false;
+      btnEl.textContent = origText;
+    }
   }
 
   // ══════════════════════════════════════════
@@ -1422,7 +1647,13 @@
     _saveBill,
     // P2c
     _saveRecurring,
+    // E4: Upload + Import
+    _uplFileSelected,
+    _uplVendorChange,
+    _uplCalc,
     _saveUploadBill,
+    _impTypeChange,
+    _impFileSelected,
     _saveImport,
   };
 

@@ -1,4 +1,4 @@
-/** Version 1.4 | 14 MAR 2026 | Siam Palette Group | Created 13 MAR 2026 */
+/** Version 1.5 | 14 MAR 2026 | Siam Palette Group | Created 13 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — api_fin.js
@@ -662,6 +662,54 @@ const API = (() => {
   }
 
   // ═══════════════════════════════════════
+  // E1: COA (Chart of Accounts)
+  // ═══════════════════════════════════════
+
+  /** Get COA list — always fresh from DB (4 ACC concurrent, no stale cache) */
+  async function getCoa(filters = {}) {
+    try {
+      return await _call('fin_get_coa', filters);
+    } catch (e) {
+      console.warn('getCoa API failed:', e.message);
+      return { rows: [], total: 0 };
+    }
+  }
+
+  /** Create category → DB */
+  async function createCategory(data) {
+    return await _call('fin_create_category', data);
+  }
+
+  /** Update category → DB */
+  async function updateCategory(data) {
+    return await _call('fin_update_category', data);
+  }
+
+  /** Delete / deactivate category → DB */
+  async function deleteCategory(id, hardDelete = false) {
+    return await _call('fin_delete_category', { id, hard_delete: hardDelete });
+  }
+
+  // ═══════════════════════════════════════
+  // E1: TAX CODES
+  // ═══════════════════════════════════════
+
+  /** Get tax codes — fresh from DB */
+  async function getTaxCodes() {
+    try {
+      return await _call('fin_get_tax_codes', {});
+    } catch (e) {
+      console.warn('getTaxCodes API failed, using S.taxCodes:', e.message);
+      return _S().taxCodes || [];
+    }
+  }
+
+  /** Update tax code → DB */
+  async function updateTaxCode(data) {
+    return await _call('fin_update_tax_code', data);
+  }
+
+  // ═══════════════════════════════════════
   // HELPERS
   // ═══════════════════════════════════════
 
@@ -693,6 +741,13 @@ const API = (() => {
     createTransfer,
     createDebit,
     silentRefresh,
+    // E1: COA + Tax
+    getCoa,
+    createCategory,
+    updateCategory,
+    deleteCategory,
+    getTaxCodes,
+    updateTaxCode,
   };
 
 })();

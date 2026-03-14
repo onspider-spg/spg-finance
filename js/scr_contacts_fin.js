@@ -1,4 +1,4 @@
-/** Version 1.0 | 14 MAR 2026 | Siam Palette Group */
+/** Version 1.0.1 | 15 MAR 2026 | Siam Palette Group */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_contacts_fin.js
@@ -62,10 +62,10 @@
         <div style="overflow-x:auto">
           <table class="tbl" id="ct_tbl">
             <thead><tr>
-              <th>Name</th><th>Contact ID</th><th>Type</th><th>Designation</th>
-              <th>Phone</th><th>Email</th>
-              <th style="text-align:right">Balance due ($)</th>
-              <th style="text-align:right">Overdue ($)</th>
+              ${App.sth('Name','name','ct_tbl')}${App.sth('Contact ID','cid','ct_tbl')}${App.sth('Type','type','ct_tbl')}${App.sth('Designation','desig','ct_tbl')}
+              ${App.sth('Phone','phone','ct_tbl')}${App.sth('Email','email','ct_tbl')}
+              ${App.sthR('Balance due ($)','balance','ct_tbl')}
+              ${App.sthR('Overdue ($)','overdue','ct_tbl')}
             </tr></thead>
             <tbody id="ct_tbody">${_skeleton(8)}</tbody>
           </table>
@@ -317,8 +317,8 @@
       const totals = result.totals || {};
 
       let html = `<div class="card" style="border-radius:0 0 var(--rd-lg) var(--rd-lg);border-top:none">
-        <table class="tbl">
-          <thead><tr><th>Date</th><th>Bill No</th><th>Invoice No</th><th>Description</th><th style="text-align:right">Amount</th><th style="text-align:right">Balance</th><th>Status</th></tr></thead>
+        <table class="tbl" id="ct_txn_tbl">
+          <thead><tr>${App.sth('Date','date','ct_txn_tbl')}${App.sth('Bill No','bill','ct_txn_tbl')}${App.sth('Invoice No','inv','ct_txn_tbl')}${App.sth('Description','desc','ct_txn_tbl')}${App.sthR('Amount','amount','ct_txn_tbl')}${App.sthR('Balance','balance','ct_txn_tbl')}${App.sth('Status','status','ct_txn_tbl')}</tr></thead>
           <tbody>`;
 
       if (_detailTxns.length === 0) {

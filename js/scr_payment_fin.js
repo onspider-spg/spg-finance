@@ -1,4 +1,4 @@
-/** Version 1.0 | 14 MAR 2026 | Siam Palette Group */
+/** Version 1.0.1 | 15 MAR 2026 | Siam Palette Group */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_payment_fin.js
@@ -434,10 +434,10 @@
 
         <!-- History table -->
         <div class="card" style="padding:0;overflow:hidden">
-          <table class="tbl"><thead><tr>
-            <th style="width:24px"></th><th>Date</th><th>Ref</th><th>Type</th>
-            <th>Payee</th><th>Brand</th><th>Bank</th>
-            <th style="text-align:right">Amount ($)</th><th>Items</th>
+          <table class="tbl" id="ph_tbl"><thead><tr>
+            <th style="width:24px"></th>${App.sth('Date','date','ph_tbl')}${App.sth('Ref','ref','ph_tbl')}${App.sth('Type','type','ph_tbl')}
+            ${App.sth('Payee','payee','ph_tbl')}${App.sth('Brand','brand','ph_tbl')}${App.sth('Bank','bank','ph_tbl')}
+            ${App.sthR('Amount ($)','amount','ph_tbl')}${App.sth('Items','items','ph_tbl')}
           </tr></thead>
           <tbody id="ph_body">${_skeleton(9)}</tbody>
           </table>

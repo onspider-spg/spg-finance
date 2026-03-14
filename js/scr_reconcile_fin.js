@@ -1,4 +1,4 @@
-/** Version 1.0 | 14 MAR 2026 | Siam Palette Group */
+/** Version 1.0.1 | 15 MAR 2026 | Siam Palette Group */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_reconcile_fin.js
@@ -286,10 +286,10 @@
             <input class="fl" type="date" id="cr_to" value="${_today()}" style="width:120px">
           </div>
           <div class="card" style="padding:0;overflow:hidden;margin:0">
-            <table class="tbl"><thead><tr>
-              <th>Date</th><th>Type</th><th>Description</th><th>Ref</th>
-              <th style="text-align:right">In ($)</th><th style="text-align:right">Out ($)</th>
-              <th style="text-align:right">Balance ($)</th>
+            <table class="tbl" id="cr_stmt_tbl"><thead><tr>
+              ${App.sth('Date','date','cr_stmt_tbl')}${App.sth('Type','type','cr_stmt_tbl')}${App.sth('Description','desc','cr_stmt_tbl')}${App.sth('Ref','ref','cr_stmt_tbl')}
+              ${App.sthR('In ($)','in','cr_stmt_tbl')}${App.sthR('Out ($)','out','cr_stmt_tbl')}
+              ${App.sthR('Balance ($)','balance','cr_stmt_tbl')}
             </tr></thead>
             <tbody id="cr_stmt_body">${_skeleton(7)}</tbody>
             </table>
@@ -339,10 +339,10 @@
         <!-- History tab -->
         <div id="cr_history_tab" style="display:none">
           <div class="card" style="padding:0;overflow:hidden;margin:0">
-            <table class="tbl"><thead><tr>
-              <th>Date</th><th style="text-align:right">Expected</th>
-              <th style="text-align:right">Counted</th><th style="text-align:right">Variance</th>
-              <th>Destination</th><th>Journal</th><th>Status</th>
+            <table class="tbl" id="cr_hist_tbl"><thead><tr>
+              ${App.sth('Date','date','cr_hist_tbl')}${App.sthR('Expected','expected','cr_hist_tbl')}
+              ${App.sthR('Counted','counted','cr_hist_tbl')}${App.sthR('Variance','variance','cr_hist_tbl')}
+              ${App.sth('Destination','dest','cr_hist_tbl')}${App.sth('Journal','journal','cr_hist_tbl')}${App.sth('Status','status','cr_hist_tbl')}
             </tr></thead>
             <tbody id="cr_history_body">${_skeleton(7)}</tbody>
             </table>

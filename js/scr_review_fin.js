@@ -1,4 +1,4 @@
-/** Version 1.0 | 14 MAR 2026 | Siam Palette Group */
+/** Version 1.0.1 | 15 MAR 2026 | Siam Palette Group */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_review_fin.js
@@ -122,9 +122,9 @@
           <button class="btn bo rv-chip${_pendingFilter === 'due_soon' ? ' rv-chip-a' : ''}" onclick="ScrReview._filterPending('due_soon')" id="rv_chip_due_soon">Due soon</button>
         </div>
         <div class="card" style="padding:0;overflow:hidden;margin:0">
-          <table class="tbl"><thead><tr>
-            <th>Source</th><th>Vendor</th><th>Expected Item</th><th>Frequency</th>
-            <th style="text-align:right">Est. $</th><th>Due</th><th>Status</th><th>Action</th>
+          <table class="tbl" id="rv_pend_tbl"><thead><tr>
+            ${App.sth('Source','source','rv_pend_tbl')}${App.sth('Vendor','vendor','rv_pend_tbl')}${App.sth('Expected Item','item','rv_pend_tbl')}${App.sth('Frequency','freq','rv_pend_tbl')}
+            ${App.sthR('Est. $','est','rv_pend_tbl')}${App.sth('Due','due','rv_pend_tbl')}${App.sth('Status','status','rv_pend_tbl')}<th>Action</th>
           </tr></thead>
           <tbody id="rv_pending_body">${_skeleton(8)}</tbody>
           </table>
@@ -216,10 +216,10 @@
         ${_kpiBar('rv_recurring')}
         ${_tabs('rv_recurring')}
         <div class="card" style="padding:0;overflow:hidden;margin:0">
-          <table class="tbl"><thead><tr>
-            <th>Vendor</th><th>Item</th><th>Frequency</th>
-            <th style="text-align:right">Est. Amount</th><th>Next Due</th>
-            <th>Last Matched Bill</th><th>Status</th><th></th>
+          <table class="tbl" id="rv_rec_tbl"><thead><tr>
+            ${App.sth('Vendor','vendor','rv_rec_tbl')}${App.sth('Item','item','rv_rec_tbl')}${App.sth('Frequency','freq','rv_rec_tbl')}
+            ${App.sthR('Est. Amount','est','rv_rec_tbl')}${App.sth('Next Due','due','rv_rec_tbl')}
+            ${App.sth('Last Matched Bill','lastmatch','rv_rec_tbl')}${App.sth('Status','status','rv_rec_tbl')}<th></th>
           </tr></thead>
           <tbody id="rv_recurring_body">${_skeleton(8)}</tbody>
           </table>
@@ -292,10 +292,10 @@
         ${_kpiBar('rv_expected')}
         ${_tabs('rv_expected')}
         <div class="card" style="padding:0;overflow:hidden;margin:0">
-          <table class="tbl"><thead><tr>
-            <th>Created</th><th>By</th><th>Vendor</th><th>Description</th>
-            <th style="text-align:right">Est. $</th><th>Expected Date</th>
-            <th>Days Waiting</th><th>Responsible</th><th>Status</th><th>Action</th>
+          <table class="tbl" id="rv_exp_tbl"><thead><tr>
+            ${App.sth('Created','created','rv_exp_tbl')}${App.sth('By','by','rv_exp_tbl')}${App.sth('Vendor','vendor','rv_exp_tbl')}${App.sth('Description','desc','rv_exp_tbl')}
+            ${App.sthR('Est. $','est','rv_exp_tbl')}${App.sth('Expected Date','expdate','rv_exp_tbl')}
+            ${App.sth('Days Waiting','days','rv_exp_tbl')}${App.sth('Responsible','resp','rv_exp_tbl')}${App.sth('Status','status','rv_exp_tbl')}<th>Action</th>
           </tr></thead>
           <tbody id="rv_expected_body">${_skeleton(10)}</tbody>
           </table>

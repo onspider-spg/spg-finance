@@ -1,4 +1,4 @@
-/** Version 1.5.3 | 14 MAR 2026 | Siam Palette Group | Created 13 MAR 2026 */
+/** Version 1.5.4 | 14 MAR 2026 | Siam Palette Group | Created 13 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — api_fin.js
@@ -759,6 +759,13 @@ const API = (() => {
     updateRecurringRule: (data) => _call('fin_update_recurring_rule', data),
     getExpectedInvoices: (filters) => _call('fin_get_expected_invoices', filters || {}),
     createExpectedInvoice: (data) => _call('fin_create_expected_invoice', data),
+    // E5b: Payment — thin wrappers using _call
+    getUnpaidForPayment: (filters) => _call('fin_get_unpaid_for_payment', filters || {}),
+    getNextPaymentRef: (data) => _call('fin_get_next_payment_ref', data || {}),
+    recordPayment: (data) => _call('fin_record_payment', data),
+    getPaymentHistory: (filters) => _call('fin_get_payment_history', filters || {}),
+    getRemittanceList: (filters) => _call('fin_get_remittance_list', filters || {}),
+    sendRemittance: (data) => _call('fin_send_remittance', data),
   };
 
 })();

@@ -1,4 +1,4 @@
-/** Version 1.6.4 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 1.6.5 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_input_fin.js
@@ -586,48 +586,48 @@
   // ══════════════════════════════════════════
   const MOCK_CATS = ['', '27002 Purchases-GST Free', '27010 Packaging', '42700 Rent', '43000 Utilities', '46000 Wages'];
 
-  /** Get categories for expense screens — filter out Income, group by main_category */
+  /** Get categories for Bill screens — only Expense + Asset Purchase */
   function _getCats() {
     const cats = App.S.categories;
     if (!cats || cats.length === 0) return MOCK_CATS;
 
-    // Filter: only Expense + Asset Purchase + Loan (no Income)
-    const expCats = cats.filter(c =>
-      c.transaction_type !== 'Income'
+    // Filter: only Expense + Asset Purchase (Bill creation context)
+    // Transfer → has its own screen, Loan → has its own section, Income → not a bill
+    const billCats = cats.filter(c =>
+      c.transaction_type === 'Expense' || c.transaction_type === 'Asset Purchase'
     );
 
     // Group by main_category
     const groups = {};
-    expCats.forEach(c => {
+    billCats.forEach(c => {
       const grp = c.main_category || 'Other';
       if (!groups[grp]) groups[grp] = [];
       groups[grp].push(c.sub_category);
     });
 
-    // Build flat array with group headers: ['', '── COGs ──', 'Food', 'Beverage', ...]
     const result = [''];
     Object.keys(groups).forEach(grp => {
-      result.push('── ' + grp + ' ──');
+      result.push('\u2500\u2500 ' + grp + ' \u2500\u2500');
       groups[grp].forEach(name => result.push(name));
     });
     return result;
   }
 
-  /** Get categories as <option> HTML with optgroup for select elements */
+  /** Get categories as <option> HTML with optgroup — only Expense + Asset Purchase */
   function _getCatOptsHTML() {
     const cats = App.S.categories;
     if (!cats || cats.length === 0) {
       return MOCK_CATS.map(c => `<option>${esc(c)}</option>`).join('');
     }
 
-    // Filter: only Expense types (no Income for Bill creation)
-    const expCats = cats.filter(c =>
-      c.transaction_type !== 'Income'
+    // Filter: only Expense + Asset Purchase (Bill creation context)
+    const billCats = cats.filter(c =>
+      c.transaction_type === 'Expense' || c.transaction_type === 'Asset Purchase'
     );
 
     // Group by main_category
     const groups = {};
-    expCats.forEach(c => {
+    billCats.forEach(c => {
       const grp = c.main_category || 'Other';
       if (!groups[grp]) groups[grp] = [];
       groups[grp].push(c);

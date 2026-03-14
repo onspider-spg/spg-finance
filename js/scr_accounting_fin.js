@@ -1,8 +1,9 @@
-/** Version 1.1 | 14 MAR 2026 | Siam Palette Group */
+/** Version 1.5 | 14 MAR 2026 | Siam Palette Group */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_accounting_fin.js
- * Accounting screens: COA List, Create, Edit, Tax Codes
+ * Accounting screens: COA List, Create, Edit, Tax Codes,
+ * Bank Rules, Banking Hub
  * ═══════════════════════════════════════════
  *
  * SCREENS:
@@ -10,6 +11,8 @@
  *   ac_coa_create — Create Category form
  *   ac_coa_edit   — Edit Category form (+ bank details if type=Bank)
  *   ac_tax        — Tax Codes list + inline edit
+ *   ac_rules      — Bank Rules list + Create/Edit modal (E3a)
+ *   ac_hub        — Banking Hub — accounts + balance overview (E3a)
  *
  * ALL screens connect to DB via API (no MOCK fallback needed).
  * Concurrency: 4 ACC simultaneous — list views always fresh, save has stale check.
@@ -500,6 +503,399 @@
   }
 
   // ══════════════════════════════════════════
+  // 5. BANK RULES (ac_rules) — ★ E3a
+  // ══════════════════════════════════════════
+
+  let _brRows = [];
+  let _brStats = {};
+  let _brTypeFilter = 'all';
+  let _brBankFilter = '';
+  let _brSearch = '';
+  let _brShowInactive = false;
+  let _brEditing = null; // rule being edited (null = create mode)
+  let _brSaving = false;
+
+  function renderBankRules() {
+    _brTypeFilter = 'all';
+    _brBankFilter = '';
+    _brSearch = '';
+    _brShowInactive = false;
+    return {
+      tb: `<div class="tb"><div class="tb-t">Bank Rules <span style="font-size:var(--fs-xs);color:var(--t3);font-weight:400">Auto-match rules for bank reconciliation</span></div><div style="position:relative;display:inline-block" id="br_cr_wrap"><button class="bs" onclick="ScrAccounting._brToggleMenu()" style="display:flex;align-items:center;gap:4px">+ Create Rule <span style="font-size:10px">▾</span></button><div class="br-cr-menu" id="br_cr_menu"><div class="br-cr-item" onclick="ScrAccounting._brOpenModal('receive')"><span class="br-tt br-tt-recv">IN</span> Receive money</div><div class="br-cr-item" onclick="ScrAccounting._brOpenModal('spend')"><span class="br-tt br-tt-spend">OUT</span> Spend money</div><div class="br-cr-item" onclick="ScrAccounting._brOpenModal('bill')"><span class="br-tt br-tt-bill">BILL</span> Bill / Invoice</div></div></div></div>`,
+      ct: `<div style="max-width:1100px;margin:0 auto">
+        <div class="br-info">💡 <b>Bank Rules คืออะไร?</b> — เมื่อ bank statement เข้ามา description ของแบงค์จะไม่ตรงกับชื่อ vendor ในระบบ เช่น แบงค์เขียน <code style="background:rgba(124,58,237,.1);padding:1px 4px;border-radius:3px">PRO BROS PTY LTD DD</code> แต่ในระบบชื่อ "Pro Bros Providore" — Bank Rules ช่วยบอกว่า <b>"ถ้าเห็นคำนี้ใน description → match กับ contact นี้ + category นี้"</b> เพื่อให้ reconciliation ทำงานอัตโนมัติ</div>
+        <div class="br-stats" id="br_stats"></div>
+        <div class="br-fbar">
+          <div class="fg"><div class="fl-l">Transaction Type</div><select class="fl" style="width:140px" id="br_ftype" onchange="ScrAccounting._brSetFilter('type',this.value)"><option value="all">All</option><option value="receive">Receive money</option><option value="spend">Spend money</option><option value="bill">Bill</option></select></div>
+          <div class="fg"><div class="fl-l">Bank Account</div><select class="fl" style="width:180px" id="br_fbank" onchange="ScrAccounting._brSetFilter('bank',this.value)"><option value="">All accounts</option></select></div>
+          <div class="fg"><div class="fl-l">Search</div><input class="fl" placeholder="Search rule name..." style="width:160px" id="br_search" oninput="ScrAccounting._brSetFilter('search',this.value)"></div>
+          <div class="fg" style="align-self:flex-end"><label style="font-size:var(--fs-xxs);color:var(--t3);display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="br_inactive" onchange="ScrAccounting._brSetFilter('inactive',this.checked)"> Show inactive</label></div>
+          <div style="flex:1"></div>
+          <button class="bg" style="color:var(--acc)" onclick="ScrAccounting._brResetFilters()">Reset</button>
+        </div>
+        <div class="card" style="padding:0;overflow:hidden"><table class="br-tbl"><thead><tr><th style="width:22%">Rule Name</th><th style="width:15%">Bank Account</th><th style="width:10%">Type</th><th style="width:17%">Contact</th><th style="width:12%">Main Category</th><th style="width:11%">Sub Category</th><th style="width:8%">Active</th><th style="width:5%"></th></tr></thead><tbody id="br_tbody">${_skeleton(8)}</tbody></table></div>
+        <div id="br_count" style="font-size:var(--fs-xxs);color:var(--t3);display:flex;gap:12px;align-items:center;margin-top:8px"></div>
+      </div>`,
+    };
+  }
+
+  async function _brLoad() {
+    // Populate bank account filter dropdown
+    const bankSel = document.getElementById('br_fbank');
+    if (bankSel && App.S.bankAccounts) {
+      let opts = '<option value="">All accounts</option>';
+      App.S.bankAccounts.forEach(b => { opts += `<option value="${b.id}">${esc(b.label)}</option>`; });
+      bankSel.innerHTML = opts;
+    }
+
+    try {
+      const result = await API.call('fin_get_bank_rules', {
+        type_filter: _brTypeFilter,
+        bank_account_id: _brBankFilter || null,
+        search: _brSearch,
+        show_inactive: _brShowInactive,
+      });
+      _brRows = result.rows || [];
+      _brStats = result.stats || {};
+      _brRenderStats();
+      _brRenderRows();
+    } catch (e) {
+      const tbody = document.getElementById('br_tbody');
+      if (tbody) tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--r)">Error: ${esc(e.message)}</td></tr>`;
+    }
+  }
+
+  function _brRenderStats() {
+    const el = document.getElementById('br_stats');
+    if (!el) return;
+    const s = _brStats;
+    el.innerHTML = `<div class="br-stat"><span class="br-dot br-dot-g"></span> <b>${s.active_count || 0}</b> active rules</div><div class="br-stat"><span class="br-dot br-dot-b"></span> <b>${s.receive_count || 0}</b> receive money</div><div class="br-stat"><span class="br-dot br-dot-r"></span> <b>${s.spend_count || 0}</b> spend money</div><div class="br-stat"><span class="br-dot br-dot-o"></span> <b>${s.bill_count || 0}</b> bill</div><div class="br-stat" style="color:var(--t4)"><b>${s.inactive_count || 0}</b> inactive</div>`;
+  }
+
+  function _brRenderRows() {
+    const tbody = document.getElementById('br_tbody');
+    const countEl = document.getElementById('br_count');
+    if (!tbody) return;
+
+    if (_brRows.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--t3)">No rules found. Create your first rule above.</td></tr>';
+      if (countEl) countEl.textContent = '';
+      return;
+    }
+
+    // Bank account label lookup
+    const bankMap = {};
+    (App.S.bankAccounts || []).forEach(b => { bankMap[b.id] = b.label; });
+
+    tbody.innerHTML = _brRows.map(r => {
+      const typeCls = r.transaction_type === 'receive' ? 'br-tt-recv' : r.transaction_type === 'spend' ? 'br-tt-spend' : 'br-tt-bill';
+      const typeLabel = r.transaction_type === 'receive' ? 'Receive money' : r.transaction_type === 'spend' ? 'Spend money' : 'Bill';
+      const bankLabel = r.bank_account_id ? (bankMap[r.bank_account_id] || '—') : 'All accounts';
+      const inactive = !r.is_active ? ' br-inactive' : '';
+      const kws = (r.keywords || []).map(k => `<span class="br-kw">${esc(k)}</span>`).join('');
+      return `<tr class="${inactive}" onclick="ScrAccounting._brOpenModal('${r.transaction_type}','edit','${r.id}')">
+        <td><div class="br-rn">${esc(r.rule_name)}</div><div class="br-kws">${kws}</div></td>
+        <td style="font-size:var(--fs-xs)">${esc(bankLabel)}</td>
+        <td><span class="br-tt ${typeCls}">${typeLabel}</span></td>
+        <td style="font-size:var(--fs-xs);font-weight:${r.vendor_name ? '500' : '400'}">${esc(r.vendor_name || '—')}</td>
+        <td style="font-size:var(--fs-xxs);color:var(--t2)">${esc(r.main_category || '')}</td>
+        <td style="font-size:var(--fs-xxs);color:var(--t2)">${esc(r.sub_category || '')}</td>
+        <td onclick="event.stopPropagation()"><label class="br-tgl"><input type="checkbox" ${r.is_active ? 'checked' : ''} onchange="ScrAccounting._brToggleActive('${r.id}',this.checked)"><span class="br-sl"></span></label></td>
+        <td><button class="bg" style="font-size:14px" title="Edit">✎</button></td>
+      </tr>`;
+    }).join('');
+
+    if (countEl) countEl.innerHTML = `<span>Showing ${_brRows.length} rules</span>`;
+  }
+
+  function _brSetFilter(key, val) {
+    if (key === 'type') _brTypeFilter = val;
+    else if (key === 'bank') _brBankFilter = val;
+    else if (key === 'search') { _brSearch = val; clearTimeout(_brSetFilter._t); _brSetFilter._t = setTimeout(() => _brLoad(), 300); return; }
+    else if (key === 'inactive') _brShowInactive = val;
+    _brLoad();
+  }
+
+  function _brResetFilters() {
+    _brTypeFilter = 'all'; _brBankFilter = ''; _brSearch = ''; _brShowInactive = false;
+    const ft = document.getElementById('br_ftype'); if (ft) ft.value = 'all';
+    const fb = document.getElementById('br_fbank'); if (fb) fb.value = '';
+    const fs = document.getElementById('br_search'); if (fs) fs.value = '';
+    const fi = document.getElementById('br_inactive'); if (fi) fi.checked = false;
+    _brLoad();
+  }
+
+  async function _brToggleActive(id, checked) {
+    try {
+      await API.call('fin_update_bank_rule', { id, is_active: checked });
+    } catch (e) {
+      App.toast(e.message || 'Update failed');
+      _brLoad(); // revert on fail
+    }
+  }
+
+  // ── Bank Rules Modal ──
+  function _brToggleMenu() {
+    const m = document.getElementById('br_cr_menu');
+    if (m) m.classList.toggle('open');
+  }
+
+  function _brOpenModal(type, mode, ruleId) {
+    // Close create dropdown
+    const menu = document.getElementById('br_cr_menu');
+    if (menu) menu.classList.remove('open');
+
+    _brEditing = null;
+    if (mode === 'edit' && ruleId) {
+      _brEditing = _brRows.find(r => r.id === ruleId) || null;
+    }
+
+    // Remove existing modal
+    let ov = document.getElementById('br_modal_ov');
+    if (ov) ov.remove();
+
+    const isEdit = !!_brEditing;
+    const r = _brEditing || {};
+    const editType = isEdit ? r.transaction_type : type;
+    const title = isEdit ? 'Edit Bank Rule' : ('Create Bank Rule — ' + (type === 'receive' ? 'Receive Money' : type === 'spend' ? 'Spend Money' : 'Bill'));
+
+    // Bank account options
+    let bankOpts = '<option value="">All bank accounts</option>';
+    (App.S.bankAccounts || []).forEach(b => {
+      bankOpts += `<option value="${b.id}" ${b.id === r.bank_account_id ? 'selected' : ''}>${esc(b.label)}</option>`;
+    });
+
+    // Vendor options from S.vendors
+    let vendorOpts = '<option value="">— Select —</option>';
+    (App.S.vendors || []).forEach(v => {
+      vendorOpts += `<option value="${v.id}" ${v.id === r.vendor_id ? 'selected' : ''}>${esc(v.name)}</option>`;
+    });
+
+    // Main category options (unique from S.categories)
+    const mainSet = new Set();
+    (App.S.categories || []).forEach(c => { if (c.main_category) mainSet.add(c.main_category); });
+    let mainOpts = '<option value="">— Select —</option>';
+    [...mainSet].sort().forEach(m => {
+      mainOpts += `<option value="${esc(m)}" ${m === r.main_category ? 'selected' : ''}>${esc(m)}</option>`;
+    });
+
+    // Keywords as comma-separated
+    const kwStr = (r.keywords || []).join(', ');
+
+    ov = document.createElement('div');
+    ov.className = 'br-modal-ov open';
+    ov.id = 'br_modal_ov';
+    ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+    ov.innerHTML = `<div class="br-modal">
+      <div class="br-mh"><div class="br-mt">${esc(title)}</div><button class="br-mx" onclick="document.getElementById('br_modal_ov').remove()">✕</button></div>
+      <div class="br-mb">
+        <div class="br-fs"><div class="br-fst">Rule Details</div>
+          <div class="br-fr"><div class="fg" style="flex:1"><label>Transaction Type *</label><select class="fl" id="brm_type" style="width:100%"><option value="receive" ${editType==='receive'?'selected':''}>Receive money</option><option value="spend" ${editType==='spend'?'selected':''}>Spend money</option><option value="bill" ${editType==='bill'?'selected':''}>Bill</option></select></div><div class="fg" style="flex:2"><label>Rule Name *</label><input class="fl" id="brm_name" value="${esc(r.rule_name || '')}" placeholder="e.g. PRO BROS, UBER EATS" style="width:100%"></div></div>
+          <div class="br-fr"><div class="fg"><label>Applies to</label><select class="fl" id="brm_bank" style="width:100%">${bankOpts}</select></div></div>
+        </div>
+        <div class="br-fs"><div class="br-fst">Keywords (comma-separated)</div>
+          <input class="fl" id="brm_keywords" value="${esc(kwStr)}" placeholder="e.g. PRO BROS, PRO BRO" style="width:100%">
+          <div style="font-size:var(--fs-xxs);color:var(--t3);margin-top:4px">ใส่ keywords ที่ปรากฏใน bank statement description คั่นด้วย comma (match = ตรงอย่างน้อย 1 keyword)</div>
+        </div>
+        <div class="br-fs"><div class="br-fst">Then auto-fill with</div>
+          <div class="br-fr"><div class="fg"><label>Contact / Supplier</label><select class="fl" id="brm_vendor" style="width:100%" onchange="ScrAccounting._brOnVendorChange()">${vendorOpts}</select></div><div class="fg"><label>Main Category</label><select class="fl" id="brm_main" style="width:100%" onchange="ScrAccounting._brUpdateSubCats()">${mainOpts}</select></div><div class="fg"><label>Sub Category</label><select class="fl" id="brm_sub" style="width:100%"><option value="">— Select main first —</option></select></div></div>
+        </div>
+      </div>
+      <div class="br-mf">
+        <button class="btn bo" onclick="document.getElementById('br_modal_ov').remove()">Cancel</button>
+        ${isEdit ? `<button class="btn bo" style="color:var(--r);border-color:var(--r)" onclick="ScrAccounting._brDelete('${r.id}')">Delete Rule</button>` : ''}
+        <button class="bs" id="brm_save" onclick="ScrAccounting._brSave()">${isEdit ? 'Save Changes' : 'Create Rule'}</button>
+      </div>
+    </div>`;
+
+    document.body.appendChild(ov);
+
+    // Populate sub-cats if main is set
+    if (r.main_category) {
+      requestAnimationFrame(() => _brUpdateSubCats(r.sub_category));
+    }
+
+    // Ensure master data is ready for vendor/category dropdowns
+    if (!App.S._masterReady) {
+      API.waitMaster().then(() => {
+        // Re-populate vendor dropdown
+        const vSel = document.getElementById('brm_vendor');
+        if (vSel && App.S.vendors) {
+          let opts2 = '<option value="">— Select —</option>';
+          App.S.vendors.forEach(v => { opts2 += `<option value="${v.id}" ${v.id === r.vendor_id ? 'selected' : ''}>${esc(v.name)}</option>`; });
+          vSel.innerHTML = opts2;
+        }
+      });
+    }
+  }
+
+  function _brOnVendorChange() {
+    const vSel = document.getElementById('brm_vendor');
+    if (!vSel) return;
+    const vid = vSel.value;
+    const vendor = (App.S.vendors || []).find(v => v.id === vid);
+    // No auto-fill needed — vendor name stored separately
+  }
+
+  function _brUpdateSubCats(preselect) {
+    const mainSel = document.getElementById('brm_main');
+    const subSel = document.getElementById('brm_sub');
+    if (!mainSel || !subSel) return;
+    const mainVal = mainSel.value;
+    const subs = (App.S.categories || []).filter(c => c.main_category === mainVal).map(c => c.sub_category).filter(Boolean);
+    const unique = [...new Set(subs)];
+    let opts = '<option value="">— Select —</option>';
+    unique.forEach(s => { opts += `<option value="${esc(s)}" ${s === preselect ? 'selected' : ''}>${esc(s)}</option>`; });
+    subSel.innerHTML = opts;
+  }
+
+  async function _brSave() {
+    if (_brSaving) return;
+    const btn = document.getElementById('brm_save');
+    const name = document.getElementById('brm_name')?.value?.trim();
+    const kwRaw = document.getElementById('brm_keywords')?.value?.trim();
+
+    if (!name) { App.toast('Rule Name is required'); return; }
+    if (!kwRaw) { App.toast('At least 1 keyword is required'); return; }
+
+    const keywords = kwRaw.split(',').map(k => k.trim().toUpperCase()).filter(Boolean);
+    if (keywords.length === 0) { App.toast('At least 1 keyword is required'); return; }
+
+    _brSaving = true;
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+
+    try {
+      const vendorSel = document.getElementById('brm_vendor');
+      const vendorId = vendorSel?.value || null;
+      const vendorName = vendorId ? vendorSel.options[vendorSel.selectedIndex]?.text : null;
+
+      const data = {
+        rule_name: name,
+        keywords,
+        transaction_type: document.getElementById('brm_type')?.value || 'spend',
+        bank_account_id: document.getElementById('brm_bank')?.value || null,
+        vendor_id: vendorId,
+        vendor_name: vendorName,
+        main_category: document.getElementById('brm_main')?.value || null,
+        sub_category: document.getElementById('brm_sub')?.value || null,
+      };
+
+      if (_brEditing) {
+        data.id = _brEditing.id;
+        await API.call('fin_update_bank_rule', data);
+        App.toast('Rule updated');
+      } else {
+        await API.call('fin_create_bank_rule', data);
+        App.toast('Rule created');
+      }
+
+      document.getElementById('br_modal_ov')?.remove();
+      _brLoad();
+    } catch (e) {
+      App.toast(e.message || 'Save failed');
+    } finally {
+      _brSaving = false;
+      if (btn) { btn.disabled = false; btn.textContent = _brEditing ? 'Save Changes' : 'Create Rule'; }
+    }
+  }
+
+  function _brDelete(id) {
+    App.showDialog({
+      title: 'Delete Bank Rule',
+      message: 'Delete this rule permanently? This will not affect past reconciled transactions.',
+      confirmText: 'Delete',
+      onConfirm: async () => {
+        try {
+          await API.call('fin_delete_bank_rule', { id });
+          App.toast('Rule deleted');
+          document.getElementById('br_modal_ov')?.remove();
+          _brLoad();
+        } catch (e) {
+          App.toast(e.message || 'Delete failed');
+        }
+      },
+    });
+  }
+
+  // Close dropdown when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#br_cr_wrap')) {
+      const m = document.getElementById('br_cr_menu');
+      if (m) m.classList.remove('open');
+    }
+  });
+
+  // ══════════════════════════════════════════
+  // 6. BANKING HUB (ac_hub) — ★ E3a
+  // ══════════════════════════════════════════
+
+  let _hubAccounts = [];
+
+  function renderBankingHub() {
+    return {
+      tb: `<div class="tb"><div class="tb-t">Banking Hub</div><button class="bs" onclick="App.go('ac_coa_create')">+ Add Bank Account</button></div>`,
+      ct: `<div style="max-width:1000px;margin:0 auto" id="hub_content">${_skeleton(1).replace('<tr><td', '<div style="text-align:center;padding:40px;color:var(--t3)"><div class="fin-spinner" style="margin:0 auto 8px"></div>').replace('</td></tr>', '</div>')}</div>`,
+    };
+  }
+
+  async function _hubLoad() {
+    const el = document.getElementById('hub_content');
+    if (!el) return;
+
+    try {
+      const result = await API.call('fin_get_banking_hub', {});
+      _hubAccounts = result.accounts || [];
+      _hubRender(el);
+    } catch (e) {
+      el.innerHTML = `<div style="padding:20px;color:var(--r)">Error: ${esc(e.message)}</div>`;
+    }
+  }
+
+  function _hubRender(el) {
+    if (_hubAccounts.length === 0) {
+      el.innerHTML = '<div class="empty" style="padding:40px">No bank accounts found. Add one in Categories (COA).</div>';
+      return;
+    }
+
+    const active = _hubAccounts.filter(a => a.is_active !== false);
+    const inactive = _hubAccounts.filter(a => a.is_active === false);
+
+    let html = '';
+    if (active.length > 0) {
+      html += `<div style="font-size:var(--fs-sm);font-weight:600;margin-bottom:8px">Accounts${active.length > 0 ? ` (${active.length})` : ''}</div>`;
+      html += active.map(a => _hubCard(a)).join('');
+    }
+    if (inactive.length > 0) {
+      html += `<div style="font-size:var(--fs-sm);font-weight:600;margin:16px 0 8px">Inactive accounts</div>`;
+      html += inactive.map(a => _hubCard(a, true)).join('');
+    }
+
+    el.innerHTML = html;
+  }
+
+  function _hubCard(a, dimmed) {
+    const style = dimmed ? 'opacity:.6' : '';
+    const diff = a.bank_balance != null ? (a.spg_balance - a.bank_balance) : null;
+    const diffHtml = diff != null
+      ? `<span style="color:${diff === 0 ? 'var(--g)' : 'var(--r)'};font-size:var(--fs-xs)">(${fm(diff)})</span>`
+      : '';
+    const bankBalHtml = a.bank_balance != null
+      ? `<div style="font-size:var(--fs-kpi-md);font-weight:800">${fm(a.bank_balance)} ${diffHtml}</div><div style="font-size:var(--fs-xxs);color:var(--t3)">Bank updated ${a.bank_balance_date || '—'}</div>`
+      : `<div style="font-size:var(--fs-kpi-md);font-weight:800;color:var(--t3)">N/A</div><div style="font-size:var(--fs-xxs);color:var(--t3)">No bank connection</div>`;
+
+    return `<div class="card" style="display:flex;justify-content:space-between;align-items:center;${style}">
+      <div>
+        <div style="font-size:var(--fs-body);font-weight:700">${esc(a.label)}${!a.is_active ? ' <span class="sts sts-o" style="font-size:9px">Inactive</span>' : ''}</div>
+        <div style="font-size:var(--fs-xxs);color:var(--t3)">${a.bsb ? 'BSB ' + esc(a.bsb) + ' · ' : ''}${a.account_number ? 'ACC ' + esc(a.account_number) : ''}</div>
+        <div style="display:flex;gap:20px;margin-top:6px">
+          <div><div style="font-size:var(--fs-kpi-md);font-weight:800">${fm(a.spg_balance)}</div><div style="font-size:var(--fs-xxs);color:var(--t3)">SPG balance</div></div>
+          <div>${bankBalHtml}</div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // ══════════════════════════════════════════
   // REGISTER ROUTES
   // ══════════════════════════════════════════
   App.registerRoutes({
@@ -507,6 +903,8 @@
     ac_coa_create: { render: renderCreateCategory, onLoad: _onCreateLoad },
     ac_coa_edit:   { render: renderEditCategory, onLoad: _onEditLoad },
     ac_tax:        { render: renderTaxCodes, onLoad: _loadTax },
+    ac_rules:      { render: renderBankRules, onLoad: _brLoad },
+    ac_hub:        { render: renderBankingHub, onLoad: _hubLoad },
   });
 
   // ══════════════════════════════════════════
@@ -525,6 +923,16 @@
     _toggleActive,
     _deleteCat,
     _editTax,
+    // E3a: Bank Rules
+    _brToggleMenu,
+    _brOpenModal,
+    _brSetFilter,
+    _brResetFilters,
+    _brToggleActive,
+    _brSave,
+    _brDelete,
+    _brOnVendorChange,
+    _brUpdateSubCats,
   };
 
 })();

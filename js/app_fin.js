@@ -1,4 +1,4 @@
-/** Version 2.1 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 2.2 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — app_fin.js
@@ -186,9 +186,10 @@ const App = (() => {
     // Settings screens
     st_alert: 'js/scr_settings_fin.js', st_perm: 'js/scr_settings_fin.js',
     st_audit: 'js/scr_settings_fin.js',
-    // Accounting screens (E1)
+    // Accounting screens (E1 + E3a)
     ac_coa: 'js/scr_accounting_fin.js', ac_coa_create: 'js/scr_accounting_fin.js',
     ac_coa_edit: 'js/scr_accounting_fin.js', ac_tax: 'js/scr_accounting_fin.js',
+    ac_rules: 'js/scr_accounting_fin.js', ac_hub: 'js/scr_accounting_fin.js',
     // Contacts screens (E2)
     contacts: 'js/scr_contacts_fin.js', ct_detail: 'js/scr_contacts_fin.js',
     ct_create: 'js/scr_contacts_fin.js',
@@ -346,7 +347,7 @@ const App = (() => {
 
     // Footer
     html += `<div class="sf">
-      <div style="font-size:9px;color:var(--t4);padding:2px 0;margin-bottom:4px">v2.1 | 14 Mar 2026 AEDT</div>
+      <div style="font-size:9px;color:var(--t4);padding:2px 0;margin-bottom:4px">v2.2 | 14 Mar 2026 AEDT</div>
       <a href="https://onspider-spg.github.io/spg/#dashboard"><span style="font-size:12px">←</span><span class="sit"> Back to Home</span></a>
       <a href="https://onspider-spg.github.io/spg/#logout" class="danger"><span style="font-size:12px">→</span><span class="sit"> Log out</span></a>
     </div>`;

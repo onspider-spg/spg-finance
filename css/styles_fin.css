@@ -1,4 +1,4 @@
-/* Version 1.6.5 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/* Version 1.7 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /* ═══════════════════════════════════════════
    SPG Finance Module — styles_fin.css
    Desktop-first · System Font · MYOB Purple
@@ -708,7 +708,123 @@ html, body {
   background: var(--acc2);
 }
 
-/* ═══ 22. RESPONSIVE ═══ */
+/* ═══ 23. BANK RULES (E3a) ═══ */
+.br-info {
+  background: var(--acc2); border: 1px solid rgba(124,58,237,.15);
+  border-radius: var(--rd); padding: 10px 14px;
+  font-size: var(--fs-xs); color: var(--acc3);
+  margin-bottom: 14px; line-height: 1.5;
+}
+.br-info code { background: rgba(124,58,237,.1); padding: 1px 4px; border-radius: 3px; }
+.br-stats {
+  display: flex; gap: 16px; padding: 10px 14px;
+  background: var(--bg2); border-radius: var(--rd);
+  margin-bottom: 14px; font-size: var(--fs-xs); color: var(--t2); flex-wrap: wrap;
+}
+.br-stat { display: flex; align-items: center; gap: 4px; }
+.br-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.br-dot-g { background: var(--g); }
+.br-dot-b { background: var(--b); }
+.br-dot-r { background: var(--r); }
+.br-dot-o { background: var(--o); }
+.br-fbar {
+  display: flex; gap: 8px; align-items: flex-end;
+  margin-bottom: 12px; flex-wrap: wrap;
+}
+.br-fbar .fg { display: flex; flex-direction: column; gap: 2px; margin-bottom: 0; }
+.br-tbl { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+.br-tbl th {
+  text-align: left; font-size: var(--fs-xxs); font-weight: 600;
+  color: var(--t3); text-transform: uppercase; letter-spacing: .3px;
+  padding: 10px 12px; border-bottom: 1px solid var(--bd); background: var(--bg2);
+}
+.br-tbl td { padding: 10px 12px; border-bottom: 1px solid var(--bd2); vertical-align: middle; }
+.br-tbl tbody tr { cursor: pointer; transition: background .1s; }
+.br-tbl tbody tr:hover { background: var(--bg3); }
+.br-tbl tbody tr.br-inactive { opacity: .45; }
+.br-rn { font-weight: 600; color: var(--acc); }
+.br-kws { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 3px; }
+.br-kw {
+  font-size: 9px; font-weight: 600; padding: 1px 6px;
+  border-radius: 3px; background: var(--bg3); color: var(--t2);
+  font-family: 'SF Mono', Consolas, monospace;
+}
+.br-tt {
+  font-size: 9px; font-weight: 600; padding: 2px 8px;
+  border-radius: 4px; display: inline-block; white-space: nowrap;
+}
+.br-tt-recv { background: var(--gbg); color: var(--g); }
+.br-tt-spend { background: var(--rbg); color: var(--r); }
+.br-tt-bill { background: var(--obg); color: var(--o); }
+
+/* Toggle switch */
+.br-tgl { position: relative; width: 36px; height: 20px; display: inline-block; }
+.br-tgl input { opacity: 0; width: 0; height: 0; }
+.br-tgl .br-sl {
+  position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--bd); border-radius: 20px; transition: .2s;
+}
+.br-tgl .br-sl::before {
+  position: absolute; content: ""; height: 16px; width: 16px;
+  left: 2px; bottom: 2px; background: #fff;
+  border-radius: 50%; transition: .2s;
+}
+.br-tgl input:checked + .br-sl { background: var(--g); }
+.br-tgl input:checked + .br-sl::before { transform: translateX(16px); }
+
+/* Create Rule dropdown */
+.br-cr-menu {
+  display: none; position: absolute; right: 0; top: 100%;
+  margin-top: 4px; background: #fff; border: 1px solid var(--bd);
+  border-radius: var(--rd); box-shadow: var(--sh2);
+  min-width: 200px; z-index: 50; padding: 4px 0;
+}
+.br-cr-menu.open { display: block; }
+.br-cr-item {
+  padding: 8px 14px; font-size: var(--fs-sm);
+  cursor: pointer; display: flex; align-items: center; gap: 8px;
+}
+.br-cr-item:hover { background: var(--bg3); }
+
+/* Modal */
+.br-modal-ov {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,.4); z-index: 100;
+  display: none; align-items: center; justify-content: center;
+}
+.br-modal-ov.open { display: flex; }
+.br-modal {
+  background: #fff; border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.2);
+  width: 580px; max-width: 95vw; max-height: 90vh; overflow-y: auto;
+}
+.br-mh {
+  display: flex; align-items: center;
+  padding: 16px 20px; border-bottom: 1px solid var(--bd2);
+}
+.br-mt { font-size: 15px; font-weight: 700; flex: 1; }
+.br-mx {
+  width: 28px; height: 28px; border: none;
+  background: var(--bg3); border-radius: 50%;
+  cursor: pointer; font-size: 14px; color: var(--t2);
+  display: flex; align-items: center; justify-content: center;
+}
+.br-mx:hover { background: var(--bd); color: var(--t1); }
+.br-mb { padding: 20px; }
+.br-mf {
+  padding: 12px 20px; border-top: 1px solid var(--bd2);
+  display: flex; gap: 8px; justify-content: flex-end;
+}
+.br-fs { margin-bottom: 16px; }
+.br-fst {
+  font-size: var(--fs-sm); font-weight: 700;
+  margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid var(--bd2);
+}
+.br-fr { display: flex; gap: 10px; margin-bottom: 10px; align-items: flex-end; }
+.br-fr .fg { display: flex; flex-direction: column; gap: 3px; margin-bottom: 0; flex: 1; }
+.br-fr .fg label { font-size: var(--fs-xxs); font-weight: 600; color: var(--t3); }
+
+/* ═══ 24. RESPONSIVE ═══ */
 @media (max-width: 900px) {
   .sd { width: var(--sidebar-w-cl); min-width: var(--sidebar-w-cl); }
   .sd .sg-head span:not(.sg-ico) { display: none; }

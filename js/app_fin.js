@@ -1,4 +1,4 @@
-/** Version 2.5.4 | 15 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 2.5.5 | 15 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — app_fin.js
@@ -210,6 +210,8 @@ const App = (() => {
     pr_create_s2: 'js/scr_payroll_fin.js', pr_create_s3: 'js/scr_payroll_fin.js',
     pr_detail: 'js/scr_payroll_fin.js', pr_emp: 'js/scr_payroll_fin.js',
     pr_emp_detail: 'js/scr_payroll_fin.js',
+    pr_wage: 'js/scr_payroll_fin.js', pr_super: 'js/scr_payroll_fin.js',
+    pr_payg: 'js/scr_payroll_fin.js',
   };
 
   // ═══════════════════════════

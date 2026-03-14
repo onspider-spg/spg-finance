@@ -1,4 +1,4 @@
-/** Version 1.0 | 15 MAR 2026 | Siam Palette Group */
+/** Version 1.2 | 15 MAR 2026 | Siam Palette Group */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_payroll_fin.js
@@ -26,6 +26,17 @@
   // Detail state
   let _detailPayRun = null;
   let _detailBrands = {};
+
+  // Employee state
+  let _employees = [];
+  let _empFilters = { brand: 'All', status: 'Active', search: '' };
+  let _empDetail = null;   // { employee, balances, history }
+  let _empActiveTab = 'profile';
+
+  // Obligation state (wage/super/payg)
+  let _wageData = null;
+  let _superData = null;
+  let _paygData = null;
 
   // ══════════════════════════════════════════
   // HELPERS
@@ -683,6 +694,635 @@
   }
 
   // ══════════════════════════════════════════
+  // S6. EMPLOYEE LIST (pr_emp)
+  // ══════════════════════════════════════════
+
+  function renderEmployees() {
+    const brands = (App.S.brands || []);
+    const brandOpts = brands.map(b => `<option>${esc(b)}</option>`).join('');
+    return {
+      tb: '<div class="tb"><div class="tb-t">Employees</div><button class="bs" onclick="ScrPayroll._addEmployee()">+ Add Employee</button></div>',
+      ct: `<div class="card" style="max-width:1000px;margin:0 auto">
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <div><div class="fl-l">Brand</div><select class="fl" id="pr_emp_fl_brand" onchange="ScrPayroll._applyEmpFilter()"><option>All</option>${brandOpts}</select></div>
+          <div><div class="fl-l">Status</div><select class="fl" id="pr_emp_fl_status" onchange="ScrPayroll._applyEmpFilter()"><option>Active</option><option>Casual</option><option>Inactive</option><option>All</option></select></div>
+          <div><div class="fl-l">Search</div><input class="fl" id="pr_emp_fl_search" placeholder="Name..." style="width:140px" oninput="ScrPayroll._applyEmpFilter()"></div>
+        </div>
+        <table class="tbl"><thead><tr>
+          <th>Name</th><th>Nickname</th><th>Department</th><th>Brand</th>
+          <th style="text-align:right">Hourly Rate</th><th style="text-align:right">Cash Rate</th><th>Status</th>
+        </tr></thead><tbody id="pr_emp_body"><tr><td colspan="7" style="text-align:center;padding:20px;color:var(--t3)">Loading...</td></tr></tbody></table>
+      </div>`,
+    };
+  }
+
+  async function _loadEmployees() {
+    try {
+      const data = await API.getEmployees(_empFilters);
+      _employees = data.rows || [];
+      _renderEmpRows();
+    } catch (e) {
+      const body = document.getElementById('pr_emp_body');
+      if (body) body.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--r)">${esc(e.message)}</td></tr>`;
+    }
+  }
+
+  function _renderEmpRows() {
+    const body = document.getElementById('pr_emp_body');
+    if (!body) return;
+
+    if (_employees.length === 0) {
+      body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--t3)">No employees found</td></tr>';
+      return;
+    }
+
+    body.innerHTML = _employees.map(e => {
+      const stsMap = { active: 'sts-c', casual: 'sts-o', inactive: 'sts-p' };
+      const stsCls = stsMap[(e.status || '').toLowerCase()] || 'sts-o';
+      const label = (e.status || 'active').charAt(0).toUpperCase() + (e.status || 'active').slice(1);
+      return `<tr style="cursor:pointer" onclick="ScrPayroll.goEmpDetail('${e.id}')">
+        <td><a class="lk">${esc(e.full_name)}</a></td>
+        <td>${esc(e.nickname || '')}</td>
+        <td>${esc(e.department || '—')}</td>
+        <td>${esc(e.primary_brand_id || '—')}</td>
+        <td style="text-align:right">${fm(e.payroll_rate)}</td>
+        <td style="text-align:right">${fm(e.cash_rate)}</td>
+        <td><span class="sts ${stsCls}">${esc(label)}</span></td>
+      </tr>`;
+    }).join('');
+  }
+
+  function _applyEmpFilter() {
+    _empFilters.brand = document.getElementById('pr_emp_fl_brand')?.value || 'All';
+    _empFilters.status = document.getElementById('pr_emp_fl_status')?.value || 'Active';
+    _empFilters.search = document.getElementById('pr_emp_fl_search')?.value || '';
+    _loadEmployees();
+  }
+
+  function _addEmployee() {
+    _empDetail = null;
+    _empActiveTab = 'profile';
+    App.go('pr_emp_detail');
+  }
+
+  // ══════════════════════════════════════════
+  // S7. EMPLOYEE DETAIL — 3 tabs (pr_emp_detail)
+  // ══════════════════════════════════════════
+
+  function renderEmpDetail() {
+    const emp = _empDetail?.employee;
+    const isNew = !emp?.id;
+    const name = emp ? `${emp.full_name || 'New'}${emp.nickname ? ' (' + emp.nickname + ')' : ''}` : 'New Employee';
+    const subtitle = emp ? `${emp.employee_code || ''} · ${emp.department || ''} · ${emp.primary_brand_id || ''}` : '';
+    const stsMap = { active: 'sts-c', casual: 'sts-o', inactive: 'sts-p' };
+    const stsCls = stsMap[(emp?.status || 'active').toLowerCase()] || 'sts-c';
+    const stsLabel = (emp?.status || 'active').charAt(0).toUpperCase() + (emp?.status || 'active').slice(1);
+
+    const brands = (App.S.brands || []);
+    const brandOpts = brands.map(b => `<option${emp?.primary_brand_id === b ? ' selected' : ''}>${esc(b)}</option>`).join('');
+
+    const payTypeMap = { payroll: 'Payroll only', cash_only: 'Cash only', cash_payroll: 'Cash + Payroll' };
+    const payTypeVal = emp?.pay_type || 'cash_payroll';
+
+    return {
+      tb: `<div class="tb"><button class="bg" onclick="App.go('pr_emp')">← Employees</button><div class="tb-t">Employee Detail</div>${isNew ? '' : '<button class="btn bo" onclick="ScrPayroll._deleteEmployee()">Delete</button>'}<button class="bs" id="pr_emp_save_btn" onclick="ScrPayroll._saveEmployee()">Save</button></div>`,
+      ct: `<div style="max-width:900px;margin:0 auto">
+        <div class="card" style="margin-bottom:0;border-bottom:none;border-radius:10px 10px 0 0">
+          <div style="display:flex;gap:14px;align-items:center">
+            <div style="width:56px;height:56px;border-radius:50%;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--t4);flex-shrink:0">👤</div>
+            <div style="flex:1">
+              <div style="font-size:16px;font-weight:700" id="pr_emp_header_name">${esc(name)}</div>
+              <div style="font-size:11px;color:var(--t3)" id="pr_emp_header_sub">${esc(subtitle)}</div>
+            </div>
+            <div style="text-align:right"><span class="sts ${stsCls}">${esc(stsLabel)}</span></div>
+          </div>
+        </div>
+
+        <div style="background:#fff;border-left:1px solid var(--bd);border-right:1px solid var(--bd);padding:0 16px">
+          <div class="tabs" style="margin:0">
+            <div class="tab${_empActiveTab === 'profile' ? ' a' : ''}" onclick="ScrPayroll._switchEmpTab('profile')">Profile</div>
+            <div class="tab${_empActiveTab === 'balance' ? ' a' : ''}" onclick="ScrPayroll._switchEmpTab('balance')">Balances</div>
+            <div class="tab${_empActiveTab === 'history' ? ' a' : ''}" onclick="ScrPayroll._switchEmpTab('history')">Pay Run History</div>
+          </div>
+        </div>
+
+        <div id="pr_edt_profile" style="${_empActiveTab !== 'profile' ? 'display:none' : ''}">
+          <div class="card" style="border-radius:0 0 10px 10px;border-top:none">
+            <div class="fr">
+              <div class="fg" style="flex:1"><label class="lb">Employee Code</label><input class="inp" id="pr_emp_code" value="${esc(emp?.employee_code || '')}" ${isNew ? '' : 'readonly style="background:var(--bg3);color:var(--t3)"'}></div>
+              <div class="fg" style="flex:1"><label class="lb">Name *</label><input class="inp" id="pr_emp_name" value="${esc(emp?.full_name || '')}"></div>
+              <div class="fg" style="flex:1"><label class="lb">Nickname</label><input class="inp" id="pr_emp_nick" value="${esc(emp?.nickname || '')}"></div>
+            </div>
+            <div class="fr" style="margin-top:8px">
+              <div class="fg" style="flex:1"><label class="lb">Primary Brand</label><select class="inp" id="pr_emp_brand"><option value="">— Select —</option>${brandOpts}</select></div>
+              <div class="fg" style="flex:1"><label class="lb">Department</label><select class="inp" id="pr_emp_dept"><option${emp?.department === 'Kitchen' ? ' selected' : ''}>Kitchen</option><option${emp?.department === 'Floor' ? ' selected' : ''}>Floor</option><option${emp?.department === 'Office' ? ' selected' : ''}>Office</option></select></div>
+              <div class="fg" style="flex:1"><label class="lb">Status</label><select class="inp" id="pr_emp_status"><option${emp?.status === 'active' ? ' selected' : ''} value="active">Active</option><option${emp?.status === 'casual' ? ' selected' : ''} value="casual">Casual</option><option${emp?.status === 'inactive' ? ' selected' : ''} value="inactive">Inactive</option></select></div>
+            </div>
+
+            <div style="font-size:12px;font-weight:700;color:var(--acc);margin:14px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--bd2)">Payroll Settings</div>
+            <div class="fr">
+              <div class="fg" style="flex:1"><label class="lb">Pay Type</label><select class="inp" id="pr_emp_paytype"><option value="cash_payroll"${payTypeVal === 'cash_payroll' ? ' selected' : ''}>Cash + Payroll</option><option value="cash_only"${payTypeVal === 'cash_only' ? ' selected' : ''}>Cash only</option><option value="payroll"${payTypeVal === 'payroll' ? ' selected' : ''}>Payroll only</option></select></div>
+              <div class="fg" style="flex:1"><label class="lb">Payroll Rate ($/hr)</label><input class="inp" id="pr_emp_payrate" type="number" step="0.01" value="${emp?.payroll_rate || 0}"></div>
+              <div class="fg" style="flex:1"><label class="lb">Cash Rate ($/hr)</label><input class="inp" id="pr_emp_cashrate" type="number" step="0.01" value="${emp?.cash_rate || 0}"></div>
+            </div>
+            <div class="fr" style="margin-top:8px">
+              <div class="fg" style="flex:1"><label class="lb">Super Rate (%)</label><input class="inp" id="pr_emp_superrate" type="number" step="0.01" value="${emp?.super_rate || 12}"></div>
+              <div class="fg" style="flex:1"><label class="lb">Tax Table</label><select class="inp" id="pr_emp_taxtable"><option value="resident_no_help"${emp?.tax_table === 'resident_no_help' ? ' selected' : ''}>Resident — No HELP</option><option value="resident_help"${emp?.tax_table === 'resident_help' ? ' selected' : ''}>Resident — HELP</option><option value="foreign"${emp?.tax_table === 'foreign' ? ' selected' : ''}>Foreign Resident</option></select></div>
+              <div class="fg" style="flex:1"><label class="lb">Max Payroll Hrs/week</label><input class="inp" id="pr_emp_maxhrs" type="number" step="0.5" value="${emp?.max_payroll_hrs || 24}"></div>
+            </div>
+
+            <div style="font-size:12px;font-weight:700;color:var(--acc);margin:14px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--bd2)">Bank Details</div>
+            <div class="fr">
+              <div class="fg" style="flex:1"><label class="lb">BSB</label><input class="inp" id="pr_emp_bsb" value="${esc(emp?.bank_bsb || '')}"></div>
+              <div class="fg" style="flex:1"><label class="lb">Account Number</label><input class="inp" id="pr_emp_accno" value="${esc(emp?.bank_account_no || '')}"></div>
+              <div class="fg" style="flex:1"><label class="lb">Account Name</label><input class="inp" id="pr_emp_accname" value="${esc(emp?.bank_account_name || '')}"></div>
+            </div>
+
+            <div style="font-size:12px;font-weight:700;color:var(--acc);margin:14px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--bd2)">Tax Information</div>
+            <div class="fr">
+              <div class="fg" style="flex:1"><label class="lb">TFN</label><input class="inp" id="pr_emp_tfn" value="${esc(emp?.tfn || '')}"></div>
+              <div class="fg" style="flex:1"><label class="lb">Super Fund</label><input class="inp" id="pr_emp_superfund" value="${esc(emp?.super_fund || '')}"></div>
+              <div class="fg" style="flex:1"><label class="lb">Member No</label><input class="inp" id="pr_emp_memberno" value="${esc(emp?.super_member_no || '')}"></div>
+            </div>
+
+            <div style="display:flex;gap:6px;margin-top:12px;justify-content:flex-end;padding-top:10px;border-top:1px solid var(--bd2)">
+              <button class="btn bo" onclick="App.go('pr_emp')">Cancel</button>
+              <button class="bs" onclick="ScrPayroll._saveEmployee()">Save</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="pr_edt_balance" style="${_empActiveTab !== 'balance' ? 'display:none' : ''}">
+          <div class="card" style="border-radius:0 0 10px 10px;border-top:none" id="pr_emp_bal_content">
+            <div style="text-align:center;padding:20px;color:var(--t3)">Loading balances...</div>
+          </div>
+        </div>
+
+        <div id="pr_edt_history" style="${_empActiveTab !== 'history' ? 'display:none' : ''}">
+          <div class="card" style="border-radius:0 0 10px 10px;border-top:none" id="pr_emp_hist_content">
+            <div style="text-align:center;padding:20px;color:var(--t3)">Loading history...</div>
+          </div>
+        </div>
+      </div>`,
+    };
+  }
+
+  async function _loadEmpDetail() {
+    if (!_empDetail?.employee?.id) return; // new employee — nothing to load
+
+    try {
+      const data = await API.getEmployeeDetail({ employee_id: _empDetail.employee.id });
+      _empDetail = data;
+      _renderEmpBalances();
+      _renderEmpHistory();
+    } catch (e) {
+      App.toast(e.message || 'Failed to load employee');
+    }
+  }
+
+  function _renderEmpBalances() {
+    const el = document.getElementById('pr_emp_bal_content');
+    if (!el || !_empDetail) return;
+
+    const b = _empDetail.balances || {};
+
+    el.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px">
+        <div class="card" style="margin:0;border-top:3px solid var(--r);text-align:center">
+          <div style="font-size:10px;color:var(--t3)">PAYG Withheld (owing ATO)</div>
+          <div style="font-size:24px;font-weight:800;color:var(--r)">${fm(b.payg_owing)}</div>
+          <div style="font-size:10px;color:var(--t3)">Total withheld: ${fm(b.payg_total)}</div>
+        </div>
+        <div class="card" style="margin:0;border-top:3px solid var(--o);text-align:center">
+          <div style="font-size:10px;color:var(--t3)">Super Payable (owing fund)</div>
+          <div style="font-size:24px;font-weight:800;color:var(--o)">${fm(b.super_owing)}</div>
+          <div style="font-size:10px;color:var(--t3)">Total accrued: ${fm(b.super_total)}</div>
+        </div>
+        <div class="card" style="margin:0;border-top:3px solid var(--g);text-align:center">
+          <div style="font-size:10px;color:var(--t3)">Total Gross Paid (YTD)</div>
+          <div style="font-size:24px;font-weight:800">${fm(b.gross_ytd)}</div>
+          <div style="font-size:10px;color:var(--t3)">Jul 2025 — present</div>
+        </div>
+      </div>
+      <div style="font-size:12px;font-weight:700;margin-bottom:6px">PAYG + Super Breakdown</div>
+      <table class="tbl"><thead><tr>
+        <th>Pay Run</th><th>Work Period</th><th style="text-align:right">Gross</th>
+        <th style="text-align:right;color:var(--r)">PAYG</th><th style="text-align:right;color:var(--o)">Super</th>
+        <th>PAYG Status</th><th>Super Status</th>
+      </tr></thead><tbody>${_empBalanceRows()}</tbody>
+      <tfoot><tr style="border-top:2px solid var(--bd);font-weight:700">
+        <td colspan="2">Total</td>
+        <td style="text-align:right">${fm(b.gross_ytd)}</td>
+        <td style="text-align:right;color:var(--r)">${fm(b.payg_total)}</td>
+        <td style="text-align:right;color:var(--o)">${fm(b.super_total)}</td>
+        <td></td><td></td>
+      </tr></tfoot></table>`;
+  }
+
+  function _empBalanceRows() {
+    const history = _empDetail?.history || [];
+    if (history.length === 0) return '<tr><td colspan="7" style="text-align:center;color:var(--t3)">No data</td></tr>';
+
+    return history.slice(0, 20).map(h => {
+      const gross = Number(h.cash_pay || 0) + Number(h.transfer_pay || 0);
+      const paygSts = h.payment_status === 'paid' ? '<span class="sts sts-c">Paid</span>' : '<span class="sts sts-r">Owing ATO</span>';
+      const superSts = h.payment_status === 'paid' ? '<span class="sts sts-c">Paid</span>' : '<span class="sts sts-r">Owing Fund</span>';
+      return `<tr>
+        <td><a class="lk">${esc(h.pay_run_no)}</a></td>
+        <td>${_fmtPeriod(h.period_start, h.period_end)}</td>
+        <td style="text-align:right">${fm(gross)}</td>
+        <td style="text-align:right;color:var(--r)">${fm(h.tax_withheld)}</td>
+        <td style="text-align:right;color:var(--o)">${fm(h.super_amount)}</td>
+        <td>${paygSts}</td>
+        <td>${superSts}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  function _renderEmpHistory() {
+    const el = document.getElementById('pr_emp_hist_content');
+    if (!el || !_empDetail) return;
+
+    const history = _empDetail.history || [];
+    if (history.length === 0) {
+      el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--t3)">No pay run history</div>';
+      return;
+    }
+
+    el.innerHTML = `<table class="tbl"><thead><tr>
+      <th>Pay Run</th><th>Work Period</th><th>Brand</th>
+      <th style="text-align:right">Payroll Hrs</th><th style="text-align:right">Cash Hrs</th>
+      <th style="text-align:right">Cash Pay</th><th style="text-align:right">Transfer</th>
+      <th style="text-align:right;color:var(--r)">TAX</th><th style="text-align:right;color:var(--o)">SUPER</th>
+      <th style="text-align:right;font-weight:700">Total</th><th>Status</th>
+    </tr></thead><tbody>${history.slice(0, 50).map(h => `<tr>
+      <td><a class="lk">${esc(h.pay_run_no)}</a></td>
+      <td>${_fmtPeriod(h.period_start, h.period_end)}</td>
+      <td>${esc(h.brand_id || '')}</td>
+      <td style="text-align:right">${Number(h.payroll_hrs || 0).toFixed(1)}</td>
+      <td style="text-align:right">${Number(h.cash_hrs || 0).toFixed(2)}</td>
+      <td style="text-align:right">${fm(h.cash_pay, 0)}</td>
+      <td style="text-align:right">${fm(h.transfer_pay, 0)}</td>
+      <td style="text-align:right;color:var(--r)">${fm(h.tax_withheld, 0)}</td>
+      <td style="text-align:right;color:var(--o)">${fm(h.super_amount, 0)}</td>
+      <td style="text-align:right;font-weight:700">${fm(h.total_amount, 0)}</td>
+      <td>${_statusBadge(h.payment_status)}</td>
+    </tr>`).join('')}</tbody></table>`;
+  }
+
+  function _switchEmpTab(tab) {
+    _empActiveTab = tab;
+    ['profile', 'balance', 'history'].forEach(t => {
+      const el = document.getElementById('pr_edt_' + t);
+      if (el) el.style.display = t === tab ? '' : 'none';
+    });
+    // Update tab active class
+    const tabs = document.querySelectorAll('.tabs .tab');
+    const tabMap = ['profile', 'balance', 'history'];
+    tabs.forEach((el, i) => {
+      if (tabMap[i]) el.className = 'tab' + (tabMap[i] === tab ? ' a' : '');
+    });
+  }
+
+  async function _saveEmployee() {
+    const btn = document.getElementById('pr_emp_save_btn');
+    if (btn) btn.disabled = true;
+
+    const data = {
+      employee_id: _empDetail?.employee?.id || null,
+      employee_code: document.getElementById('pr_emp_code')?.value?.trim() || '',
+      full_name: document.getElementById('pr_emp_name')?.value?.trim() || '',
+      nickname: document.getElementById('pr_emp_nick')?.value?.trim() || '',
+      primary_brand_id: document.getElementById('pr_emp_brand')?.value || '',
+      department: document.getElementById('pr_emp_dept')?.value || '',
+      status: document.getElementById('pr_emp_status')?.value || 'active',
+      pay_type: document.getElementById('pr_emp_paytype')?.value || 'cash_payroll',
+      payroll_rate: document.getElementById('pr_emp_payrate')?.value || 0,
+      cash_rate: document.getElementById('pr_emp_cashrate')?.value || 0,
+      super_rate: document.getElementById('pr_emp_superrate')?.value || 12,
+      tax_table: document.getElementById('pr_emp_taxtable')?.value || 'resident_no_help',
+      max_payroll_hrs: document.getElementById('pr_emp_maxhrs')?.value || 24,
+      bank_bsb: document.getElementById('pr_emp_bsb')?.value?.trim() || '',
+      bank_account_no: document.getElementById('pr_emp_accno')?.value?.trim() || '',
+      bank_account_name: document.getElementById('pr_emp_accname')?.value?.trim() || '',
+      tfn: document.getElementById('pr_emp_tfn')?.value?.trim() || '',
+      super_fund: document.getElementById('pr_emp_superfund')?.value?.trim() || '',
+      super_member_no: document.getElementById('pr_emp_memberno')?.value?.trim() || '',
+    };
+
+    if (!data.employee_code || !data.full_name) {
+      App.toast('Employee code and name are required');
+      if (btn) btn.disabled = false;
+      return;
+    }
+
+    try {
+      App.showLoader();
+      await API.saveEmployee(data);
+      App.toast(data.employee_id ? 'Employee updated ✔' : 'Employee created ✔');
+      App.go('pr_emp');
+    } catch (e) {
+      App.toast(e.message || 'Save failed');
+    } finally {
+      App.hideLoader();
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  function _deleteEmployee() {
+    if (!_empDetail?.employee?.id) return;
+    App.showDialog({
+      title: 'Deactivate Employee',
+      message: `Set <b>${esc(_empDetail.employee.full_name)}</b> as Inactive?`,
+      confirmText: 'Deactivate',
+      onConfirm: async () => {
+        try {
+          App.showLoader();
+          await API.deleteEmployee({ employee_id: _empDetail.employee.id });
+          App.toast('Employee deactivated');
+          App.go('pr_emp');
+        } catch (e) {
+          App.toast(e.message || 'Delete failed');
+        } finally {
+          App.hideLoader();
+        }
+      },
+    });
+  }
+
+  // ══════════════════════════════════════════
+  // S8. WAGE PAYMENTS — Weekly View (pr_wage)
+  // ══════════════════════════════════════════
+
+  function renderWage() {
+    const brands = (App.S.brands || []);
+    const brandOpts = brands.map(b => `<option>${esc(b)}</option>`).join('');
+    return {
+      tb: '<div class="tb"><div class="tb-t">Wage Payments</div><button class="bs" onclick="App.go(\'py_record\')">Record Wage Payment</button></div>',
+      ct: `<div style="max-width:1060px;margin:0 auto">
+        <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:10px;flex-wrap:wrap">
+          <div><div class="fl-l">Brand</div><select class="fl" id="pr_wg_brand"><option>All Brands</option>${brandOpts}</select></div>
+          <div><div class="fl-l">Status</div><select class="fl" id="pr_wg_status"><option>All</option><option>Outstanding</option><option>Paid</option></select></div>
+          <div style="flex:1"></div>
+          <button class="bg" style="color:var(--acc)" onclick="ScrPayroll._loadWage()">Refresh</button>
+        </div>
+        <div class="kpi">
+          <div class="kpi-c" style="border-top:3px solid var(--r)"><div class="kpi-v" style="color:var(--r)" id="pr_wg_outstanding">$0</div><div class="kpi-l">Outstanding</div></div>
+          <div class="kpi-c" style="border-top:3px solid var(--g)"><div class="kpi-v" style="color:var(--g)" id="pr_wg_paid">$0</div><div class="kpi-l">Paid</div></div>
+          <div class="kpi-c" style="border-top:3px solid var(--b)"><div class="kpi-v" id="pr_wg_total">$0</div><div class="kpi-l">Total Wages</div></div>
+          <div class="kpi-c"><div class="kpi-v" id="pr_wg_periods">0</div><div class="kpi-l">Pay Periods</div></div>
+          <div class="kpi-c"><div class="kpi-v" id="pr_wg_emps">0</div><div class="kpi-l">Employees</div></div>
+        </div>
+        <div id="pr_wg_cards"><div style="text-align:center;padding:30px;color:var(--t3)">Loading...</div></div>
+        <div style="font-size:10px;color:var(--t3);margin-top:8px">Tax rate = หัก PAYG + Super · Cash rate = จ่ายสด · Record Wage Payment → หน้า Record Payment</div>
+      </div>`,
+    };
+  }
+
+  async function _loadWage() {
+    try {
+      const data = await API.call('fin_get_wage_payments', {
+        brand: document.getElementById('pr_wg_brand')?.value || 'All Brands',
+        status: document.getElementById('pr_wg_status')?.value || 'All',
+      });
+      _wageData = data;
+      _renderWageKpi();
+      _renderWageCards();
+    } catch (e) {
+      document.getElementById('pr_wg_cards').innerHTML = `<div style="text-align:center;padding:30px;color:var(--r)">${esc(e.message)}</div>`;
+    }
+  }
+
+  function _renderWageKpi() {
+    const k = _wageData?.kpi || {};
+    const el = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+    el('pr_wg_outstanding', fm(k.outstanding || 0));
+    el('pr_wg_paid', fm(k.paid || 0));
+    el('pr_wg_total', fm(k.total || 0));
+    el('pr_wg_periods', k.periods || 0);
+    el('pr_wg_emps', k.employees || 0);
+  }
+
+  function _renderWageCards() {
+    const container = document.getElementById('pr_wg_cards');
+    if (!container) return;
+    const weeks = _wageData?.weeks || [];
+    if (weeks.length === 0) {
+      container.innerHTML = '<div style="text-align:center;padding:30px;color:var(--t3)">No wage data</div>';
+      return;
+    }
+
+    container.innerHTML = weeks.map((w, i) => {
+      const isOwing = w.status === 'owing' || w.status === 'approved';
+      const borderColor = isOwing ? 'var(--r)' : 'var(--g)';
+      const stsLabel = isOwing ? 'Owing' : 'Paid';
+      const stsBg = isOwing ? 'var(--rbg)' : 'var(--gbg)';
+      const stsColor = isOwing ? 'var(--r)' : 'var(--g)';
+      const wId = 'prwg_' + i;
+      const period = _fmtPeriod(w.period_start, w.period_end);
+      const lines = w.lines || [];
+
+      const empRows = lines.map(l => {
+        const isCash = l.pay_type === 'cash' || l.pay_type === 'cash_only';
+        const hrs = Number(l.payroll_hrs || 0) + Number(l.cash_hrs || 0);
+        const gross = Number(l.cash_pay || 0) + Number(l.transfer_pay || 0);
+        const net = gross - Number(l.tax_withheld || 0);
+        const rowBg = isCash ? 'background:var(--bg3)' : '';
+        const typeLabel = isCash ? 'Cash' : 'Tax';
+        const typeBg = isCash ? 'background:var(--acc2);color:var(--acc)' : 'background:var(--bbg);color:var(--b)';
+        return `<tr style="${rowBg}">
+          <td style="font-weight:600">${esc(l.employee_name || '')}${l.employee_nickname ? ' (' + esc(l.employee_nickname) + ')' : ''}</td>
+          <td>${esc(l.brand_id || '')}</td>
+          <td style="text-align:right">${hrs.toFixed(0)}</td>
+          <td style="text-align:right">${fm(gross, 0)}</td>
+          <td style="text-align:right;color:var(--t3)">${isCash ? '—' : fm(l.tax_withheld, 0)}</td>
+          <td style="text-align:right;color:var(--t3)">${isCash ? '—' : fm(l.super_amount, 0)}</td>
+          <td style="text-align:right;font-weight:700">${fm(net, 0)}</td>
+          <td><span style="font-size:9px;padding:2px 8px;border-radius:16px;${typeBg}">${typeLabel}</span></td>
+          <td><span style="font-size:9px;padding:2px 8px;border-radius:16px;background:${stsBg};color:${stsColor}">${stsLabel}</span></td>
+        </tr>`;
+      }).join('');
+
+      const totalGross = lines.reduce((s, l) => s + Number(l.cash_pay || 0) + Number(l.transfer_pay || 0), 0);
+
+      return `<div class="card" style="border-left:4px solid ${borderColor};padding:12px 16px;margin-bottom:8px${!isOwing && i > 1 ? ';opacity:.6' : ''}">
+        <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="var b=document.getElementById('${wId}');b.style.display=b.style.display==='none'?'block':'none'">
+          <div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:13px;font-weight:700">${esc(period)} ${(w.period_start || '').substring(0, 4)}</span>
+              ${w.pay_run_no ? '<span style="font-size:11px;color:var(--t3)">Pay Run <a class="lk">' + esc(w.pay_run_no) + '</a></span>' : ''}
+              <span style="font-size:9px;padding:2px 8px;border-radius:16px;background:${stsBg};color:${stsColor}">${stsLabel}</span>
+            </div>
+            ${w.pay_date ? '<div style="font-size:10px;color:' + stsColor + ';font-weight:600;margin-top:2px">' + (isOwing ? 'Due: ' : 'Paid: ') + _fmtPayDate(w.pay_date) + '</div>' : ''}
+          </div>
+          <div style="display:flex;gap:14px;text-align:right">
+            <div><div style="font-size:9px;color:var(--t3)">Gross</div><div style="font-size:14px;font-weight:700">${fm(totalGross, 0)}</div></div>
+            <div style="color:var(--acc);font-size:14px;display:flex;align-items:center">▼</div>
+          </div>
+        </div>
+        <div id="${wId}" style="display:${i === 0 && isOwing ? 'block' : 'none'};margin-top:10px">
+          ${lines.length > 0 ? '<table class="tbl"><thead><tr><th>Employee</th><th>Brand</th><th style="text-align:right">Hours</th><th style="text-align:right">Gross</th><th style="text-align:right">PAYG</th><th style="text-align:right">Super</th><th style="text-align:right">Net Pay</th><th>Pay Type</th><th>Status</th></tr></thead><tbody>' + empRows + '</tbody></table>' : '<div style="padding:12px;text-align:center;font-size:11px;color:var(--t3)">No detail</div>'}
+          ${isOwing ? '<div style="display:flex;justify-content:flex-end;padding-top:8px;margin-top:4px"><button class="bs" style="font-size:11px;padding:5px 14px" onclick="App.go(\'py_record\')">Record Wage Payment →</button></div>' : ''}
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // ══════════════════════════════════════════
+  // S9. SUPERANNUATION — Quarter Cards (pr_super)
+  // ══════════════════════════════════════════
+
+  function renderSuper() {
+    return {
+      tb: '<div class="tb"><div class="tb-t">Superannuation</div><button class="bs" onclick="App.go(\'py_record\')">Record Super Payment</button></div>',
+      ct: `<div style="max-width:1060px;margin:0 auto">
+        <div class="kpi">
+          <div class="kpi-c" style="border-top:3px solid var(--r)"><div class="kpi-v" style="color:var(--r)" id="pr_sp_outstanding">$0</div><div class="kpi-l">Outstanding</div></div>
+          <div class="kpi-c" style="border-top:3px solid var(--g)"><div class="kpi-v" style="color:var(--g)" id="pr_sp_paid">$0</div><div class="kpi-l">Paid</div></div>
+          <div class="kpi-c" style="border-top:3px solid var(--b)"><div class="kpi-v" id="pr_sp_accrued">$0</div><div class="kpi-l">Accrued</div></div>
+          <div class="kpi-c"><div class="kpi-v" id="pr_sp_rate">12%</div><div class="kpi-l">Rate</div></div>
+          <div class="kpi-c"><div class="kpi-v" id="pr_sp_emps">0</div><div class="kpi-l">Employees</div></div>
+        </div>
+        <div id="pr_sp_cards"><div style="text-align:center;padding:30px;color:var(--t3)">Loading...</div></div>
+        <div style="font-size:10px;color:var(--t3);margin-top:8px">Super rate 12% · Accrued from Pay Run (weekly) · กด ▶ ที่ชื่อ → weekly detail</div>
+      </div>`,
+    };
+  }
+
+  async function _loadSuper() {
+    try {
+      _superData = await API.call('fin_get_super_obligations', {});
+      _renderObligationKpi('sp', _superData);
+      _renderQuarterCards('pr_sp_cards', _superData, 'super');
+    } catch (e) {
+      document.getElementById('pr_sp_cards').innerHTML = `<div style="text-align:center;padding:30px;color:var(--r)">${esc(e.message)}</div>`;
+    }
+  }
+
+  // ══════════════════════════════════════════
+  // S10. PAYG WITHHOLDING TAX — Quarter Cards (pr_payg)
+  // ══════════════════════════════════════════
+
+  function renderPayg() {
+    return {
+      tb: '<div class="tb"><div class="tb-t">Withholding Tax (PAYG)</div><button class="bs" onclick="App.go(\'py_record\')">Record PAYG Payment</button></div>',
+      ct: `<div style="max-width:1060px;margin:0 auto">
+        <div class="kpi">
+          <div class="kpi-c" style="border-top:3px solid var(--r)"><div class="kpi-v" style="color:var(--r)" id="pr_pg_outstanding">$0</div><div class="kpi-l">Outstanding</div></div>
+          <div class="kpi-c" style="border-top:3px solid var(--g)"><div class="kpi-v" style="color:var(--g)" id="pr_pg_paid">$0</div><div class="kpi-l">Submitted</div></div>
+          <div class="kpi-c" style="border-top:3px solid var(--b)"><div class="kpi-v" id="pr_pg_accrued">$0</div><div class="kpi-l">Total Withheld</div></div>
+          <div class="kpi-c"><div class="kpi-v" id="pr_pg_emps">0</div><div class="kpi-l">Employees</div></div>
+        </div>
+        <div id="pr_pg_cards"><div style="text-align:center;padding:30px;color:var(--t3)">Loading...</div></div>
+        <div style="font-size:10px;color:var(--t3);margin-top:8px">PAYG withheld from wages · Accrued from Pay Run (weekly) · Work Period = ฐาน</div>
+      </div>`,
+    };
+  }
+
+  async function _loadPayg() {
+    try {
+      _paygData = await API.call('fin_get_payg_obligations', {});
+      _renderObligationKpi('pg', _paygData);
+      _renderQuarterCards('pr_pg_cards', _paygData, 'payg');
+    } catch (e) {
+      document.getElementById('pr_pg_cards').innerHTML = `<div style="text-align:center;padding:30px;color:var(--r)">${esc(e.message)}</div>`;
+    }
+  }
+
+  // ══════════════════════════════════════════
+  // SHARED: Quarter Card Renderer (Super + PAYG)
+  // ══════════════════════════════════════════
+
+  function _renderObligationKpi(prefix, data) {
+    const k = data?.kpi || {};
+    const el = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+    el('pr_' + prefix + '_outstanding', fm(k.outstanding || 0));
+    el('pr_' + prefix + '_paid', fm(k.paid || 0));
+    el('pr_' + prefix + '_accrued', fm(k.accrued || 0));
+    if (prefix === 'sp') el('pr_sp_rate', (k.rate || 12) + '%');
+    el('pr_' + prefix + '_emps', k.employees || 0);
+  }
+
+  function _renderQuarterCards(containerId, data, type) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    const quarters = data?.quarters || [];
+    if (quarters.length === 0) {
+      container.innerHTML = '<div style="text-align:center;padding:30px;color:var(--t3)">No data</div>';
+      return;
+    }
+
+    const amtField = type === 'super' ? 'super_amount' : 'tax_withheld';
+    const amtLabel = type === 'super' ? 'Super' : 'Withheld';
+    const paidLabel = type === 'super' ? 'Paid' : 'Submitted';
+    const btnLabel = type === 'super' ? 'Record Super Payment →' : 'Record PAYG Payment →';
+
+    container.innerHTML = quarters.map((q, qi) => {
+      const isOwing = q.outstanding > 0;
+      const borderColor = isOwing ? 'var(--r)' : 'var(--g)';
+      const qId = 'prq_' + type + '_' + qi;
+      const employees = q.employees || [];
+
+      const empHtml = employees.map((emp, ei) => {
+        const eId = qId + '_e' + ei;
+        const empOwing = Number(emp.accrued || 0) - Number(emp.paid || 0);
+        return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--bd2);cursor:pointer" onclick="var r=document.getElementById('${eId}');r.style.display=r.style.display==='none'?'block':'none'">
+          <span style="color:var(--acc);font-size:12px">▶</span>
+          <span style="font-weight:600;font-size:12px">${esc(emp.full_name || '')}</span>
+          <span style="font-size:10px;color:var(--t3)">(${esc(emp.nickname || '')}) · ${esc(emp.brand || '')}${emp.fund ? ' · ' + esc(emp.fund) : ''}</span>
+          <span style="margin-left:auto;font-size:11px">Accrued <b>${fm(emp.accrued)}</b> · ${paidLabel} <b style="color:var(--g)">${fm(emp.paid)}</b> · <b style="color:${empOwing > 0 ? 'var(--r)' : 'var(--g)'}">Owing ${fm(empOwing)}</b></span>
+        </div>
+        <div id="${eId}" style="display:${ei === 0 && qi === 0 && isOwing ? 'block' : 'none'}">
+          ${emp.weeks && emp.weeks.length > 0 ? _buildWeekTable(emp.weeks, amtField, amtLabel) : '<div style="padding:8px;font-size:11px;color:var(--t3)">No weekly detail</div>'}
+        </div>`;
+      }).join('');
+
+      return `<div class="card" style="border-left:4px solid ${borderColor};padding:12px 16px;margin-bottom:8px${!isOwing && qi > 0 ? ';opacity:.6' : ''}">
+        <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="var b=document.getElementById('${qId}');b.style.display=b.style.display==='none'?'block':'none'">
+          <div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:14px;font-weight:700">${esc(q.label || '')}</span>
+              <span style="font-size:11px;color:var(--t3)">${esc(q.range || '')}</span>
+              <span class="sts ${isOwing ? 'sts-r' : 'sts-g'}" style="font-size:9px">${isOwing ? 'Owing' : (type === 'super' ? 'Fully Paid' : 'Submitted')}</span>
+            </div>
+            <div style="font-size:10px;color:${isOwing ? 'var(--r)' : 'var(--g)'};font-weight:600;margin-top:2px">${esc(q.due_text || '')}</div>
+          </div>
+          <div style="display:flex;gap:14px;text-align:right">
+            <div><div style="font-size:9px;color:var(--t3)">Accrued</div><div style="font-size:14px;font-weight:700">${fm(q.accrued)}</div></div>
+            <div><div style="font-size:9px;color:var(--t3)">${paidLabel}</div><div style="font-size:14px;font-weight:700;color:var(--g)">${fm(q.paid)}</div></div>
+            <div><div style="font-size:9px;color:var(--t3)">Outstanding</div><div style="font-size:14px;font-weight:800;color:${isOwing ? 'var(--r)' : 'var(--g)'}">${fm(q.outstanding)}</div></div>
+            <div style="color:var(--acc);font-size:14px;display:flex;align-items:center">▼</div>
+          </div>
+        </div>
+        <div id="${qId}" style="display:${qi === 0 && isOwing ? 'block' : 'none'};margin-top:10px">
+          ${empHtml}
+          ${isOwing ? '<div style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid var(--bd2);margin-top:6px"><span style="font-size:11px;color:var(--t3)">Select weeks → Record Payment</span><button class="bs" style="font-size:11px;padding:5px 14px" onclick="App.go(\'py_record\')">' + btnLabel + '</button></div>' : ''}
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function _buildWeekTable(weeks, amtField, amtLabel) {
+    return `<table class="tbl"><thead><tr>
+      <th>Work Period</th><th>Pay Date</th><th style="text-align:right">Gross</th>
+      <th style="text-align:right">${esc(amtLabel)}</th><th>${amtField === 'super_amount' ? 'Paid' : 'Submitted'}</th><th>Status</th>
+    </tr></thead><tbody>${weeks.map(w => {
+      const isPaid = w.status === 'paid' || w.status === 'submitted';
+      const rowBg = isPaid ? 'background:var(--gbg)' : '';
+      const color = isPaid ? 'color:var(--g)' : '';
+      return `<tr style="${rowBg}">
+        <td ${color ? 'style="' + color + '"' : ''}>${_fmtPeriod(w.period_start, w.period_end)}</td>
+        <td ${color ? 'style="' + color + '"' : ''}>${fd(w.pay_date)}</td>
+        <td style="text-align:right;${color}">${fm(w.gross, 0)}</td>
+        <td style="text-align:right;font-weight:600;${color}">${fm(w.amount)}</td>
+        <td ${color ? 'style="' + color + '"' : ''}>${isPaid ? fd(w.paid_date || w.pay_date) : '<span style="color:var(--t4)">—</span>'}</td>
+        <td><span class="sts ${isPaid ? 'sts-g' : 'sts-r'}">${isPaid ? (amtField === 'super_amount' ? 'Paid' : 'Submitted') : 'Owing'}</span></td>
+      </tr>`;
+    }).join('')}</tbody></table>`;
+  }
+
+  // ══════════════════════════════════════════
   // NAVIGATION HELPERS
   // ══════════════════════════════════════════
 
@@ -705,8 +1345,9 @@
   }
 
   function goEmpDetail(empId) {
-    // Will be implemented in E6a-2
-    App.toast('Employee detail — coming in next batch');
+    _empDetail = { employee: _employees.find(e => e.id === empId) || { id: empId } };
+    _empActiveTab = 'profile';
+    App.go('pr_emp_detail');
   }
 
   // ══════════════════════════════════════════
@@ -714,11 +1355,16 @@
   // ══════════════════════════════════════════
 
   App.registerRoutes({
-    pr_runs:       { render: renderPayRuns,    onLoad: _loadPayRuns },
-    pr_create_s1:  { render: renderCreateS1,   onLoad: _loadCreateS1 },
+    pr_runs:       { render: renderPayRuns,     onLoad: _loadPayRuns },
+    pr_create_s1:  { render: renderCreateS1,    onLoad: _loadCreateS1 },
     pr_create_s2:  { render: renderCreateS2 },
-    pr_create_s3:  { render: renderCreateS3,   onLoad: _loadCreateS3 },
-    pr_detail:     { render: renderDetail,     onLoad: _loadDetail },
+    pr_create_s3:  { render: renderCreateS3,    onLoad: _loadCreateS3 },
+    pr_detail:     { render: renderDetail,      onLoad: _loadDetail },
+    pr_emp:        { render: renderEmployees,   onLoad: _loadEmployees },
+    pr_emp_detail: { render: renderEmpDetail,   onLoad: _loadEmpDetail },
+    pr_wage:       { render: renderWage,        onLoad: _loadWage },
+    pr_super:      { render: renderSuper,       onLoad: _loadSuper },
+    pr_payg:       { render: renderPayg,        onLoad: _loadPayg },
   });
 
   // ══════════════════════════════════════════
@@ -738,6 +1384,14 @@
     _approvePayRun,
     _markPaid,
     _exportCsv,
+    // E6a-2: Employee
+    _applyEmpFilter,
+    _addEmployee,
+    _switchEmpTab,
+    _saveEmployee,
+    _deleteEmployee,
+    // E6a-3: Obligations
+    _loadWage,
   };
 
 })();

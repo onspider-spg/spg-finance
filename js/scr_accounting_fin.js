@@ -1,4 +1,4 @@
-/** Version 2.1 | 14 MAR 2026 | Siam Palette Group */
+/** Version 2.2 | 15 MAR 2026 | Siam Palette Group */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_accounting_fin.js
@@ -51,7 +51,7 @@
           <table class="tbl" id="coa_tbl">
             <thead><tr>
               <th style="width:28px"><input type="checkbox" style="accent-color:var(--acc)" onclick="ScrAccounting._toggleAllCoa(this.checked)"></th>
-              <th>Code</th><th>Name</th><th>Type</th><th>Tax</th><th>Linked</th><th>Level</th><th style="text-align:right">Balance ($)</th>
+              ${App.sth('Code','code','coa_tbl')}${App.sth('Name','name','coa_tbl')}${App.sth('Type','type','coa_tbl')}${App.sth('Tax','tax','coa_tbl')}${App.sth('Linked','linked','coa_tbl')}${App.sth('Level','level','coa_tbl')}${App.sthR('Balance ($)','balance','coa_tbl')}
             </tr></thead>
             <tbody id="coa_tbody">${_skeleton(8)}</tbody>
           </table>
@@ -109,7 +109,7 @@
         const groupTotal = _coaRows
           .filter(x => (x.main_category || x.transaction_type) === mainCat)
           .reduce((s, x) => s + (x.current_balance || 0), 0);
-        html += `<tr style="background:var(--bg2)">
+        html += `<tr class="sort-skip" style="background:var(--bg2)">
           <td></td>
           <td></td>
           <td style="font-weight:700;color:var(--acc);font-size:var(--fs-body)">${esc(mainCat)}</td>
@@ -426,7 +426,7 @@
       tb: `<div class="tb"><div class="tb-t">Tax Codes</div></div>`,
       ct: `<div class="card" style="max-width:700px;margin:0 auto">
         <table class="tbl" id="tax_tbl">
-          <thead><tr><th>Code</th><th>Name</th><th style="text-align:right">Rate</th><th>Description</th><th>Status</th><th style="width:60px"></th></tr></thead>
+          <thead><tr>${App.sth('Code','code','tax_tbl')}${App.sth('Name','name','tax_tbl')}${App.sthR('Rate','rate','tax_tbl')}${App.sth('Description','desc','tax_tbl')}${App.sth('Status','status','tax_tbl')}<th style="width:60px"></th></tr></thead>
           <tbody id="tax_tbody">${_skeleton(6)}</tbody>
         </table>
       </div>`,
@@ -521,7 +521,7 @@
           <div style="flex:1"></div>
           <button class="bg" style="color:var(--acc)" onclick="ScrAccounting._brResetFilters()">Reset</button>
         </div>
-        <div class="card" style="padding:0;overflow:hidden"><table class="br-tbl"><thead><tr><th style="width:22%">Rule Name</th><th style="width:15%">Bank Account</th><th style="width:10%">Type</th><th style="width:17%">Contact</th><th style="width:12%">Main Category</th><th style="width:11%">Sub Category</th><th style="width:8%">Active</th><th style="width:5%"></th></tr></thead><tbody id="br_tbody">${_skeleton(8)}</tbody></table></div>
+        <div class="card" style="padding:0;overflow:hidden"><table class="br-tbl" id="br_tbl"><thead><tr>${App.sth('Rule Name','rule','br_tbl')}${App.sth('Bank Account','bank','br_tbl')}${App.sth('Type','type','br_tbl')}${App.sth('Contact','contact','br_tbl')}${App.sth('Main Category','main','br_tbl')}${App.sth('Sub Category','sub','br_tbl')}<th style="width:8%">Active</th><th style="width:5%"></th></tr></thead><tbody id="br_tbody">${_skeleton(8)}</tbody></table></div>
         <div id="br_count" style="font-size:var(--fs-xxs);color:var(--t3);display:flex;gap:12px;align-items:center;margin-top:8px"></div>
       </div>`,
     };
@@ -1021,7 +1021,7 @@
     banks.forEach(b => { if (bankCount[b.id]) bankCount[b.id].label = b.account_label; });
 
     let html = `<div style="font-size:var(--fs-xs);color:var(--t3);margin-bottom:14px">Overview of all bank accounts used in SD Bridge mapping, and how many channels are assigned to each.</div>
-      <table class="tbl"><thead><tr><th>Account Name</th><th>Bank</th><th>Type</th><th>Channels</th></tr></thead><tbody>`;
+      <table class="tbl" id="bm_ch_tbl"><thead><tr>${App.sth('Account Name','acct','bm_ch_tbl')}${App.sth('Bank','bank','bm_ch_tbl')}${App.sth('Type','type','bm_ch_tbl')}${App.sth('Channels','channels','bm_ch_tbl')}</tr></thead><tbody>`;
 
     banks.forEach(b => {
       const cnt = bankCount[b.id]?.count || 0;
@@ -1128,7 +1128,7 @@
       ct: `<div class="card" style="max-width:900px;margin:0 auto">
         <div style="font-size:var(--fs-xs);color:var(--t3);margin-bottom:8px">Link related categories so transactions auto-update paired accounts (e.g. Super expense → Super payable on Balance Sheet)</div>
         <table class="tbl" id="lc_tbl">
-          <thead><tr><th>Source Category</th><th style="width:30px">→</th><th>Linked Account</th><th>Effect</th><th>Status</th><th style="width:40px"></th></tr></thead>
+          <thead><tr>${App.sth('Source Category','src','lc_tbl')}<th style="width:30px">→</th>${App.sth('Linked Account','lnk','lc_tbl')}${App.sth('Effect','effect','lc_tbl')}${App.sth('Status','status','lc_tbl')}<th style="width:40px"></th></tr></thead>
           <tbody id="lc_tbody">${_skeleton(6)}</tbody>
         </table>
       </div>`,
@@ -1286,7 +1286,7 @@
       // Repayment history
       const reps = l.repayments || [];
       const repHtml = reps.length > 0 ? `<div style="font-size:var(--fs-sm);font-weight:700;margin:12px 0 6px">Repayment History</div>
-        <table class="tbl"><thead><tr><th>Date</th><th>Reference</th><th style="text-align:right">Principal</th><th style="text-align:right">Interest</th><th style="text-align:right">Total</th></tr></thead><tbody>
+        <table class="tbl" id="ln_rep_${idx}"><thead><tr>${App.sth('Date','date','ln_rep_'+idx)}${App.sth('Reference','ref','ln_rep_'+idx)}${App.sthR('Principal','principal','ln_rep_'+idx)}${App.sthR('Interest','interest','ln_rep_'+idx)}${App.sthR('Total','total','ln_rep_'+idx)}</tr></thead><tbody>
         ${reps.slice(0, 5).map(r => `<tr><td>${App.formatDateFull(r.payment_date)}</td><td>${esc(r.reference || '—')}</td><td style="text-align:right">${fm(r.principal_amount)}</td><td style="text-align:right;color:var(--t3)">${fm(r.interest_amount)}</td><td style="text-align:right;font-weight:600">${fm(r.total_amount)}</td></tr>`).join('')}
         ${reps.length > 5 ? `<tr><td colspan="5" style="font-size:var(--fs-xxs);color:var(--t3)">... ${reps.length - 5} earlier payments</td></tr>` : ''}
         </tbody></table>
@@ -1351,7 +1351,7 @@
     // Unsettled transactions table
     if (rows.length > 0) {
       html += `<div style="font-size:var(--fs-sm);font-weight:700;margin-bottom:6px">Unsettled Transactions (${rows.length})</div>
-        <div class="card" style="padding:0;overflow:hidden"><table class="tbl"><thead><tr><th>Date</th><th>Debtor</th><th>Creditor</th><th>Source</th><th>Description</th><th style="text-align:right">Amount</th></tr></thead><tbody>
+        <div class="card" style="padding:0;overflow:hidden"><table class="tbl" id="ln_ic_tbl"><thead><tr>${App.sth('Date','date','ln_ic_tbl')}${App.sth('Debtor','debtor','ln_ic_tbl')}${App.sth('Creditor','creditor','ln_ic_tbl')}${App.sth('Source','source','ln_ic_tbl')}${App.sth('Description','desc','ln_ic_tbl')}${App.sthR('Amount','amount','ln_ic_tbl')}</tr></thead><tbody>
         ${rows.map(r => {
           const srcCls = r.source_type === 'on_behalf' ? 'sts-o' : r.source_type === 'split' ? 'sts-p' : 'sts-c';
           return `<tr><td>${App.formatDateFull(r.created_at?.substring(0,10))}</td><td style="font-weight:600;color:var(--r)">${esc(r.debtor_entity)}</td><td style="font-weight:600;color:var(--g)">${esc(r.creditor_entity)}</td><td><span class="sts ${srcCls}" style="font-size:8px">${esc(r.source_type)}</span></td><td style="font-size:var(--fs-xs)">${esc(r.description || '')}</td><td style="text-align:right;font-weight:600">${fm(r.amount)}</td></tr>`;
@@ -1373,7 +1373,7 @@
       html = '<div class="empty" style="padding:40px">No capital transactions yet. Click "+ Equity Transaction" to record one.</div>';
     } else {
       html += `<div style="font-size:var(--fs-sm);font-weight:700;margin-bottom:6px">Capital Transaction History</div>
-        <div class="card" style="padding:0;overflow:hidden;margin-bottom:12px"><table class="tbl"><thead><tr><th>Date</th><th>Type</th><th>Investor</th><th>Brand</th><th>Description</th><th style="text-align:right">Amount</th><th>Ref</th></tr></thead><tbody>
+        <div class="card" style="padding:0;overflow:hidden;margin-bottom:12px"><table class="tbl" id="ln_cap_tbl"><thead><tr>${App.sth('Date','date','ln_cap_tbl')}${App.sth('Type','type','ln_cap_tbl')}${App.sth('Investor','investor','ln_cap_tbl')}${App.sth('Brand','brand','ln_cap_tbl')}${App.sth('Description','desc','ln_cap_tbl')}${App.sthR('Amount','amount','ln_cap_tbl')}${App.sth('Ref','ref','ln_cap_tbl')}</tr></thead><tbody>
         ${capital.map(e => `<tr><td>${App.formatDateFull(e.transaction_date)}</td><td><span class="sts sts-p">${e.equity_type === 'capital_in' ? 'Capital In' : 'Capital Out'}</span></td><td style="font-weight:600">${esc(e.person_name)}</td><td>${esc(e.entity_id || '—')}</td><td style="font-size:var(--fs-xs)">${esc(e.description || '')}</td><td style="text-align:right;font-weight:600;color:${e.equity_type === 'capital_in' ? 'var(--g)' : 'var(--r)'}">${e.equity_type === 'capital_in' ? '+' : '-'}${fm(e.amount)}</td><td style="font-size:var(--fs-xs)">${esc(e.reference || '—')}</td></tr>`).join('')}
         </tbody><tfoot><tr style="border-top:2px solid var(--bd);font-weight:700"><td colspan="5">Total Capital Invested</td><td style="text-align:right;color:var(--g)">${fm(totalInvested)}</td><td></td></tr></tfoot></table></div>`;
     }
@@ -1406,7 +1406,7 @@
     // Paid history
     if (paid.length > 0) {
       html += `<div style="font-size:var(--fs-sm);font-weight:700;margin-bottom:6px">Dividend History</div>
-        <div class="card" style="padding:0;overflow:hidden"><table class="tbl"><thead><tr><th>Date</th><th>Recipient</th><th>Description</th><th>Period</th><th style="text-align:right">Amount</th><th>Ref</th><th>Status</th></tr></thead><tbody>
+        <div class="card" style="padding:0;overflow:hidden"><table class="tbl" id="ln_div_tbl"><thead><tr>${App.sth('Date','date','ln_div_tbl')}${App.sth('Recipient','recipient','ln_div_tbl')}${App.sth('Description','desc','ln_div_tbl')}${App.sth('Period','period','ln_div_tbl')}${App.sthR('Amount','amount','ln_div_tbl')}${App.sth('Ref','ref','ln_div_tbl')}${App.sth('Status','status','ln_div_tbl')}</tr></thead><tbody>
         ${paid.map(e => `<tr><td>${App.formatDateFull(e.transaction_date)}</td><td style="font-weight:600">${esc(e.person_name)}</td><td>${esc(e.description || '')}</td><td>${esc(e.period || '')}</td><td style="text-align:right;font-weight:600">${fm(e.amount)}</td><td style="font-size:var(--fs-xs)">${esc(e.reference || '—')}</td><td><span class="sts sts-c">Paid</span></td></tr>`).join('')}
         </tbody></table></div>`;
     }
@@ -1577,7 +1577,7 @@
       el.innerHTML = '<div class="empty" style="padding:40px">No journal entries yet. Click "+ New Journal Entry" to create one.</div>';
       return;
     }
-    el.innerHTML = `<div class="card" style="padding:0;overflow:hidden"><table class="tbl"><thead><tr><th>Journal No</th><th>Date</th><th>Description</th><th style="text-align:right">Debit</th><th style="text-align:right">Credit</th><th>Status</th></tr></thead><tbody>
+    el.innerHTML = `<div class="card" style="padding:0;overflow:hidden"><table class="tbl" id="jn_tbl"><thead><tr>${App.sth('Journal No','jno','jn_tbl')}${App.sth('Date','date','jn_tbl')}${App.sth('Description','desc','jn_tbl')}${App.sthR('Debit','debit','jn_tbl')}${App.sthR('Credit','credit','jn_tbl')}${App.sth('Status','status','jn_tbl')}</tr></thead><tbody>
       ${_jnEntries.map(e => `<tr>
         <td style="font-weight:600;color:var(--acc)">${esc(e.journal_no)}</td>
         <td>${App.formatDateFull(e.entry_date)}</td>

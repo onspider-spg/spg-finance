@@ -1,4 +1,4 @@
-/** Version 1.6.1 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 1.6.2 | 15 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_tx_fin.js
@@ -6,9 +6,10 @@
  * Bill Detail, SD Bridge, Find Transactions
  * ═══════════════════════════════════════════
  *
- * CHANGED v1.6 → v1.6.1:
- * - SD Bridge items: show vendor_name, doc_type badge, doc_number, description, payment_status
- * - SD Bridge KPI: use syncedCount from backend
+ * CHANGED v1.6.1 → v1.6.2:
+ * - [MOVED] _sortTable, sth, sthR → App.sortTable, App.sth, App.sthR (shared in app_fin.js)
+ * - [FIXED] Arrow indicator changed from ⇅ to ▲/▼ (active column only)
+ * - [ADDED] Sort support for Find DC and Find FT tables
  * ═══════════════════════════════════════════
  */
 (() => {
@@ -56,41 +57,11 @@ function reconBadge(v) {
 }
 
 const TW = 'max-width:1000px;margin:0 auto';
-let _sortState = {};
+const sth = App.sth, sthR = App.sthR;
 
 /** Skeleton loading row for tables */
 function _skeletonRow(cols) {
   return `<tr><td colspan="${cols}" style="text-align:center;padding:20px;color:var(--t3)"><div class="fin-spinner" style="margin:0 auto 8px"></div>Loading...</td></tr>`;
-}
-
-function _sortTable(tid, key) {
-  const table = document.getElementById(tid);
-  if (!table) return;
-  const tbody = table.querySelector('tbody');
-  if (!tbody) return;
-  const rows = Array.from(tbody.querySelectorAll('tr'));
-  const ths = Array.from(table.querySelectorAll('th'));
-  let idx = -1;
-  ths.forEach((th, i) => { if (th.getAttribute('data-key') === key) idx = i; });
-  if (idx < 0) return;
-  const sk = tid + '_' + key;
-  _sortState[sk] = !_sortState[sk];
-  const asc = _sortState[sk];
-  rows.sort((a, b) => {
-    const aV = (a.cells[idx]?.textContent || '').trim().replace(/[$,+]/g, '');
-    const bV = (b.cells[idx]?.textContent || '').trim().replace(/[$,+]/g, '');
-    const aN = parseFloat(aV), bN = parseFloat(bV);
-    if (!isNaN(aN) && !isNaN(bN)) return asc ? aN - bN : bN - aN;
-    return asc ? aV.localeCompare(bV) : bV.localeCompare(aV);
-  });
-  rows.forEach(r => tbody.appendChild(r));
-}
-
-function sth(label, key, tid) {
-  return `<th data-key="${key}" style="cursor:pointer" onclick="ScrTx._sortTable('${tid}','${key}')">${esc(label)} <span class="s">⇅</span></th>`;
-}
-function sthR(label, key, tid) {
-  return `<th data-key="${key}" style="text-align:right;cursor:pointer" onclick="ScrTx._sortTable('${tid}','${key}')">${esc(label)} <span class="s">⇅</span></th>`;
 }
 
 /** Format ISO date to DD/MM/YYYY for display */
@@ -746,7 +717,7 @@ async function _findDC() {
       return '<div style="text-align:center;padding:20px;color:var(--t3)">No debit/credit records found</div>';
     }
     const rows = data.map(r => `<tr><td>${_fmtDate(r.date)}</td><td style="color:var(--b)"><a class="lk">${esc(r.debitRef)}</a></td><td><a class="lk">${esc(r.creditRef)}</a></td><td>${esc(r.supplier)}</td><td style="text-align:right;color:var(--b)">${fm(r.debitAmt)}</td><td style="text-align:right">${fm(r.creditAmt)}</td><td>${sb(r.status === 'Linked' ? 'closed' : 'pending')}</td></tr>`).join('');
-    return `<div style="font-size:var(--fs-xs);color:var(--t3);margin-bottom:8px">Debit notes paired with linked invoices</div><table class="tbl"><thead><tr><th>Date</th><th>Debit Note</th><th>Linked Invoice</th><th>Supplier</th><th style="text-align:right">Debit ($)</th><th style="text-align:right">Invoice ($)</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`;
+    return `<div style="font-size:var(--fs-xs);color:var(--t3);margin-bottom:8px">Debit notes paired with linked invoices</div><table class="tbl" id="tbl_find_dc"><thead><tr>${sth('Date','date','tbl_find_dc')}${sth('Debit Note','debit','tbl_find_dc')}${sth('Linked Invoice','credit','tbl_find_dc')}${sth('Supplier','supplier','tbl_find_dc')}${sthR('Debit ($)','debitAmt','tbl_find_dc')}${sthR('Invoice ($)','creditAmt','tbl_find_dc')}${sth('Status','status','tbl_find_dc')}</tr></thead><tbody>${rows}</tbody></table>`;
   } catch (e) {
     return `<div style="text-align:center;padding:20px;color:var(--r)">Error: ${esc(e.message)}</div>`;
   }
@@ -760,7 +731,7 @@ async function _findFT() {
       return '<div style="text-align:center;padding:20px;color:var(--t3)">No transactions found</div>';
     }
     const rows = data.map(r => `<tr><td>${_fmtDate(r.date)}</td><td><a class="lk">${esc(r.ref)}</a></td><td>${esc(r.type)}</td><td>${esc(r.desc)}</td><td>${esc(r.contact)}</td><td style="text-align:right">${fm(r.amount)}</td><td>${sb(r.status)}</td></tr>`).join('');
-    return `<div style="font-size:var(--fs-xs);color:var(--t3);margin-bottom:8px">All transactions</div><table class="tbl"><thead><tr><th>Date</th><th>Reference</th><th>Type</th><th>Description</th><th>Contact</th><th style="text-align:right">Amount ($)</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`;
+    return `<div style="font-size:var(--fs-xs);color:var(--t3);margin-bottom:8px">All transactions</div><table class="tbl" id="tbl_find_ft"><thead><tr>${sth('Date','date','tbl_find_ft')}${sth('Reference','ref','tbl_find_ft')}${sth('Type','type','tbl_find_ft')}${sth('Description','desc','tbl_find_ft')}${sth('Contact','contact','tbl_find_ft')}${sthR('Amount ($)','amount','tbl_find_ft')}${sth('Status','status','tbl_find_ft')}</tr></thead><tbody>${rows}</tbody></table>`;
   } catch (e) {
     return `<div style="text-align:center;padding:20px;color:var(--r)">Error: ${esc(e.message)}</div>`;
   }
@@ -786,7 +757,7 @@ window.ScrTx = {
   _switchBdView,
   _showDebitDetail,
   _switchFindTab,
-  _sortTable,
+  _sort: App.sortTable,
   _openBillDetail,
   _loadMoreBills,
   _sdToggleGroup,

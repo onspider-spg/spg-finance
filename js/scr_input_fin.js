@@ -1,4 +1,4 @@
-/** Version 1.7 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 1.7.1 | 15 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_input_fin.js
@@ -1542,7 +1542,7 @@
       </div>`;
 
     if (_impType === 'bills') {
-      html += `<table class="tbl" style="margin:0"><thead><tr><th></th><th>Date</th><th>Supplier</th><th>Invoice</th><th style="text-align:right">Amount</th><th style="text-align:right">GST</th><th>Status</th></tr></thead><tbody>`;
+      html += `<table class="tbl" id="tbl_imp" style="margin:0"><thead><tr><th></th>${App.sth('Date','date','tbl_imp')}${App.sth('Supplier','supplier','tbl_imp')}${App.sth('Invoice','inv','tbl_imp')}${App.sthR('Amount','amount','tbl_imp')}${App.sthR('GST','gst','tbl_imp')}${App.sth('Status','status','tbl_imp')}</tr></thead><tbody>`;
       _impRows.slice(0, 20).forEach(r => {
         const icon = r.status === 'ready' ? '<span style="color:var(--g)">✓</span>' : r.status === 'warning' ? '<span style="color:var(--o)">⚠</span>' : '<span style="color:var(--r)">✗</span>';
         const stsCls = r.status === 'ready' ? 'sts-c' : r.status === 'warning' ? 'sts-p' : 'sts-r';
@@ -1551,7 +1551,7 @@
       });
       if (_impRows.length > 20) html += `<tr><td colspan="7" style="font-size:var(--fs-xxs);color:var(--t3);text-align:center">... ${_impRows.length - 20} more rows</td></tr>`;
     } else {
-      html += `<table class="tbl" style="margin:0"><thead><tr><th></th><th>Date</th><th>Description</th><th style="text-align:right">Debit</th><th style="text-align:right">Credit</th><th style="text-align:right">Balance</th><th>Status</th></tr></thead><tbody>`;
+      html += `<table class="tbl" id="tbl_imp" style="margin:0"><thead><tr><th></th>${App.sth('Date','date','tbl_imp')}${App.sth('Description','desc','tbl_imp')}${App.sthR('Debit','debit','tbl_imp')}${App.sthR('Credit','credit','tbl_imp')}${App.sthR('Balance','balance','tbl_imp')}${App.sth('Status','status','tbl_imp')}</tr></thead><tbody>`;
       _impRows.slice(0, 20).forEach(r => {
         const icon = r.status === 'ready' ? '<span style="color:var(--g)">✓</span>' : '<span style="color:var(--r)">✗</span>';
         html += `<tr><td>${icon}</td><td>${esc(r.date)}</td><td>${esc(r.description)}</td><td style="text-align:right">${r.debit.toFixed(2)}</td><td style="text-align:right">${r.credit.toFixed(2)}</td><td style="text-align:right">${r.balance.toFixed(2)}</td><td><span class="sts ${r.status === 'ready' ? 'sts-c' : 'sts-r'}" style="font-size:9px">${r.status === 'ready' ? 'Ready' : 'Error'}</span></td></tr>`;

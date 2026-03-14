@@ -1,4 +1,4 @@
-/** Version 2.6.2 | 15 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 2.7 | 15 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — app_fin.js
@@ -16,6 +16,9 @@
  *   App.hideLoader()      — hide loading spinner
  *   App.showDialog(opt)   — show confirm/alert dialog (replaces native confirm())
  *   App.statusBadge(s)    — return HTML for status badge
+ *   App.sortTable(tid,key)— sort table tbody by column (client-side, toggle asc/desc)
+ *   App.sth(l,k,tid,ns)   — sortable <th> builder (left-aligned)
+ *   App.sthR(l,k,tid,ns)  — sortable <th> builder (right-aligned)
  *   App._hardRefresh()    — clear all memory → re-init (like fresh open)
  *   --- internal ---
  *   _buildTopbar()        — render topbar
@@ -378,7 +381,7 @@ const App = (() => {
 
     // Footer
     html += `<div class="sf">
-      <div style="font-size:9px;color:var(--t4);padding:2px 0;margin-bottom:4px">v2.5 | 14 Mar 2026 AEDT</div>
+      <div style="font-size:9px;color:var(--t4);padding:2px 0;margin-bottom:4px">v2.7 | 15 Mar 2026 AEDT</div>
       <a href="https://onspider-spg.github.io/spg/#dashboard"><span style="font-size:12px">←</span><span class="sit"> Back to Home</span></a>
       <a href="https://onspider-spg.github.io/spg/#logout" class="danger"><span style="font-size:12px">→</span><span class="sit"> Log out</span></a>
     </div>`;
@@ -573,6 +576,75 @@ const App = (() => {
     return `<span class="sts ${cls}">${esc(label)}</span>`;
   }
 
+  // ═══════════════════════════
+  // TABLE SORTING (shared utility)
+  // ═══════════════════════════
+  const _sortState = {};
+
+  /**
+   * Sort a table's tbody rows by clicking a column header.
+   * Works on DOM <tr> elements — no data re-fetch needed.
+   * @param {string} tid  — table element id
+   * @param {string} key  — data-key on the <th>
+   */
+  function sortTable(tid, key) {
+    const table = document.getElementById(tid);
+    if (!table) return;
+    const tbody = table.querySelector('tbody');
+    if (!tbody) return;
+    const rows = Array.from(tbody.querySelectorAll('tr:not(.sort-skip)'));
+    const ths = Array.from(table.querySelectorAll('th'));
+    let idx = -1;
+    ths.forEach((th, i) => { if (th.getAttribute('data-key') === key) idx = i; });
+    if (idx < 0) return;
+
+    // Toggle direction
+    const sk = tid + '_' + key;
+    _sortState[sk] = !_sortState[sk];
+    const asc = _sortState[sk];
+
+    // Sort rows
+    rows.sort((a, b) => {
+      const aV = (a.cells[idx]?.textContent || '').trim().replace(/[$,+%]/g, '');
+      const bV = (b.cells[idx]?.textContent || '').trim().replace(/[$,+%]/g, '');
+      const aN = parseFloat(aV), bN = parseFloat(bV);
+      if (!isNaN(aN) && !isNaN(bN)) return asc ? aN - bN : bN - aN;
+      return asc ? aV.localeCompare(bV) : bV.localeCompare(aV);
+    });
+    rows.forEach(r => tbody.appendChild(r));
+
+    // Update arrow indicators in headers
+    ths.forEach(th => {
+      const arrow = th.querySelector('.s');
+      if (!arrow) return;
+      if (th.getAttribute('data-key') === key) {
+        arrow.textContent = asc ? '▲' : '▼';
+      } else {
+        arrow.textContent = '';
+      }
+    });
+  }
+
+  /**
+   * Build a sortable <th> (left-aligned).
+   * @param {string} label — header text
+   * @param {string} key   — sort key
+   * @param {string} tid   — table id
+   * @param {string} ns    — namespace for onclick (e.g. 'ScrTx'), defaults to 'App'
+   */
+  function sth(label, key, tid, ns) {
+    const handler = ns ? `${ns}._sort('${tid}','${key}')` : `App.sortTable('${tid}','${key}')`;
+    return `<th data-key="${key}" style="cursor:pointer" onclick="${handler}">${esc(label)} <span class="s"></span></th>`;
+  }
+
+  /**
+   * Build a sortable <th> (right-aligned).
+   */
+  function sthR(label, key, tid, ns) {
+    const handler = ns ? `${ns}._sort('${tid}','${key}')` : `App.sortTable('${tid}','${key}')`;
+    return `<th data-key="${key}" style="text-align:right;cursor:pointer" onclick="${handler}">${esc(label)} <span class="s"></span></th>`;
+  }
+
   /** API call — delegates to API module */
   async function api(action, body = {}) {
     return API.call ? API.call(action, body) : { success: true, data: null };
@@ -635,6 +707,9 @@ const App = (() => {
     hideLoader,
     showDialog,
     statusBadge,
+    sortTable,
+    sth,
+    sthR,
     api,
     registerRoutes,
     _toggleSidebar,

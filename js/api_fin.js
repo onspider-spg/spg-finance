@@ -1,4 +1,4 @@
-/** Version 1.5.1 | 14 MAR 2026 | Siam Palette Group | Created 13 MAR 2026 */
+/** Version 1.5.2 | 14 MAR 2026 | Siam Palette Group | Created 13 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — api_fin.js
@@ -750,6 +750,8 @@ const API = (() => {
     deleteCategory,
     getTaxCodes,
     updateTaxCode,
+    // E2: Contacts — thin wrappers using _call
+    call: _call,
   };
 
 })();

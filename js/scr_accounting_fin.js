@@ -1,19 +1,9 @@
-/** Version 2.0 | 14 MAR 2026 | Siam Palette Group */
+/** Version 2.1 | 14 MAR 2026 | Siam Palette Group */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_accounting_fin.js
- * Accounting screens: COA, Tax, Bank Rules, Banking Hub,
- * Bank Map, Linked Categories, Loans & Finance
- * ═══════════════════════════════════════════
- *
- * SCREENS:
- *   ac_coa/create/edit — Categories CRUD
- *   ac_tax        — Tax Codes
- *   ac_rules      — Bank Rules (E3a)
- *   ac_hub        — Banking Hub (E3a)
- *   ac_map        — Bank Mapping 3 tabs (E3b)
- *   ac_linked     — Linked Categories (E3b)
- *   ac_loan       — Loans & Finance 4 tabs + KPIs (E3c)
+ * Accounting: COA, Tax, Bank Rules, Hub, Map, Linked,
+ * Loans & Finance, General Journal
  * ═══════════════════════════════════════════
  */
 
@@ -1552,6 +1542,202 @@
   }
 
   // ══════════════════════════════════════════
+  // 10. GENERAL JOURNAL (ac_journal) ★ E3c-1
+  // ══════════════════════════════════════════
+
+  let _jnEntries = [];
+  let _jnView = 'list'; // 'list' or 'create'
+  let _jnLines = [{ category_display: '', debit: '', credit: '', tax_code: 'FRE' }, { category_display: '', debit: '', credit: '', tax_code: 'FRE' }];
+  let _jnSaving = false;
+
+  function renderJournal() {
+    _jnView = 'list';
+    return {
+      tb: `<div class="tb"><div class="tb-t">General Journal</div><button class="bs" onclick="ScrAccounting._jnNewEntry()">+ New Journal Entry</button></div>`,
+      ct: `<div style="max-width:900px;margin:0 auto" id="jn_wrap"></div>`,
+    };
+  }
+
+  async function _jnLoad() {
+    const el = document.getElementById('jn_wrap');
+    if (!el) return;
+    if (_jnView === 'create') { _jnRenderCreate(el); return; }
+
+    try {
+      const result = await API.call('fin_get_journals', {});
+      _jnEntries = result.rows || [];
+      _jnRenderList(el);
+    } catch (e) {
+      el.innerHTML = `<div style="padding:20px;color:var(--r)">Error: ${esc(e.message)}</div>`;
+    }
+  }
+
+  function _jnRenderList(el) {
+    if (_jnEntries.length === 0) {
+      el.innerHTML = '<div class="empty" style="padding:40px">No journal entries yet. Click "+ New Journal Entry" to create one.</div>';
+      return;
+    }
+    el.innerHTML = `<div class="card" style="padding:0;overflow:hidden"><table class="tbl"><thead><tr><th>Journal No</th><th>Date</th><th>Description</th><th style="text-align:right">Debit</th><th style="text-align:right">Credit</th><th>Status</th></tr></thead><tbody>
+      ${_jnEntries.map(e => `<tr>
+        <td style="font-weight:600;color:var(--acc)">${esc(e.journal_no)}</td>
+        <td>${App.formatDateFull(e.entry_date)}</td>
+        <td>${esc(e.description || '—')}</td>
+        <td style="text-align:right">${fm(e.total_debit)}</td>
+        <td style="text-align:right">${fm(e.total_credit)}</td>
+        <td><span class="sts ${e.status === 'posted' ? 'sts-c' : e.status === 'reversed' ? 'sts-o' : 'sts-p'}">${esc(e.status)}</span></td>
+      </tr>`).join('')}
+    </tbody></table></div>
+    <div style="font-size:var(--fs-xxs);color:var(--t3);margin-top:6px">${_jnEntries.length} entries</div>`;
+  }
+
+  function _jnNewEntry() {
+    _jnView = 'create';
+    _jnLines = [
+      { category_display: '', debit: '', credit: '', tax_code: 'FRE' },
+      { category_display: '', debit: '', credit: '', tax_code: 'FRE' },
+    ];
+    _jnLoad();
+  }
+
+  async function _jnRenderCreate(el) {
+    // Get next journal number
+    let jnNo = 'GJ-0001';
+    try {
+      const r = await API.call('fin_get_next_journal_no', {});
+      jnNo = r.journal_no || jnNo;
+    } catch (e) { /* use default */ }
+
+    // Category options from S.categories
+    let catOpts = '<option value="">— Select account —</option>';
+    (App.S.categories || []).forEach(c => {
+      catOpts += `<option value="${esc((c.account_code || '') + ' ' + c.sub_category)}">${esc((c.account_code ? c.account_code + ' ' : '') + c.sub_category)}</option>`;
+    });
+
+    // Tax code options
+    let taxOpts = '';
+    (App.S.taxCodes || []).forEach(t => {
+      taxOpts += `<option value="${esc(t.code)}">${esc(t.code)}</option>`;
+    });
+
+    el.innerHTML = `<div class="card">
+      <div style="font-size:var(--fs-xs);color:var(--t3);margin-bottom:8px">Manual journal entries for adjustments</div>
+      <div class="fr">
+        <div class="fg"><label class="lb">Journal Number *</label><input class="inp" id="jn_no" value="${esc(jnNo)}" readonly style="background:var(--bg3);color:var(--t3)"></div>
+        <div class="fg"><label class="lb">Date *</label><input class="inp" id="jn_date" type="date" value="${App.today()}"></div>
+        <div class="fg"><label class="lb">Description</label><input class="inp" id="jn_desc" placeholder="e.g. Monthly accrual adjustment"></div>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:var(--fs-sm);margin-top:10px">
+        <thead><tr>
+          <th style="text-align:left;padding:8px;font-weight:700;width:38%">Account</th>
+          <th style="text-align:left;padding:8px;font-weight:700;width:20%">Debit ($)</th>
+          <th style="text-align:left;padding:8px;font-weight:700;width:20%">Credit ($)</th>
+          <th style="text-align:left;padding:8px;font-weight:700;width:14%">Tax code</th>
+          <th style="width:8%"></th>
+        </tr></thead>
+        <tbody id="jn_lines"></tbody>
+      </table>
+      <div style="margin-top:6px"><a class="lk" style="font-size:var(--fs-xs);cursor:pointer" onclick="ScrAccounting._jnAddLine()">+ Add line</a></div>
+      <div id="jn_totals" style="text-align:right;margin-top:10px;font-size:var(--fs-sm)"></div>
+      <div style="display:flex;gap:6px;margin-top:14px;justify-content:flex-end;padding-top:10px;border-top:1px solid var(--bd2)">
+        <button class="btn bo" onclick="ScrAccounting._jnBackToList()">Cancel</button>
+        <button class="bs" id="jn_save_btn" onclick="ScrAccounting._jnSave()">Save Journal</button>
+      </div>
+    </div>`;
+
+    // Store options for dynamic rendering
+    _jnCatOpts = catOpts;
+    _jnTaxOpts = taxOpts;
+    _jnRenderLines();
+  }
+
+  let _jnCatOpts = '';
+  let _jnTaxOpts = '';
+
+  function _jnRenderLines() {
+    const tbody = document.getElementById('jn_lines');
+    if (!tbody) return;
+    tbody.innerHTML = _jnLines.map((l, i) => `<tr>
+      <td style="padding:0;border:1px solid var(--bd)"><select style="width:100%;padding:8px;border:none;font-size:var(--fs-sm);font-family:inherit" data-jn-line="${i}" data-jn-field="category_display" onchange="ScrAccounting._jnLineChange(${i},'category_display',this.value)">${_jnCatOpts.replace(`value="${esc(l.category_display)}"`, `value="${esc(l.category_display)}" selected`)}</select></td>
+      <td style="padding:0;border:1px solid var(--bd)"><input style="width:100%;padding:8px;border:none;text-align:right;font-size:var(--fs-sm)" value="${l.debit}" placeholder="0.00" oninput="ScrAccounting._jnLineChange(${i},'debit',this.value)"></td>
+      <td style="padding:0;border:1px solid var(--bd)"><input style="width:100%;padding:8px;border:none;text-align:right;font-size:var(--fs-sm)" value="${l.credit}" placeholder="0.00" oninput="ScrAccounting._jnLineChange(${i},'credit',this.value)"></td>
+      <td style="padding:0;border:1px solid var(--bd)"><select style="width:100%;padding:8px;border:none;font-size:var(--fs-sm)" onchange="ScrAccounting._jnLineChange(${i},'tax_code',this.value)">${_jnTaxOpts.replace(`value="${esc(l.tax_code)}"`, `value="${esc(l.tax_code)}" selected`)}</select></td>
+      <td style="text-align:center">${_jnLines.length > 2 ? `<button class="bg" style="color:var(--r);font-size:14px" onclick="ScrAccounting._jnRemoveLine(${i})">✕</button>` : ''}</td>
+    </tr>`).join('');
+    _jnCalcTotals();
+  }
+
+  function _jnLineChange(idx, field, val) {
+    if (_jnLines[idx]) _jnLines[idx][field] = val;
+    _jnCalcTotals();
+  }
+
+  function _jnAddLine() {
+    _jnLines.push({ category_display: '', debit: '', credit: '', tax_code: 'FRE' });
+    _jnRenderLines();
+  }
+
+  function _jnRemoveLine(idx) {
+    if (_jnLines.length <= 2) return;
+    _jnLines.splice(idx, 1);
+    _jnRenderLines();
+  }
+
+  function _jnCalcTotals() {
+    const el = document.getElementById('jn_totals');
+    if (!el) return;
+    let totalD = 0, totalC = 0;
+    _jnLines.forEach(l => { totalD += parseFloat(l.debit) || 0; totalC += parseFloat(l.credit) || 0; });
+    const balanced = Math.abs(totalD - totalC) < 0.01;
+    el.innerHTML = `<span style="margin-right:20px">Total Debit: <b>${fm(totalD)}</b></span><span>Total Credit: <b>${fm(totalC)}</b></span> <span style="color:${balanced ? 'var(--g)' : 'var(--r)'};margin-left:8px">${balanced ? '✓ Balanced' : '✗ Not balanced'}</span>`;
+  }
+
+  function _jnBackToList() {
+    _jnView = 'list';
+    _jnLoad();
+  }
+
+  async function _jnSave() {
+    if (_jnSaving) return;
+    const date = document.getElementById('jn_date')?.value;
+    if (!date) { App.toast('Date is required'); return; }
+
+    // Validate balanced
+    let totalD = 0, totalC = 0;
+    _jnLines.forEach(l => { totalD += parseFloat(l.debit) || 0; totalC += parseFloat(l.credit) || 0; });
+    if (Math.abs(totalD - totalC) > 0.01) { App.toast('Debit and Credit must be balanced'); return; }
+    if (totalD === 0) { App.toast('Enter at least one debit/credit amount'); return; }
+
+    // Validate at least one line has account
+    const validLines = _jnLines.filter(l => l.category_display && ((parseFloat(l.debit) || 0) > 0 || (parseFloat(l.credit) || 0) > 0));
+    if (validLines.length < 2) { App.toast('At least 2 lines with accounts required'); return; }
+
+    _jnSaving = true;
+    const btn = document.getElementById('jn_save_btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+
+    try {
+      await API.call('fin_create_journal', {
+        entry_date: date,
+        description: document.getElementById('jn_desc')?.value?.trim() || null,
+        lines: validLines.map(l => ({
+          category_display: l.category_display,
+          debit: parseFloat(l.debit) || 0,
+          credit: parseFloat(l.credit) || 0,
+          tax_code: l.tax_code || 'FRE',
+        })),
+      });
+      App.toast('Journal entry created');
+      _jnView = 'list';
+      _jnLoad();
+    } catch (e) {
+      App.toast(e.message || 'Save failed');
+    } finally {
+      _jnSaving = false;
+      if (btn) { btn.disabled = false; btn.textContent = 'Save Journal'; }
+    }
+  }
+
+  // ══════════════════════════════════════════
   // REGISTER ROUTES
   // ══════════════════════════════════════════
   App.registerRoutes({
@@ -1564,10 +1750,11 @@
     ac_map:        { render: renderBankMap, onLoad: _bmLoad },
     ac_linked:     { render: renderLinkedCats, onLoad: _lcLoad },
     ac_loan:       { render: renderLoans, onLoad: _lnLoad },
+    ac_journal:    { render: renderJournal, onLoad: _jnLoad },
   });
 
   // ══════════════════════════════════════════
-  // PUBLIC API — functions called from onclick
+  // PUBLIC API
   // ══════════════════════════════════════════
   window.ScrAccounting = {
     _setCoaTab, _onSearch, _toggleInactive, _resetCoaFilters,
@@ -1580,6 +1767,8 @@
     _bmSetTab, _bmMarkDirty, _bmSave, _lcAdd, _lcEdit,
     // E3c: Loans
     _lnSetTab, _lnNewLoanModal, _lnEditLoan, _lnRepayModal, _lnEquityModal,
+    // E3c-1: Journal
+    _jnNewEntry, _jnAddLine, _jnRemoveLine, _jnLineChange, _jnBackToList, _jnSave,
   };
 
 })();

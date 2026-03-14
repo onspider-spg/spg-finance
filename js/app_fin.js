@@ -1,4 +1,4 @@
-/** Version 2.6 | 15 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 2.6.1 | 15 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — app_fin.js
@@ -219,6 +219,9 @@ const App = (() => {
     rp_apar: 'js/scr_reports_fin.js', rp_asset: 'js/scr_reports_fin.js',
     rp_bank: 'js/scr_reports_fin.js', rp_cash: 'js/scr_reports_fin.js',
     rp_loan: 'js/scr_reports_fin.js', rp_dash: 'js/scr_reports_fin.js',
+    // Performance screens (E6c)
+    fp_brand: 'js/scr_reports_fin.js', fp_budget: 'js/scr_reports_fin.js',
+    fp_rev: 'js/scr_reports_fin.js', fp_exp: 'js/scr_reports_fin.js',
   };
 
   // ═══════════════════════════

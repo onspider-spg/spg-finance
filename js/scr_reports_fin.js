@@ -1,9 +1,9 @@
-/** Version 1.2 | 15 MAR 2026 | Siam Palette Group */
+/** Version 1.3 | 15 MAR 2026 | Siam Palette Group */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_reports_fin.js
- * Reports: P&L (4), Balance Sheet, Cash Flow, AP/AR, Assets, Bank, Cash, Loan
- * Lazy-loaded by app_fin.js on first visit to rp_* routes
+ * Reports (11) + Performance (4) = 15 screens total
+ * Lazy-loaded by app_fin.js on first visit to rp_*/fp_* routes
  * ═══════════════════════════════════════════
  */
 
@@ -27,6 +27,10 @@
   let _cashData = null;       // cash summary data
   let _loanData = null;       // loan & equity data
   let _loanTab = 'interco';   // active tab: interco / director / capital
+  let _fpBrandData = null;    // performance: brand comparison
+  let _fpBudgetData = null;   // performance: budget vs actual
+  let _fpRevData = null;      // performance: revenue analysis
+  let _fpExpData = null;      // performance: expense trend
 
   // ── Helpers ──
 
@@ -1333,6 +1337,293 @@
   }
 
   // ══════════════════════════════════════════
+  // fp_brand: BRAND COMPARISON (Performance)
+  // ══════════════════════════════════════════
+  function renderFpBrand() {
+    if (!_filters.month) _filters.month = _curMonth();
+    return {
+      tb: '<div class="tb"><div class="tb-t">Brand Comparison</div>' +
+          '<select class="fl" id="fp_month" onchange="ScrReports._onFpBrandFilter()" style="width:110px">' + _monthOpts(_filters.month) + '</select></div>',
+      ct: `<div style="max-width:1000px;margin:0 auto">
+        <div id="fp_brand_content"><div class="empty" style="padding:30px"><div class="fin-spinner" style="margin:0 auto 8px"></div>Loading...</div></div>
+      </div>`,
+    };
+  }
+
+  async function _loadFpBrand() {
+    const el = document.getElementById('fp_brand_content');
+    if (!el) return;
+    try {
+      _fpBrandData = await API.getBrandComparison({ month: _filters.month });
+    } catch (e) {
+      console.warn('getBrandComparison failed, using mock:', e.message);
+      _fpBrandData = _mockFpBrand();
+    }
+    const d = _fpBrandData;
+    const brands = d.brands || [];
+    // KPI highlights
+    const bestRev = brands.reduce((b, c) => (c.revenue || 0) > (b.revenue || 0) ? c : b, { revenue: 0 });
+    const bestGP = brands.reduce((b, c) => (c.gp_pct || 0) > (b.gp_pct || 0) ? c : b, { gp_pct: 0 });
+    const worstRev = brands.reduce((b, c) => (c.rev_chg || 0) < (b.rev_chg || 0) ? c : b, { rev_chg: 0 });
+
+    let html = `<div class="kpi" style="flex-wrap:nowrap">
+      <div class="kpi-c"><div class="kpi-v" style="color:var(--g)">${esc(bestRev.name || '')}</div><div class="kpi-l">Best Revenue ${_fmK(bestRev.revenue)}</div></div>
+      <div class="kpi-c"><div class="kpi-v" style="color:var(--g)">${esc(bestGP.name || '')}</div><div class="kpi-l">Best GP ${(bestGP.gp_pct || 0).toFixed(0)}%</div></div>
+      <div class="kpi-c"><div class="kpi-v" style="color:var(--o)">${esc(worstRev.name || '')}</div><div class="kpi-l">Revenue ${(worstRev.rev_chg || 0) >= 0 ? '+' : ''}${(worstRev.rev_chg || 0).toFixed(0)}%</div></div>
+    </div>`;
+
+    // Table
+    html += '<table class="tbl"><thead><tr><th></th>';
+    brands.forEach(b => { html += `<th style="text-align:right">${esc(b.name)}</th>`; });
+    html += '<th style="text-align:right;font-weight:700">Total</th></tr></thead><tbody>';
+
+    const totals = d.totals || {};
+    const metrics = [
+      { label: 'Revenue', key: 'revenue', fmt: (v) => _fmK(v) },
+      { label: 'GP%', key: 'gp_pct', fmt: (v) => (v || 0).toFixed(0) + '%', colorHigh: true },
+      { label: 'COL%', key: 'col_pct', fmt: (v) => (v || 0).toFixed(0) + '%', colorOver30: true },
+      { label: 'Net Profit', key: 'net', fmt: (v) => (v >= 0 ? '+' : '') + _fmK(v), colorSign: true },
+    ];
+
+    metrics.forEach(m => {
+      html += `<tr><td style="font-weight:600">${esc(m.label)}</td>`;
+      brands.forEach(b => {
+        const v = b[m.key] || 0;
+        let style = 'text-align:right';
+        if (m.colorSign) style += v >= 0 ? ';color:var(--g)' : ';color:var(--r)';
+        if (m.colorHigh && v > 70) style += ';color:var(--g)';
+        if (m.colorOver30 && v > 30) style += ';color:var(--r)';
+        html += `<td style="${style}">${m.fmt(v)}</td>`;
+      });
+      const tv = totals[m.key] || 0;
+      let tStyle = 'text-align:right;font-weight:700';
+      if (m.colorSign) tStyle += tv >= 0 ? ';color:var(--g)' : ';color:var(--r)';
+      html += `<td style="${tStyle}">${m.fmt(tv)}</td></tr>`;
+    });
+    html += '</tbody></table>';
+    el.innerHTML = html;
+  }
+
+  function _onFpBrandFilter() {
+    _filters.month = document.getElementById('fp_month')?.value || _filters.month;
+    _fpBrandData = null; _loadFpBrand();
+  }
+
+  // ══════════════════════════════════════════
+  // fp_budget: BUDGET vs ACTUAL
+  // ══════════════════════════════════════════
+  function renderFpBudget() {
+    if (!_filters.month) _filters.month = _curMonth();
+    return {
+      tb: '<div class="tb"><div class="tb-t">Budget vs Actual</div>' +
+          '<select class="fl" id="fp_bud_month" onchange="ScrReports._onFpBudgetFilter()" style="width:110px">' + _monthOpts(_filters.month) + '</select>' +
+          '<select class="fl" id="fp_bud_brand" onchange="ScrReports._onFpBudgetFilter()" style="width:140px">' + _brandOpts(_filters.brand) + '</select></div>',
+      ct: `<div style="max-width:1000px;margin:0 auto">
+        <div id="fp_budget_content"><div class="empty" style="padding:30px"><div class="fin-spinner" style="margin:0 auto 8px"></div>Loading...</div></div>
+      </div>`,
+    };
+  }
+
+  async function _loadFpBudget() {
+    const el = document.getElementById('fp_budget_content');
+    if (!el) return;
+    try {
+      _fpBudgetData = await API.getBudgetVsActual({ month: _filters.month, brand: _filters.brand === 'All' ? null : _filters.brand });
+    } catch (e) {
+      console.warn('getBudgetVsActual failed, using mock:', e.message);
+      _fpBudgetData = _mockFpBudget();
+    }
+    const d = _fpBudgetData;
+    const achievement = d.budget_rev ? ((d.actual_rev / d.budget_rev) * 100).toFixed(0) : '0';
+
+    let html = `<div class="kpi" style="flex-wrap:nowrap">
+      <div class="kpi-c"><div class="kpi-l">Actual Revenue</div><div class="kpi-v" style="color:var(--g)">${_fmK(d.actual_rev)}</div></div>
+      <div class="kpi-c"><div class="kpi-l">Budget Revenue</div><div class="kpi-v" style="color:var(--t3)">${_fmK(d.budget_rev)}</div></div>
+      <div class="kpi-c"><div class="kpi-l">Achievement</div><div class="kpi-v" style="color:${Number(achievement) >= 100 ? 'var(--g)' : 'var(--r)'}">${achievement}%</div></div>
+    </div>`;
+    html += '<table class="tbl"><thead><tr><th>Category</th><th style="text-align:right">Budget</th><th style="text-align:right">Actual</th><th style="text-align:right">Variance</th><th style="text-align:right">%</th></tr></thead><tbody>';
+    (d.rows || []).forEach(r => {
+      const variance = (r.actual || 0) - (r.budget || 0);
+      const isExpense = r.category !== 'Revenue';
+      const isGood = isExpense ? variance <= 0 : variance >= 0;
+      const vColor = isGood ? 'var(--g)' : 'var(--r)';
+      const pct = r.budget ? ((variance / r.budget) * 100).toFixed(1) : '0';
+      html += `<tr><td>${esc(r.category)}</td>
+        <td style="text-align:right">${_fmTbl(r.budget)}</td>
+        <td style="text-align:right${!isGood ? ';color:var(--r)' : ''}">${_fmTbl(r.actual)}</td>
+        <td style="text-align:right;color:${vColor}">${variance >= 0 ? '+' : ''}${_fmTbl(variance)}</td>
+        <td style="text-align:right;color:${vColor}">${variance >= 0 ? '+' : ''}${pct}%</td></tr>`;
+    });
+    html += '</tbody></table>';
+    el.innerHTML = html;
+  }
+
+  function _onFpBudgetFilter() {
+    _filters.month = document.getElementById('fp_bud_month')?.value || _filters.month;
+    _filters.brand = document.getElementById('fp_bud_brand')?.value || 'All';
+    _fpBudgetData = null; _loadFpBudget();
+  }
+
+  // ══════════════════════════════════════════
+  // fp_rev: REVENUE ANALYSIS
+  // ══════════════════════════════════════════
+  function renderFpRev() {
+    if (!_filters.month) _filters.month = _curMonth();
+    return {
+      tb: '<div class="tb"><div class="tb-t">Revenue Analysis</div>' +
+          '<select class="fl" id="fp_rev_month" onchange="ScrReports._onFpRevFilter()" style="width:110px">' + _monthOpts(_filters.month) + '</select>' +
+          '<select class="fl" id="fp_rev_brand" onchange="ScrReports._onFpRevFilter()" style="width:140px">' + _brandOpts(_filters.brand) + '</select></div>',
+      ct: `<div style="max-width:1000px;margin:0 auto">
+        <div id="fp_rev_content"><div class="empty" style="padding:30px"><div class="fin-spinner" style="margin:0 auto 8px"></div>Loading...</div></div>
+      </div>`,
+    };
+  }
+
+  async function _loadFpRev() {
+    const el = document.getElementById('fp_rev_content');
+    if (!el) return;
+    try {
+      _fpRevData = await API.getRevenueAnalysis({ month: _filters.month, brand: _filters.brand === 'All' ? null : _filters.brand });
+    } catch (e) {
+      console.warn('getRevenueAnalysis failed, using mock:', e.message);
+      _fpRevData = _mockFpRev();
+    }
+    const d = _fpRevData;
+    let html = `<div class="kpi" style="flex-wrap:nowrap">
+      <div class="kpi-c"><div class="kpi-l">Total Revenue</div><div class="kpi-v" style="color:var(--g)">${_fmK(d.total)}</div></div>
+      <div class="kpi-c"><div class="kpi-l">In-store</div><div class="kpi-v" style="color:var(--b)">${_fmK(d.instore)}</div></div>
+      <div class="kpi-c"><div class="kpi-l">Delivery</div><div class="kpi-v" style="color:var(--o)">${_fmK(d.delivery)}</div></div>
+      <div class="kpi-c"><div class="kpi-l">Other</div><div class="kpi-v" style="color:var(--acc)">${_fmK(d.other)}</div></div>
+    </div>`;
+    html += '<table class="tbl"><thead><tr><th>Channel</th><th style="text-align:right">This Month</th><th style="text-align:right">Last Month</th><th style="text-align:right">Change</th><th style="text-align:right">% of Total</th></tr></thead><tbody>';
+    (d.rows || []).forEach(r => {
+      const chg = r.prev ? (((r.amount - r.prev) / r.prev) * 100) : 0;
+      const pctTotal = d.total ? ((r.amount / d.total) * 100).toFixed(1) : '0';
+      const chgColor = chg >= 0 ? 'var(--g)' : 'var(--r)';
+      html += `<tr><td>${esc(r.channel)}</td>
+        <td style="text-align:right">${_fmTbl(r.amount)}</td>
+        <td style="text-align:right">${_fmTbl(r.prev)}</td>
+        <td style="text-align:right;color:${chgColor}${Math.abs(chg) > 20 ? ';font-weight:700' : ''}">${chg >= 0 ? '+' : ''}${chg.toFixed(1)}%</td>
+        <td style="text-align:right">${pctTotal}%</td></tr>`;
+    });
+    html += '</tbody></table>';
+    el.innerHTML = html;
+  }
+
+  function _onFpRevFilter() {
+    _filters.month = document.getElementById('fp_rev_month')?.value || _filters.month;
+    _filters.brand = document.getElementById('fp_rev_brand')?.value || 'All';
+    _fpRevData = null; _loadFpRev();
+  }
+
+  // ══════════════════════════════════════════
+  // fp_exp: EXPENSE TREND
+  // ══════════════════════════════════════════
+  function renderFpExp() {
+    if (!_filters.month) _filters.month = _curMonth();
+    return {
+      tb: '<div class="tb"><div class="tb-t">Expense Trend</div>' +
+          '<select class="fl" id="fp_exp_month" onchange="ScrReports._onFpExpFilter()" style="width:110px">' + _monthOpts(_filters.month) + '</select>' +
+          '<select class="fl" id="fp_exp_brand" onchange="ScrReports._onFpExpFilter()" style="width:140px">' + _brandOpts(_filters.brand) + '</select></div>',
+      ct: `<div style="max-width:1000px;margin:0 auto">
+        <div id="fp_exp_content"><div class="empty" style="padding:30px"><div class="fin-spinner" style="margin:0 auto 8px"></div>Loading...</div></div>
+      </div>`,
+    };
+  }
+
+  async function _loadFpExp() {
+    const el = document.getElementById('fp_exp_content');
+    if (!el) return;
+    try {
+      _fpExpData = await API.getExpenseTrend({ month: _filters.month, brand: _filters.brand === 'All' ? null : _filters.brand });
+    } catch (e) {
+      console.warn('getExpenseTrend failed, using mock:', e.message);
+      _fpExpData = _mockFpExp();
+    }
+    const d = _fpExpData;
+    const momChg = d.prev_total ? (((d.total - d.prev_total) / d.prev_total) * 100).toFixed(0) : '0';
+    const largest = (d.rows || []).reduce((b, c) => (c.amount || 0) > (b.amount || 0) ? c : b, { amount: 0 });
+
+    let html = `<div class="kpi" style="flex-wrap:nowrap">
+      <div class="kpi-c"><div class="kpi-l">Total Overheads</div><div class="kpi-v" style="color:var(--r)">${_fmK(d.total)}</div></div>
+      <div class="kpi-c"><div class="kpi-l">MoM Change</div><div class="kpi-v" style="color:var(--o)">${Number(momChg) >= 0 ? '+' : ''}${momChg}%</div></div>
+      <div class="kpi-c"><div class="kpi-l">Largest: ${esc(largest.category || '')}</div><div class="kpi-v">${_fmK(largest.amount)}</div></div>
+    </div>`;
+    html += '<table class="tbl"><thead><tr><th>Category</th><th style="text-align:right">This Month</th><th style="text-align:right">Last Month</th><th style="text-align:right">Change</th><th style="text-align:right">% of Revenue</th></tr></thead><tbody>';
+    (d.rows || []).forEach(r => {
+      const chg = r.prev ? (((r.amount - r.prev) / r.prev) * 100) : 0;
+      const revPct = d.revenue ? ((r.amount / d.revenue) * 100).toFixed(1) : '0';
+      const chgColor = Math.abs(chg) > 5 ? (chg > 0 ? 'var(--r)' : 'var(--g)') : ''; // expense increase = bad
+      html += `<tr><td>${esc(r.category)}</td>
+        <td style="text-align:right">${_fmTbl(r.amount)}</td>
+        <td style="text-align:right">${_fmTbl(r.prev)}</td>
+        <td style="text-align:right${chgColor ? ';color:' + chgColor : ''}">${chg >= 0 ? '+' : ''}${chg.toFixed(1)}%</td>
+        <td style="text-align:right${Number(revPct) > 30 ? ';color:var(--r)' : ''}">${revPct}%</td></tr>`;
+    });
+    html += '</tbody></table>';
+    el.innerHTML = html;
+  }
+
+  function _onFpExpFilter() {
+    _filters.month = document.getElementById('fp_exp_month')?.value || _filters.month;
+    _filters.brand = document.getElementById('fp_exp_brand')?.value || 'All';
+    _fpExpData = null; _loadFpExp();
+  }
+
+  // ══════════════════════════════════════════
+  // MOCK DATA: E6c Performance
+  // ══════════════════════════════════════════
+  function _mockFpBrand() {
+    return {
+      brands: [
+        { name: 'Cheese', revenue: 312000, gp_pct: 61, col_pct: 41, net: 125000, rev_chg: 5 },
+        { name: 'Flying', revenue: 87000, gp_pct: 43, col_pct: 51, net: -160000, rev_chg: -8 },
+        { name: 'Issho', revenue: 332000, gp_pct: 73, col_pct: 28, net: 312000, rev_chg: 12 },
+        { name: 'Mango', revenue: 605000, gp_pct: 72, col_pct: 35, net: -57000, rev_chg: 3 },
+        { name: 'Redwork', revenue: 231000, gp_pct: 58, col_pct: 38, net: 18000, rev_chg: 0 },
+        { name: 'SPG', revenue: 197000, gp_pct: 82, col_pct: 15, net: 27000, rev_chg: 2 },
+      ],
+      totals: { revenue: 1764000, gp_pct: 65, col_pct: 33, net: 264000 },
+    };
+  }
+
+  function _mockFpBudget() {
+    return {
+      actual_rev: 604695, budget_rev: 580000,
+      rows: [
+        { category: 'Revenue', budget: 580000, actual: 604695 },
+        { category: 'COGS', budget: 174000, actual: 170675 },
+        { category: 'Wages', budget: 174000, actual: 214162 },
+        { category: 'Rent', budget: 67000, actual: 67449 },
+      ],
+    };
+  }
+
+  function _mockFpRev() {
+    return {
+      total: 604695, instore: 342000, delivery: 156000, other: 106695,
+      rows: [
+        { channel: 'Eftpos 1+2', amount: 457189, prev: 450853 },
+        { channel: 'Cash', amount: 118285, prev: 99461 },
+        { channel: 'UberEats', amount: 19576, prev: 25140 },
+        { channel: 'Easi', amount: 8360, prev: 23842 },
+      ],
+    };
+  }
+
+  function _mockFpExp() {
+    return {
+      total: 147000, prev_total: 131000, revenue: 604695,
+      rows: [
+        { category: 'Rent', amount: 67449, prev: 67095 },
+        { category: 'Wages', amount: 214162, prev: 213740 },
+        { category: 'Utilities', amount: 4355, prev: 4191 },
+        { category: 'Admin & Office', amount: 46217, prev: 42424 },
+      ],
+    };
+  }
+
+  // ══════════════════════════════════════════
   // REGISTER ROUTES
   // ══════════════════════════════════════════
   App.registerRoutes({
@@ -1347,6 +1638,10 @@
     rp_bank:      { render: renderBank,          onLoad: _loadBank },
     rp_cash:      { render: renderCash,          onLoad: _loadCash },
     rp_loan:      { render: renderLoan,          onLoad: _loadLoan },
+    fp_brand:     { render: renderFpBrand,       onLoad: _loadFpBrand },
+    fp_budget:    { render: renderFpBudget,      onLoad: _loadFpBudget },
+    fp_rev:       { render: renderFpRev,         onLoad: _loadFpRev },
+    fp_exp:       { render: renderFpExp,         onLoad: _loadFpExp },
   });
 
   // ══════════════════════════════════════════
@@ -1365,6 +1660,10 @@
     _onBankFilter,
     _onCashFilter,
     _loanTab: _loanTabSwitch,
+    _onFpBrandFilter,
+    _onFpBudgetFilter,
+    _onFpRevFilter,
+    _onFpExpFilter,
     _exportPdf,
     _exportCsv,
   };

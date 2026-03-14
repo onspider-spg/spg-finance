@@ -1,4 +1,4 @@
-/** Version 1.9.8.1 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 1.9.9 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — app_fin.js
@@ -16,6 +16,7 @@
  *   App.hideLoader()      — hide loading spinner
  *   App.showDialog(opt)   — show confirm/alert dialog (replaces native confirm())
  *   App.statusBadge(s)    — return HTML for status badge
+ *   App._hardRefresh()    — clear all memory → re-init (like fresh open)
  *   --- internal ---
  *   _buildTopbar()        — render topbar
  *   _buildSidebar()       — render full sidebar nav
@@ -282,7 +283,7 @@ const App = (() => {
     el.innerHTML = `
       <div class="gt-logo" onclick="App.go('dashboard')">SPG Finance</div>
       <div class="gt-r">
-        <div class="gt-i" title="Help">?</div>
+        <div class="gt-i" title="Refresh" onclick="App._hardRefresh()" style="font-size:14px">↻</div>
         <div class="gt-i" title="Settings" onclick="App.go('st_alert')">⚙</div>
         <div class="gt-u">
           <div class="gt-av">${esc(s.avatar || 'U')}</div>
@@ -338,7 +339,7 @@ const App = (() => {
 
     // Footer
     html += `<div class="sf">
-      <div style="font-size:9px;color:var(--t4);padding:2px 0;margin-bottom:4px">v1.9.7 | 13 Mar 2026 AEDT</div>
+      <div style="font-size:9px;color:var(--t4);padding:2px 0;margin-bottom:4px">v1.9.9 | 14 Mar 2026 AEDT</div>
       <a href="https://onspider-spg.github.io/spg/#dashboard"><span style="font-size:12px">←</span><span class="sit"> Back to Home</span></a>
       <a href="https://onspider-spg.github.io/spg/#logout" class="danger"><span style="font-size:12px">→</span><span class="sit"> Log out</span></a>
     </div>`;
@@ -538,6 +539,43 @@ const App = (() => {
     return API.call ? API.call(action, body) : { success: true, data: null };
   }
 
+  /** Hard refresh — clear all memory → re-init like fresh app open */
+  async function _hardRefresh() {
+    // Clear all screen memory
+    S.brands = [];
+    S.channels = [];
+    S.bankAccounts = [];
+    S.taxCodes = [];
+    S.vendors = [];
+    S.categories = [];
+    S.vendorRules = [];
+    S._masterReady = false;
+    S._bills = null;
+    S._billDetail = null;
+    S._tx_log = null;
+    S._tx_sale = null;
+    S._tx_return = null;
+    S._sdPending = null;
+
+    toast('Refreshing...');
+    showLoader();
+
+    try {
+      // Re-init API (session + master data)
+      await API.init();
+      // Rebuild shell with fresh session
+      _buildTopbar();
+      // Re-navigate to current route (re-fetch data)
+      const current = S.route || 'dashboard';
+      S.route = ''; // force re-render
+      await go(current);
+    } catch (e) {
+      toast('Refresh failed');
+    } finally {
+      hideLoader();
+    }
+  }
+
   // ═══════════════════════════
   // BOOT
   // ═══════════════════════════
@@ -560,6 +598,7 @@ const App = (() => {
     api,
     registerRoutes,
     _toggleSidebar,
+    _hardRefresh,
     NAV,
   };
 

@@ -3,7 +3,7 @@
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_reports_fin.js
  * Reports (11) + Performance (4) + Dashboard (1) = 16 screens total
- * Lazy-loaded by app_fin.js on first visit to rp_*/fp_*/dashboard routes
+ * Lazy-loaded by app_fin.js on first visit to rp_ / fp_ / dashboard routes
  * ═══════════════════════════════════════════
  */
 

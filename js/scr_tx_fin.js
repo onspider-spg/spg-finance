@@ -1,4 +1,4 @@
-/** Version 1.5.2 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 1.6 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_tx_fin.js
@@ -6,13 +6,11 @@
  * Bill Detail, SD Bridge, Find Transactions
  * ═══════════════════════════════════════════
  *
- * CHANGED v1.4 → v1.5:
- * - Tx Log: MOCK → API.getTransactions({type:'all'}) + skeleton + onLoad
- * - Tx Sales: MOCK → API.getTransactions({type:'sale'}) + skeleton + onLoad
- * - Tx Return: MOCK → API.getTransactions({type:'return'}) + skeleton + onLoad
- * - Find Tx DC tab: MOCK → API.getDebitCredits() async load
- * - SD Bridge: MOCK → API.getSdPending() + dynamic render + onLoad
- * - Bills, Bill Detail: unchanged (already DB)
+ * CHANGED v1.5.2 → v1.6:
+ * - SD Bridge: MOCK hardcoded → API.getSdPending() + dynamic render + onLoad
+ * - SD Bridge: group by date+store, collapsible cards, real KPIs
+ * - SD Bridge: checkbox select + Sync selected calls API.syncSd()
+ * - SD Bridge: filter (All/Pending/Done), month picker
  * ═══════════════════════════════════════════
  */
 (() => {
@@ -479,54 +477,227 @@ function _bdObView() { return ''; }
 function _bdSplitView() { return ''; }
 
 // ═══════════════════════════════════════
-// 6. SD BRIDGE — still MOCK (same as v1.3.3)
+// 6. SD BRIDGE — ★ CONNECTED TO DB
 // ═══════════════════════════════════════
-function renderTxSdBridge(){return{tb:`<div class="tb"><div class="tb-t">SD Bridge</div><span style="font-size:var(--fs-xs);color:var(--t3)">Sale Daily → Finance sync</span><div style="flex:1"></div><select class="fl" style="width:140px"><option>Mango Coco</option><option>Flying Tigress</option><option>All Stores</option></select><button class="btn bo">Settings</button></div>`,
-ct:`<div style="max-width:1100px;margin:0 auto">
-<div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:12px;flex-wrap:wrap">
-<div style="display:flex;gap:3px"><button class="btn bo" style="padding:6px 16px;font-size:12px;font-weight:600;background:var(--t1);color:#fff;border-color:var(--t1)">All (4)</button><button class="btn bo" style="padding:6px 16px;font-size:12px">Pending (2)</button><button class="btn bo" style="padding:6px 16px;font-size:12px">Done (2)</button></div>
-<div style="flex:1"></div>
-<div><div class="fl-l">Month</div><input class="fl" type="month" value="2026-03" style="width:150px"></div>
-</div>
-<div class="kpi"><div class="kpi-c" style="background:#fff"><div class="kpi-v" style="color:var(--g)">$15,680</div><div class="kpi-l">Total Revenue</div></div><div class="kpi-c" style="background:#fff"><div class="kpi-v" style="color:var(--r)">$4,280</div><div class="kpi-l">Total Expenses</div></div><div class="kpi-c" style="background:#fff"><div class="kpi-v">8</div><div class="kpi-l">Pending items</div></div><div class="kpi-c" style="background:#fff"><div class="kpi-v" style="color:var(--g)">12</div><div class="kpi-l">Synced today</div></div></div>
+let _sdFilter = 'all'; // 'all', 'pending', 'synced'
+let _sdMonth = new Date().toISOString().substring(0, 7); // '2026-03'
+let _sdChecked = new Set();
 
-<div style="border:1px solid var(--bd);border-radius:10px;margin-bottom:12px;overflow:hidden;border-left:3px solid var(--o)">
-<div style="display:flex;align-items:center;padding:12px 16px;gap:10px;cursor:pointer;background:#fff">
-<span style="font-size:12px;color:var(--t3)">▸</span>
-<div style="font-size:13px;font-weight:700">13 Mar</div>
-<div style="font-size:11px;color:var(--t2);font-weight:600;background:var(--bg3);padding:2px 8px;border-radius:4px">Mango Coco</div>
-<div style="display:flex;align-items:center;gap:6px;margin-left:12px"><div style="width:80px;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden"><div style="width:40%;height:100%;background:var(--o);border-radius:3px"></div></div><span style="font-size:10px;color:var(--o);font-weight:600">2/5</span></div>
-<div style="display:flex;gap:8px;margin-left:auto"><span style="font-size:10px;padding:2px 8px;border-radius:4px;background:var(--gbg);color:var(--g)">💰 $5,230</span><span style="font-size:10px;padding:2px 8px;border-radius:4px;background:var(--rbg);color:var(--r)">📦 $1,630</span><span style="font-size:10px;padding:2px 8px;border-radius:4px;background:var(--rbg);color:var(--r);font-weight:600">⚠ 1 issue</span></div>
-</div>
-<div style="border-top:1px solid var(--bd2)">
-<div style="display:flex;align-items:center;gap:8px;padding:8px 16px;background:var(--rbg);border-bottom:1px solid rgba(220,38,38,.1);font-size:11px;color:var(--r)"><span>⚠</span><span style="flex:1">UberEats amount mismatch: SD $890 vs Bank $870 (diff $20)</span><button style="padding:4px 12px;font-size:11px;font-weight:600;border:1px solid var(--r);border-radius:var(--rd);background:#fff;color:var(--r);cursor:pointer">Fix</button></div>
-<div style="display:flex;align-items:center;padding:8px 16px;gap:10px;border-bottom:1px solid var(--bd2);font-size:12px;background:rgba(217,119,6,.03)"><input type="checkbox" style="accent-color:var(--acc)"><span style="font-size:15px;width:22px;text-align:center">💵</span><div style="flex:1"><div style="font-weight:500">In-store Cash</div><div style="font-size:10px;color:var(--t3)">POS closing 12 Mar</div></div><div style="font-weight:700;min-width:80px;text-align:right;color:var(--g)">+$2,340.50</div><div style="min-width:70px;text-align:center"><span class="sts sts-p">Pending</span></div><div style="min-width:80px;text-align:right"><a class="lk" style="font-size:11px">Review</a></div></div>
-<div style="display:flex;align-items:center;padding:8px 16px;gap:10px;border-bottom:1px solid var(--bd2);font-size:12px;background:rgba(217,119,6,.03)"><input type="checkbox" style="accent-color:var(--acc)"><span style="font-size:15px;width:22px;text-align:center">💳</span><div style="flex:1"><div style="font-weight:500">Card (Eftpos)</div><div style="font-size:10px;color:var(--t3)">Terminal batch</div></div><div style="font-weight:700;min-width:80px;text-align:right;color:var(--g)">+$1,560.00</div><div style="min-width:70px;text-align:center"><span class="sts sts-p">Pending</span></div><div style="min-width:80px;text-align:right"><a class="lk" style="font-size:11px">Review</a></div></div>
-<div style="display:flex;align-items:center;padding:8px 16px;gap:10px;border-bottom:1px solid var(--bd2);font-size:12px;background:rgba(220,38,38,.04)"><input type="checkbox" style="accent-color:var(--acc)"><span style="font-size:15px;width:22px;text-align:center">🛵</span><div style="flex:1"><div style="font-weight:500">UberEats</div><div style="font-size:10px;color:var(--r)">⚠ Amount mismatch</div></div><div style="font-weight:700;min-width:80px;text-align:right;color:var(--g)">+$890.20</div><div style="min-width:70px;text-align:center"><span class="sts sts-r">Issue</span></div><div style="min-width:80px;text-align:right"><a class="lk" style="font-size:11px;color:var(--r)">Fix</a></div></div>
-<div style="display:flex;align-items:center;padding:8px 16px;gap:10px;border-bottom:1px solid var(--bd2);font-size:12px;opacity:.7"><input type="checkbox" disabled checked style="accent-color:var(--acc)"><span style="font-size:15px;width:22px;text-align:center">📦</span><div style="flex:1"><div style="font-weight:500">Pro Bros — COGs</div></div><div style="font-weight:700;min-width:80px;text-align:right;color:var(--r)">-$1,200.00</div><div style="min-width:70px;text-align:center"><span class="sts sts-c">✓</span></div><div style="min-width:80px;text-align:right"></div></div>
-<div style="display:flex;align-items:center;padding:8px 16px;gap:10px;font-size:12px;opacity:.7"><input type="checkbox" disabled checked style="accent-color:var(--acc)"><span style="font-size:15px;width:22px;text-align:center">📦</span><div style="flex:1"><div style="font-weight:500">Woolworths — COGs</div></div><div style="font-weight:700;min-width:80px;text-align:right;color:var(--r)">-$430.00</div><div style="min-width:70px;text-align:center"><span class="sts sts-c">✓</span></div><div style="min-width:80px;text-align:right"></div></div>
-<div style="display:flex;align-items:center;padding:10px 16px;background:var(--bg2);border-top:1px solid var(--bd2);gap:8px"><div style="flex:1;font-size:10px;color:var(--t3)">2 of 5 synced</div><button class="btn bo" style="padding:6px 16px;font-size:12px">Auto-sync revenue</button><button class="bs" style="padding:6px 16px;font-size:12px">Sync selected</button></div>
-</div></div>
+function renderTxSdBridge() {
+  _sdChecked = new Set();
+  return {
+    tb: `<div class="tb"><div class="tb-t">SD Bridge</div><span style="font-size:var(--fs-xs);color:var(--t3)">Sale Daily → Finance sync</span><div style="flex:1"></div><select class="fl" style="width:150px" id="sd_month" onchange="ScrTx._sdChangeMonth()"><option value="${_sdMonth}">${_sdMonth}</option></select><button class="btn bo" onclick="App.go('st_alert')">Settings</button></div>`,
+    ct: `<div style="max-width:1100px;margin:0 auto">
+      <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:12px;flex-wrap:wrap">
+        <div style="display:flex;gap:3px" id="sd_filter_btns">
+          <button class="btn bo" style="padding:6px 16px;font-size:12px;font-weight:600;background:var(--t1);color:#fff;border-color:var(--t1)" onclick="ScrTx._sdSetFilter('all',this)">All</button>
+          <button class="btn bo" style="padding:6px 16px;font-size:12px" onclick="ScrTx._sdSetFilter('pending',this)">Pending</button>
+          <button class="btn bo" style="padding:6px 16px;font-size:12px" onclick="ScrTx._sdSetFilter('synced',this)">Done</button>
+        </div>
+        <div style="flex:1"></div>
+      </div>
+      <div class="kpi" id="sd_kpi">
+        <div class="kpi-c" style="background:#fff"><div class="kpi-v" style="color:var(--t4)">—</div><div class="kpi-l">Total Revenue</div></div>
+        <div class="kpi-c" style="background:#fff"><div class="kpi-v" style="color:var(--t4)">—</div><div class="kpi-l">Total Expenses</div></div>
+        <div class="kpi-c" style="background:#fff"><div class="kpi-v" style="color:var(--t4)">—</div><div class="kpi-l">Pending items</div></div>
+      </div>
+      <div id="sd_cards"><div style="text-align:center;padding:30px;color:var(--t3)"><div class="fin-spinner" style="margin:0 auto 8px"></div>Loading SD Bridge...</div></div>
+      <div id="sd_actions" style="display:none;display:flex;align-items:center;padding:10px 0;gap:8px">
+        <div style="flex:1;font-size:var(--fs-xs);color:var(--t3)" id="sd_sel_count">0 selected</div>
+        <button class="bs" style="padding:6px 16px;font-size:12px" onclick="ScrTx._sdSyncSelected()">Sync selected</button>
+      </div>
+    </div>`,
+  };
+}
 
-<div style="border:1px solid var(--bd);border-radius:10px;margin-bottom:12px;overflow:hidden;border-left:3px solid var(--g)">
-<div style="display:flex;align-items:center;padding:12px 16px;gap:10px;cursor:pointer;background:#fff">
-<span style="font-size:12px;color:var(--t3)">▸</span>
-<div style="font-size:13px;font-weight:700">12 Mar</div>
-<div style="font-size:11px;color:var(--t2);font-weight:600;background:var(--bg3);padding:2px 8px;border-radius:4px">Mango Coco</div>
-<div style="display:flex;align-items:center;gap:6px;margin-left:12px"><div style="width:80px;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden"><div style="width:100%;height:100%;background:var(--g);border-radius:3px"></div></div><span style="font-size:10px;color:var(--g);font-weight:600">5/5 ✓</span></div>
-<div style="display:flex;gap:8px;margin-left:auto"><span style="font-size:10px;padding:2px 8px;border-radius:4px;background:var(--gbg);color:var(--g)">💰 $4,650</span><span style="font-size:10px;padding:2px 8px;border-radius:4px;background:var(--rbg);color:var(--r)">📦 $2,000</span><span class="sts sts-c" style="font-size:10px">All synced</span></div>
-</div></div>
+async function _loadSdBridge() {
+  try {
+    const result = await API.getSdPending({ month: _sdMonth });
+    const rows = result.rows || [];
+    const kpi = result.kpi || {};
 
-<div style="border:1px solid var(--bd);border-radius:10px;margin-bottom:12px;overflow:hidden;border-left:3px solid var(--g)">
-<div style="display:flex;align-items:center;padding:12px 16px;gap:10px;cursor:pointer;background:#fff">
-<span style="font-size:12px;color:var(--t3)">▸</span>
-<div style="font-size:13px;font-weight:700">11 Mar</div>
-<div style="font-size:11px;color:var(--t2);font-weight:600;background:var(--bg3);padding:2px 8px;border-radius:4px">Flying Tigress</div>
-<div style="display:flex;align-items:center;gap:6px;margin-left:12px"><div style="width:80px;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden"><div style="width:100%;height:100%;background:var(--g);border-radius:3px"></div></div><span style="font-size:10px;color:var(--g);font-weight:600">4/4 ✓</span></div>
-<div style="display:flex;gap:8px;margin-left:auto"><span style="font-size:10px;padding:2px 8px;border-radius:4px;background:var(--gbg);color:var(--g)">💰 $2,800</span><span style="font-size:10px;padding:2px 8px;border-radius:4px;background:var(--rbg);color:var(--r)">📦 $650</span><span class="sts sts-c" style="font-size:10px">All synced</span></div>
-</div></div>
+    // Render KPI
+    const kpiEl = document.getElementById('sd_kpi');
+    if (kpiEl) {
+      const syncedCount = rows.filter(r => r.status === 'synced').length;
+      kpiEl.innerHTML = `
+        <div class="kpi-c" style="background:#fff"><div class="kpi-v" style="color:var(--g)">${fm(kpi.revenue || 0)}</div><div class="kpi-l">Total Revenue</div></div>
+        <div class="kpi-c" style="background:#fff"><div class="kpi-v" style="color:var(--r)">${fm(kpi.expenses || 0)}</div><div class="kpi-l">Total Expenses</div></div>
+        <div class="kpi-c" style="background:#fff"><div class="kpi-v">${kpi.pendingCount || 0}</div><div class="kpi-l">Pending items</div></div>
+        <div class="kpi-c" style="background:#fff"><div class="kpi-v" style="color:var(--g)">${syncedCount}</div><div class="kpi-l">Synced</div></div>`;
+    }
 
-</div>`};}
+    // Update filter button counts
+    const allCount = rows.length;
+    const pendingCount = rows.filter(r => r.status === 'pending').length;
+    const syncedCount2 = rows.filter(r => r.status === 'synced').length;
+    const btns = document.getElementById('sd_filter_btns');
+    if (btns) {
+      const btnEls = btns.querySelectorAll('button');
+      if (btnEls[0]) btnEls[0].textContent = 'All (' + allCount + ')';
+      if (btnEls[1]) btnEls[1].textContent = 'Pending (' + pendingCount + ')';
+      if (btnEls[2]) btnEls[2].textContent = 'Done (' + syncedCount2 + ')';
+    }
+
+    // Filter rows
+    let filtered = rows;
+    if (_sdFilter === 'pending') filtered = rows.filter(r => r.status === 'pending');
+    else if (_sdFilter === 'synced') filtered = rows.filter(r => r.status === 'synced');
+
+    // Group by date + store
+    const groups = {};
+    filtered.forEach(r => {
+      const key = (r.date || 'unknown') + '|' + (r.store || 'unknown');
+      if (!groups[key]) groups[key] = { date: r.date, store: r.store, items: [] };
+      groups[key].items.push(r);
+    });
+
+    const cardsEl = document.getElementById('sd_cards');
+    if (!cardsEl) return;
+
+    if (filtered.length === 0) {
+      cardsEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--t3)">No records for this period</div>';
+      return;
+    }
+
+    // Sort groups by date desc
+    const sortedGroups = Object.values(groups).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+    let html = '';
+    sortedGroups.forEach((g, gi) => {
+      const pendingItems = g.items.filter(r => r.status === 'pending');
+      const syncedItems = g.items.filter(r => r.status === 'synced');
+      const totalItems = g.items.length;
+      const syncPct = totalItems > 0 ? Math.round(syncedItems.length / totalItems * 100) : 0;
+      const allSynced = pendingItems.length === 0;
+      const borderColor = allSynced ? 'var(--g)' : 'var(--o)';
+      const barColor = allSynced ? 'var(--g)' : 'var(--o)';
+
+      const rev = g.items.filter(r => r.type === 'revenue').reduce((s, r) => s + (r.amount || 0), 0);
+      const exp = g.items.filter(r => r.type === 'expense').reduce((s, r) => s + (r.amount || 0), 0);
+
+      const fmtDate = _fmtDate(g.date);
+
+      html += `<div style="border:1px solid var(--bd);border-radius:10px;margin-bottom:12px;overflow:hidden;border-left:3px solid ${borderColor}">`;
+      // Group header
+      html += `<div style="display:flex;align-items:center;padding:12px 16px;gap:10px;cursor:pointer;background:#fff" onclick="ScrTx._sdToggleGroup(${gi})">`;
+      html += `<span style="font-size:12px;color:var(--t3)" id="sd_arr_${gi}">▸</span>`;
+      html += `<div style="font-size:13px;font-weight:700">${esc(fmtDate)}</div>`;
+      html += `<div style="font-size:11px;color:var(--t2);font-weight:600;background:var(--bg3);padding:2px 8px;border-radius:4px">${esc(g.store || '')}</div>`;
+      html += `<div style="display:flex;align-items:center;gap:6px;margin-left:12px"><div style="width:80px;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden"><div style="width:${syncPct}%;height:100%;background:${barColor};border-radius:3px"></div></div><span style="font-size:10px;color:${barColor};font-weight:600">${syncedItems.length}/${totalItems}${allSynced ? ' ✓' : ''}</span></div>`;
+      html += `<div style="display:flex;gap:8px;margin-left:auto">`;
+      if (rev > 0) html += `<span style="font-size:10px;padding:2px 8px;border-radius:4px;background:var(--gbg);color:var(--g)">💰 ${fm(rev)}</span>`;
+      if (exp > 0) html += `<span style="font-size:10px;padding:2px 8px;border-radius:4px;background:var(--rbg);color:var(--r)">📦 ${fm(exp)}</span>`;
+      if (allSynced) html += `<span class="sts sts-c" style="font-size:10px">All synced</span>`;
+      html += `</div></div>`;
+
+      // Group items (collapsed by default)
+      html += `<div id="sd_grp_${gi}" style="display:none;border-top:1px solid var(--bd2)">`;
+      g.items.forEach(r => {
+        const isPending = r.status === 'pending';
+        const isRev = r.type === 'revenue';
+        const icon = isRev ? '💰' : '📦';
+        const amtColor = isRev ? 'var(--g)' : 'var(--r)';
+        const amtSign = isRev ? '+' : '-';
+        const rowBg = isPending ? 'rgba(217,119,6,.03)' : '';
+        const rowOpacity = isPending ? '' : 'opacity:.7';
+
+        html += `<div style="display:flex;align-items:center;padding:8px 16px;gap:10px;border-bottom:1px solid var(--bd2);font-size:12px;background:${rowBg};${rowOpacity}">`;
+        if (isPending) {
+          html += `<input type="checkbox" style="accent-color:var(--acc)" data-sdid="${esc(r.id)}" onchange="ScrTx._sdCheckToggle(this)">`;
+        } else {
+          html += `<input type="checkbox" disabled checked style="accent-color:var(--acc)">`;
+        }
+        html += `<span style="font-size:15px;width:22px;text-align:center">${icon}</span>`;
+        html += `<div style="flex:1"><div style="font-weight:500">${esc(r.channel || r.type)}</div></div>`;
+        html += `<div style="font-weight:700;min-width:80px;text-align:right;color:${amtColor}">${amtSign}${fm(Math.abs(r.amount || 0))}</div>`;
+        html += `<div style="min-width:70px;text-align:center">${isPending ? '<span class="sts sts-p">Pending</span>' : '<span class="sts sts-c">✓</span>'}</div>`;
+        html += `</div>`;
+      });
+
+      // Group footer — sync buttons (only if has pending)
+      if (pendingItems.length > 0) {
+        html += `<div style="display:flex;align-items:center;padding:10px 16px;background:var(--bg2);border-top:1px solid var(--bd2);gap:8px">`;
+        html += `<div style="flex:1;font-size:10px;color:var(--t3)">${syncedItems.length} of ${totalItems} synced</div>`;
+        html += `<button class="bs" style="padding:6px 16px;font-size:12px" onclick="ScrTx._sdSyncSelected()">Sync selected</button>`;
+        html += `</div>`;
+      }
+      html += `</div></div>`;
+    });
+
+    cardsEl.innerHTML = html;
+
+    // Show/hide bottom actions
+    _sdUpdateSelCount();
+
+  } catch (e) {
+    const cardsEl = document.getElementById('sd_cards');
+    if (cardsEl) cardsEl.innerHTML = `<div style="text-align:center;padding:30px;color:var(--r)">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+function _sdToggleGroup(idx) {
+  const el = document.getElementById('sd_grp_' + idx);
+  const arr = document.getElementById('sd_arr_' + idx);
+  if (!el) return;
+  const show = el.style.display === 'none';
+  el.style.display = show ? 'block' : 'none';
+  if (arr) arr.textContent = show ? '▾' : '▸';
+}
+
+function _sdSetFilter(f, btn) {
+  _sdFilter = f;
+  // Highlight button
+  if (btn) {
+    btn.parentElement.querySelectorAll('button').forEach(b => {
+      b.style.background = '#fff'; b.style.color = 'var(--t2)'; b.style.borderColor = 'var(--bd)';
+    });
+    btn.style.background = 'var(--t1)'; btn.style.color = '#fff'; btn.style.borderColor = 'var(--t1)';
+  }
+  _loadSdBridge();
+}
+
+function _sdChangeMonth() {
+  const el = document.getElementById('sd_month');
+  if (el) _sdMonth = el.value;
+  _sdChecked = new Set();
+  _loadSdBridge();
+}
+
+function _sdCheckToggle(cb) {
+  const id = cb.dataset.sdid;
+  if (cb.checked) _sdChecked.add(id);
+  else _sdChecked.delete(id);
+  _sdUpdateSelCount();
+}
+
+function _sdUpdateSelCount() {
+  const el = document.getElementById('sd_sel_count');
+  const actEl = document.getElementById('sd_actions');
+  if (el) el.textContent = _sdChecked.size + ' selected';
+  if (actEl) actEl.style.display = _sdChecked.size > 0 ? 'flex' : 'none';
+}
+
+async function _sdSyncSelected() {
+  if (_sdChecked.size === 0) { App.toast('Please select records to sync'); return; }
+  const ids = Array.from(_sdChecked);
+
+  // Disable buttons during sync
+  const btns = document.querySelectorAll('#sd_cards .bs, #sd_actions .bs');
+  btns.forEach(b => { b.disabled = true; b.textContent = 'Syncing...'; });
+
+  try {
+    const result = await API.syncSd(ids);
+    App.toast('Synced ' + (result.synced || ids.length) + ' records');
+    _sdChecked = new Set();
+    // Reload to reflect new state
+    await _loadSdBridge();
+  } catch (e) {
+    App.toast('Sync failed: ' + e.message);
+  } finally {
+    btns.forEach(b => { b.disabled = false; b.textContent = 'Sync selected'; });
+  }
+}
 
 // ═══════════════════════════════════════
 // 7. FIND TRANSACTIONS — ★ CONNECTED TO DB (DC tab)
@@ -590,7 +761,7 @@ App.registerRoutes({
   tx_bill:        { render: renderTxBill, onLoad: _loadBills },
   tx_return:      { render: renderTxReturn, onLoad: _loadReturns },
   tx_bill_detail: { render: renderTxBillDetail },
-  tx_sd:          { render: renderTxSdBridge },
+  tx_sd:          { render: renderTxSdBridge, onLoad: _loadSdBridge },
   tx_find:        { render: renderTxFind, onLoad: _loadFind },
 });
 
@@ -604,6 +775,11 @@ window.ScrTx = {
   _sortTable,
   _openBillDetail,
   _loadMoreBills,
+  _sdToggleGroup,
+  _sdSetFilter,
+  _sdChangeMonth,
+  _sdCheckToggle,
+  _sdSyncSelected,
 };
 
 })();

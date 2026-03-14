@@ -1,4 +1,4 @@
-/** Version 1.0 | 14 MAR 2026 | Siam Palette Group */
+/** Version 1.0.1 | 14 MAR 2026 | Siam Palette Group */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_accounting_fin.js
@@ -44,6 +44,19 @@
     'Equity': 'Equity', 'Income': 'Income', 'Cost of sales': 'Cost of Sales',
     'Expense': 'Expense', 'Other income': 'Other Income', 'Other expense': 'Other Expense',
   };
+
+  /** Infer account_type from transaction_type for old records that don't have account_type set */
+  function _inferAccountType(txType) {
+    if (!txType) return '';
+    const map = {
+      'Income': 'Income', 'Expense': 'Expense', 'Asset Purchase': 'Fixed asset',
+      'Transfer': 'Bank', 'Loan': 'Long term liability',
+      'Asset': 'Other current asset', 'Liability': 'Other current liability',
+      'Equity': 'Equity', 'Cost of Sales': 'Cost of sales',
+      'Other Income': 'Other income', 'Other Expense': 'Other expense',
+    };
+    return map[txType] || '';
+  }
 
   // Tab filter options
   const COA_TABS = ['All', 'Asset', 'Liability', 'Equity', 'Income', 'Cost of Sales', 'Expense', 'Other Income', 'Other Expense'];
@@ -247,11 +260,14 @@
   function _categoryForm(cat) {
     const isEdit = !!cat;
     const c = cat || {};
-    const isBank = (c.account_type === 'Bank');
 
-    // Category type options
+    // Resolve account_type: use stored value, or infer from transaction_type for old records
+    const resolvedAccountType = c.account_type || _inferAccountType(c.transaction_type) || '';
+    const isBank = (resolvedAccountType === 'Bank');
+
+    // Category type options — match resolved type
     const typeOpts = CAT_TYPES.map(t =>
-      `<option value="${t}"${t === c.account_type ? ' selected' : ''}>${t}</option>`
+      `<option value="${t}"${t === resolvedAccountType ? ' selected' : ''}>${t}</option>`
     ).join('');
 
     // Tax code options
@@ -264,7 +280,7 @@
     const infoBar = isEdit ? `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--bg3);border-radius:var(--rd);margin-bottom:14px"><div><div style="font-size:var(--fs-xs);font-weight:600">Linked category for</div><div style="font-size:var(--fs-xs);color:var(--t3)">${c.is_linked ? esc(c.linked_description || 'Linked') : '—'}</div></div><div style="text-align:right"><div style="font-size:var(--fs-xs);font-weight:600">Current balance</div><div style="font-size:var(--fs-h1);font-weight:700">${fm(c.current_balance || 0)}</div></div></div>` : '';
 
     // Classification (auto from type)
-    const classDisplay = c.account_type ? (TYPE_TO_CLASS[c.account_type] || '—') : '—';
+    const classDisplay = resolvedAccountType ? (TYPE_TO_CLASS[resolvedAccountType] || c.transaction_type || '—') : (c.transaction_type || '—');
 
     // Form row helper
     const frow = (label, req, content) =>
@@ -330,11 +346,27 @@
   }
 
   function _onCreateLoad() {
-    _populateParentHeaders();
+    // Ensure COA data is available for parent header dropdown
+    if (_coaRows.length === 0) {
+      API.getCoa({ show_inactive: false }).then(res => {
+        _coaRows = res.rows || [];
+        _populateParentHeaders();
+      });
+    } else {
+      _populateParentHeaders();
+    }
   }
 
   function _onEditLoad() {
-    _populateParentHeaders();
+    // Ensure COA data is available for parent header dropdown
+    if (_coaRows.length === 0) {
+      API.getCoa({ show_inactive: false }).then(res => {
+        _coaRows = res.rows || [];
+        _populateParentHeaders();
+      });
+    } else {
+      _populateParentHeaders();
+    }
   }
 
   function _onTypeChange(val) {
@@ -344,7 +376,7 @@
     _populateParentHeaders();
   }
 
-  /** Populate parent header dropdown from existing Level 1 categories */
+  /** Populate parent header dropdown from existing categories */
   function _populateParentHeaders() {
     const sel = document.getElementById('cat_parent');
     if (!sel) return;
@@ -352,18 +384,48 @@
     const selectedType = typeEl ? typeEl.value : '';
     const classification = TYPE_TO_CLASS[selectedType] || '';
 
-    // Find Level 1 headers that match this classification
-    const headers = _coaRows.filter(r => r.level === 1 && r.transaction_type === classification);
+    // Strategy: find Level 1 headers first, fallback to unique main_categories
+    let headers = _coaRows.filter(r => r.level === 1 && r.transaction_type === classification);
+
+    // Fallback: if no Level 1 headers, collect unique main_category values for this classification
+    if (headers.length === 0 && classification) {
+      const matchingRows = _coaRows.filter(r => {
+        // Match by transaction_type OR by inferred classification
+        const rowClass = TYPE_TO_CLASS[r.account_type] || r.transaction_type || '';
+        return rowClass === classification || r.transaction_type === classification;
+      });
+      const seen = new Set();
+      headers = [];
+      matchingRows.forEach(r => {
+        if (r.main_category && !seen.has(r.main_category)) {
+          seen.add(r.main_category);
+          headers.push({ sub_category: r.main_category });
+        }
+      });
+    }
 
     let opts = '<option value="">Select an option</option>';
+    const editMain = _editingCat ? _editingCat.main_category : '';
     if (headers.length > 0) {
       headers.forEach(h => {
-        const selected = _editingCat && _editingCat.main_category === h.sub_category ? ' selected' : '';
-        opts += `<option value="${esc(h.sub_category)}"${selected}>${esc(h.sub_category)}</option>`;
+        const label = h.sub_category || h.main_category || '';
+        const selected = label === editMain ? ' selected' : '';
+        opts += `<option value="${esc(label)}"${selected}>${esc(label)}</option>`;
       });
+      // If editing and current main_category not in list, add it
+      if (editMain && !headers.some(h => (h.sub_category || h.main_category) === editMain)) {
+        opts += `<option value="${esc(editMain)}" selected>${esc(editMain)}</option>`;
+      }
     } else if (classification) {
-      // No headers yet — offer the classification as default
-      opts += `<option value="${esc(classification)}" selected>${esc(classification)}</option>`;
+      // No headers at all — offer the classification as default
+      const selected = editMain === classification || !editMain ? ' selected' : '';
+      opts += `<option value="${esc(classification)}"${selected}>${esc(classification)}</option>`;
+      if (editMain && editMain !== classification) {
+        opts += `<option value="${esc(editMain)}" selected>${esc(editMain)}</option>`;
+      }
+    } else if (editMain) {
+      // No classification resolved — just show current value
+      opts += `<option value="${esc(editMain)}" selected>${esc(editMain)}</option>`;
     }
     sel.innerHTML = opts;
   }

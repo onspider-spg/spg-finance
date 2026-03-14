@@ -1,4 +1,4 @@
-/** Version 1.5.5 | 14 MAR 2026 | Siam Palette Group | Created 13 MAR 2026 */
+/** Version 1.5.6 | 15 MAR 2026 | Siam Palette Group | Created 13 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — api_fin.js
@@ -773,6 +773,14 @@ const API = (() => {
     confirmMatch: (data) => _call('fin_confirm_match', data),
     getCashRecon: (filters) => _call('fin_get_cash_recon', filters || {}),
     recordCashCollection: (data) => _call('fin_record_cash_collection', data),
+    // E6a: Payroll — thin wrappers using _call
+    getPayRuns: (filters) => _call('fin_get_pay_runs', filters || {}),
+    createPayRun: (data) => _call('fin_create_pay_run', data),
+    importPayRun: (data) => _call('fin_import_pay_run', data),
+    getPayRunDetail: (data) => _call('fin_get_pay_run_detail', data),
+    approvePayRun: (data) => _call('fin_approve_pay_run', data),
+    markPayRunPaid: (data) => _call('fin_mark_pay_run_paid', data),
+    getNextPayRunNo: () => _call('fin_get_next_pay_run_no', {}),
   };
 
 })();

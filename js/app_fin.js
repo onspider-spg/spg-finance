@@ -1,4 +1,4 @@
-/** Version 2.5.3 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 2.5.4 | 15 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — app_fin.js
@@ -205,6 +205,11 @@ const App = (() => {
     // Reconciliation screens (E5c)
     rc_stmt: 'js/scr_reconcile_fin.js', rc_cash: 'js/scr_reconcile_fin.js',
     rc_bank: 'js/scr_reconcile_fin.js',
+    // Payroll screens (E6a)
+    pr_runs: 'js/scr_payroll_fin.js', pr_create_s1: 'js/scr_payroll_fin.js',
+    pr_create_s2: 'js/scr_payroll_fin.js', pr_create_s3: 'js/scr_payroll_fin.js',
+    pr_detail: 'js/scr_payroll_fin.js', pr_emp: 'js/scr_payroll_fin.js',
+    pr_emp_detail: 'js/scr_payroll_fin.js',
   };
 
   // ═══════════════════════════

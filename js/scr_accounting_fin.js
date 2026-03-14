@@ -1,20 +1,19 @@
-/** Version 1.8 | 14 MAR 2026 | Siam Palette Group */
+/** Version 2.0 | 14 MAR 2026 | Siam Palette Group */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_accounting_fin.js
  * Accounting screens: COA, Tax, Bank Rules, Banking Hub,
- * Bank Map, Linked Categories
+ * Bank Map, Linked Categories, Loans & Finance
  * ═══════════════════════════════════════════
  *
  * SCREENS:
- *   ac_coa        — Categories (Chart of Accounts) full list
- *   ac_coa_create — Create Category form
- *   ac_coa_edit   — Edit Category form
- *   ac_tax        — Tax Codes list + inline edit
- *   ac_rules      — Bank Rules list + Create/Edit modal (E3a)
- *   ac_hub        — Banking Hub — accounts + balance overview (E3a)
- *   ac_map        — Bank Mapping — 3 tabs (E3b)
+ *   ac_coa/create/edit — Categories CRUD
+ *   ac_tax        — Tax Codes
+ *   ac_rules      — Bank Rules (E3a)
+ *   ac_hub        — Banking Hub (E3a)
+ *   ac_map        — Bank Mapping 3 tabs (E3b)
  *   ac_linked     — Linked Categories (E3b)
+ *   ac_loan       — Loans & Finance 4 tabs + KPIs (E3c)
  * ═══════════════════════════════════════════
  */
 
@@ -1214,6 +1213,345 @@
   }
 
   // ══════════════════════════════════════════
+  // 9. LOANS & FINANCE (ac_loan) — 4 tabs ★ E3c
+  // ══════════════════════════════════════════
+
+  let _lnData = null;   // full dashboard data
+  let _lnTab = 'external';
+  let _lnSaving = false;
+
+  function _lnTabs(active) {
+    const tabs = [
+      { id: 'external', label: 'External Loans' },
+      { id: 'interco', label: 'Intercompany' },
+      { id: 'capital', label: 'Investment & Capital' },
+      { id: 'dividend', label: 'Dividends' },
+    ];
+    return '<div class="tabs" id="ln_tabs" style="margin-bottom:12px">'
+      + tabs.map(t => `<div class="tab${t.id === active ? ' a' : ''}" onclick="ScrAccounting._lnSetTab('${t.id}')">${esc(t.label)}</div>`).join('')
+      + '</div>';
+  }
+
+  function renderLoans() {
+    _lnTab = 'external';
+    return {
+      tb: `<div class="tb"><div class="tb-t">Loans and Finance</div><div style="display:flex;gap:6px"><button class="btn bo" onclick="ScrAccounting._lnRepayModal()">+ Record Repayment</button><button class="btn bo" onclick="ScrAccounting._lnEquityModal('capital_in')">+ Equity Transaction</button><button class="bs" onclick="ScrAccounting._lnNewLoanModal()">+ Record New Loan</button></div></div>`,
+      ct: `<div style="max-width:1100px;margin:0 auto"><div id="ln_kpis"></div><div id="ln_tabs_wrap">${_lnTabs('external')}</div><div id="ln_content">${_skeleton(1).replace('<tr><td', '<div style="text-align:center;padding:40px;color:var(--t3)"><div class="fin-spinner" style="margin:0 auto 8px"></div>').replace('</td></tr>', '</div>')}</div></div>`,
+    };
+  }
+
+  async function _lnLoad() {
+    try {
+      _lnData = await API.call('fin_get_loans_dashboard', {});
+      _lnRenderKpis();
+      const tabsEl = document.getElementById('ln_tabs_wrap');
+      if (tabsEl) tabsEl.innerHTML = _lnTabs(_lnTab);
+      _lnRenderTab();
+    } catch (e) {
+      const el = document.getElementById('ln_content');
+      if (el) el.innerHTML = `<div style="padding:20px;color:var(--r)">Error: ${esc(e.message)}</div>`;
+    }
+  }
+
+  function _lnRenderKpis() {
+    const el = document.getElementById('ln_kpis');
+    if (!el || !_lnData) return;
+    const k = _lnData.kpis || {};
+    el.innerHTML = `<div class="kpi" style="flex-wrap:nowrap;margin-bottom:14px">
+      <div class="kpi-c" style="border-top:3px solid var(--r)"><div class="kpi-v" style="color:var(--r)">${fm(k.loans_outstanding)}</div><div class="kpi-l">Loans Outstanding</div></div>
+      <div class="kpi-c" style="border-top:3px solid var(--o)"><div class="kpi-v" style="color:var(--o)">${fm(k.interco_owing)}</div><div class="kpi-l">Intercompany Owing</div></div>
+      <div class="kpi-c" style="border-top:3px solid var(--acc)"><div class="kpi-v" style="color:var(--acc)">${fm(k.capital_invested)}</div><div class="kpi-l">Total Capital Invested</div></div>
+      <div class="kpi-c" style="border-top:3px solid var(--b)"><div class="kpi-v" style="color:var(--b)">${fm(k.dividends_paid_ytd)}</div><div class="kpi-l">Dividends Paid (YTD)</div></div>
+      <div class="kpi-c" style="border-top:3px solid var(--g)"><div class="kpi-v" style="color:var(--g)">${fm(k.retained_earnings)}</div><div class="kpi-l">Retained Earnings</div></div>
+    </div>`;
+  }
+
+  function _lnSetTab(tab) { _lnTab = tab; const tabsEl = document.getElementById('ln_tabs_wrap'); if (tabsEl) tabsEl.innerHTML = _lnTabs(tab); _lnRenderTab(); }
+
+  function _lnRenderTab() {
+    const el = document.getElementById('ln_content');
+    if (!el || !_lnData) return;
+    if (_lnTab === 'external') _lnRenderExternal(el);
+    else if (_lnTab === 'interco') _lnRenderInterco(el);
+    else if (_lnTab === 'capital') _lnRenderCapital(el);
+    else if (_lnTab === 'dividend') _lnRenderDividend(el);
+  }
+
+  // ── Tab 1: External Loans ──
+  function _lnRenderExternal(el) {
+    const loans = _lnData.loans || [];
+    if (loans.length === 0) {
+      el.innerHTML = '<div class="empty" style="padding:40px">No loans recorded yet. Click "+ Record New Loan" to add one.</div>';
+      return;
+    }
+    el.innerHTML = loans.map((l, idx) => {
+      const repaid = Number(l.original_amount) - Number(l.outstanding_amount);
+      const pct = l.original_amount > 0 ? Math.round((repaid / l.original_amount) * 100) : 0;
+      const borderColor = l.loan_type === 'bank_loan' ? 'var(--o)' : l.loan_type === 'director_loan' ? 'var(--acc)' : 'var(--b)';
+      const typeLabel = l.loan_type === 'bank_loan' ? 'Bank Loan' : l.loan_type === 'director_loan' ? 'Director Loan' : 'Equipment';
+      const typeCls = l.loan_type === 'bank_loan' ? 'sts-b' : l.loan_type === 'director_loan' ? 'sts-p' : '';
+      const statusCls = l.status === 'active' ? 'sts-o' : 'sts-c';
+      const dim = l.status === 'paid_off' ? 'opacity:.7' : '';
+
+      // Repayment history
+      const reps = l.repayments || [];
+      const repHtml = reps.length > 0 ? `<div style="font-size:var(--fs-sm);font-weight:700;margin:12px 0 6px">Repayment History</div>
+        <table class="tbl"><thead><tr><th>Date</th><th>Reference</th><th style="text-align:right">Principal</th><th style="text-align:right">Interest</th><th style="text-align:right">Total</th></tr></thead><tbody>
+        ${reps.slice(0, 5).map(r => `<tr><td>${App.formatDateFull(r.payment_date)}</td><td>${esc(r.reference || '—')}</td><td style="text-align:right">${fm(r.principal_amount)}</td><td style="text-align:right;color:var(--t3)">${fm(r.interest_amount)}</td><td style="text-align:right;font-weight:600">${fm(r.total_amount)}</td></tr>`).join('')}
+        ${reps.length > 5 ? `<tr><td colspan="5" style="font-size:var(--fs-xxs);color:var(--t3)">... ${reps.length - 5} earlier payments</td></tr>` : ''}
+        </tbody></table>
+        <div style="display:flex;gap:6px;margin-top:10px;justify-content:flex-end"><button class="btn bo" onclick="ScrAccounting._lnEditLoan('${l.id}')">Edit Loan</button><button class="bs" onclick="ScrAccounting._lnRepayModal('${l.id}')">Record Repayment</button></div>` : '';
+
+      return `<div class="card" style="border-left:4px solid ${borderColor};${dim};cursor:pointer" onclick="var d=document.getElementById('lnd_${idx}');if(d)d.style.display=d.style.display==='none'?'block':'none'">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span style="font-size:14px;font-weight:700">${esc(l.loan_name)}</span><span class="sts ${statusCls}">${l.status === 'active' ? 'Active' : 'Paid off'}</span><span class="sts ${typeCls}">${typeLabel}</span></div>
+            <div style="font-size:var(--fs-xs);color:var(--t3)">Lender: ${esc(l.lender)} · ${l.account_number ? 'Account: ' + esc(l.account_number) + ' · ' : ''}${l.brand_id ? 'Brand: ' + esc(l.brand_id) : ''}</div>
+            ${l.purpose ? `<div style="font-size:var(--fs-xs);color:var(--t3);margin-top:2px">Purpose: ${esc(l.purpose)} · Start: ${App.formatDateFull(l.start_date)}${l.term_months ? ' · Term: ' + Math.floor(l.term_months / 12) + ' yrs' : ''}</div>` : ''}
+          </div>
+          <div style="text-align:right"><div style="font-size:22px;font-weight:800;color:${l.status === 'paid_off' ? 'var(--g)' : 'var(--r)'}">${fm(l.outstanding_amount)}</div><div style="font-size:var(--fs-xxs);color:var(--t3)">outstanding of ${fm(l.original_amount)}</div></div>
+        </div>
+        <div style="margin-top:8px"><div style="display:flex;justify-content:space-between;font-size:var(--fs-xxs);color:var(--t3);margin-bottom:3px"><span>Repaid ${pct}%</span><span>${fm(repaid)} of ${fm(l.original_amount)}</span></div><div style="height:6px;background:var(--bd2);border-radius:3px;overflow:hidden"><div style="width:${pct}%;height:100%;background:var(--g);border-radius:3px"></div></div></div>
+        <div style="display:flex;gap:16px;margin-top:10px;font-size:var(--fs-xs)">
+          ${l.interest_rate ? `<div><span style="color:var(--t3)">Interest:</span> <b>${l.interest_rate}% p.a.</b></div>` : ''}
+          ${l.monthly_repayment ? `<div><span style="color:var(--t3)">Monthly:</span> <b>${fm(l.monthly_repayment)}</b></div>` : ''}
+          ${l.next_due_date ? `<div><span style="color:var(--t3)">Next due:</span> <b style="color:var(--o)">${App.formatDateFull(l.next_due_date)}</b></div>` : ''}
+        </div>
+      </div>
+      <div id="lnd_${idx}" style="display:none"><div class="card" style="border:1.5px solid var(--acc);margin-top:-10px;border-radius:0 0 10px 10px">${repHtml || '<div style="font-size:var(--fs-xs);color:var(--t3);padding:8px">No repayments recorded yet</div>'}</div></div>`;
+    }).join('');
+  }
+
+  // ── Tab 2: Intercompany ──
+  function _lnRenderInterco(el) {
+    const rows = (_lnData.intercompany || []).filter(i => !i.is_settled);
+    const settled = (_lnData.intercompany || []).filter(i => i.is_settled);
+
+    // Build matrix from intercompany data
+    const entities = new Set();
+    rows.forEach(r => { entities.add(r.debtor_entity); entities.add(r.creditor_entity); });
+    settled.forEach(r => { entities.add(r.debtor_entity); entities.add(r.creditor_entity); });
+    const brands = [...entities].sort();
+
+    // Owing matrix
+    const matrix = {};
+    brands.forEach(b => { matrix[b] = {}; brands.forEach(b2 => { matrix[b][b2] = 0; }); });
+    rows.forEach(r => { matrix[r.debtor_entity][r.creditor_entity] += Number(r.amount); });
+
+    if (brands.length === 0) {
+      el.innerHTML = '<div class="empty" style="padding:40px">No intercompany transactions yet. These are auto-generated from On Behalf / Split bills.</div>';
+      return;
+    }
+
+    // Matrix table
+    let html = `<div style="font-size:var(--fs-xs);color:var(--t3);margin-bottom:10px">Auto-generated from On Behalf / Split bills · Rows owe columns</div>
+      <div class="card" style="padding:0;overflow:hidden;margin-bottom:12px"><table class="tbl" style="text-align:center"><thead><tr><th style="text-align:left">Owes →</th>${brands.map(b => `<th>${esc(b)}</th>`).join('')}<th style="background:var(--rbg);color:var(--r)">Total Owing</th></tr></thead><tbody>`;
+
+    brands.forEach(debtor => {
+      const totalOwing = brands.reduce((s, creditor) => s + (debtor !== creditor ? matrix[debtor][creditor] : 0), 0);
+      html += `<tr><td style="text-align:left;font-weight:700">${esc(debtor)}</td>`;
+      brands.forEach(creditor => {
+        if (debtor === creditor) html += `<td style="background:var(--bg3);color:var(--t4)">—</td>`;
+        else { const v = matrix[debtor][creditor]; html += `<td style="${v > 0 ? 'font-weight:700;color:var(--r)' : 'color:var(--t4)'}">${v > 0 ? fm(v) : '$0'}</td>`; }
+      });
+      html += `<td style="font-weight:700;color:${totalOwing > 0 ? 'var(--r)' : 'var(--g)'}">${fm(totalOwing)}</td></tr>`;
+    });
+    html += '</tbody></table></div>';
+
+    // Unsettled transactions table
+    if (rows.length > 0) {
+      html += `<div style="font-size:var(--fs-sm);font-weight:700;margin-bottom:6px">Unsettled Transactions (${rows.length})</div>
+        <div class="card" style="padding:0;overflow:hidden"><table class="tbl"><thead><tr><th>Date</th><th>Debtor</th><th>Creditor</th><th>Source</th><th>Description</th><th style="text-align:right">Amount</th></tr></thead><tbody>
+        ${rows.map(r => {
+          const srcCls = r.source_type === 'on_behalf' ? 'sts-o' : r.source_type === 'split' ? 'sts-p' : 'sts-c';
+          return `<tr><td>${App.formatDateFull(r.created_at?.substring(0,10))}</td><td style="font-weight:600;color:var(--r)">${esc(r.debtor_entity)}</td><td style="font-weight:600;color:var(--g)">${esc(r.creditor_entity)}</td><td><span class="sts ${srcCls}" style="font-size:8px">${esc(r.source_type)}</span></td><td style="font-size:var(--fs-xs)">${esc(r.description || '')}</td><td style="text-align:right;font-weight:600">${fm(r.amount)}</td></tr>`;
+        }).join('')}
+        </tbody></table></div>`;
+    }
+
+    el.innerHTML = html;
+  }
+
+  // ── Tab 3: Investment & Capital ──
+  function _lnRenderCapital(el) {
+    const equity = _lnData.equity || [];
+    const capital = equity.filter(e => e.equity_type === 'capital_in' || e.equity_type === 'capital_out');
+    const totalInvested = capital.filter(e => e.equity_type === 'capital_in').reduce((s, e) => s + Number(e.amount), 0);
+
+    let html = '';
+    if (capital.length === 0) {
+      html = '<div class="empty" style="padding:40px">No capital transactions yet. Click "+ Equity Transaction" to record one.</div>';
+    } else {
+      html += `<div style="font-size:var(--fs-sm);font-weight:700;margin-bottom:6px">Capital Transaction History</div>
+        <div class="card" style="padding:0;overflow:hidden;margin-bottom:12px"><table class="tbl"><thead><tr><th>Date</th><th>Type</th><th>Investor</th><th>Brand</th><th>Description</th><th style="text-align:right">Amount</th><th>Ref</th></tr></thead><tbody>
+        ${capital.map(e => `<tr><td>${App.formatDateFull(e.transaction_date)}</td><td><span class="sts sts-p">${e.equity_type === 'capital_in' ? 'Capital In' : 'Capital Out'}</span></td><td style="font-weight:600">${esc(e.person_name)}</td><td>${esc(e.entity_id || '—')}</td><td style="font-size:var(--fs-xs)">${esc(e.description || '')}</td><td style="text-align:right;font-weight:600;color:${e.equity_type === 'capital_in' ? 'var(--g)' : 'var(--r)'}">${e.equity_type === 'capital_in' ? '+' : '-'}${fm(e.amount)}</td><td style="font-size:var(--fs-xs)">${esc(e.reference || '—')}</td></tr>`).join('')}
+        </tbody><tfoot><tr style="border-top:2px solid var(--bd);font-weight:700"><td colspan="5">Total Capital Invested</td><td style="text-align:right;color:var(--g)">${fm(totalInvested)}</td><td></td></tr></tfoot></table></div>`;
+    }
+    html += `<div style="display:flex;gap:6px;justify-content:flex-end"><button class="bs" onclick="ScrAccounting._lnEquityModal('capital_in')">+ Record Capital Injection</button></div>`;
+    el.innerHTML = html;
+  }
+
+  // ── Tab 4: Dividends ──
+  function _lnRenderDividend(el) {
+    const equity = _lnData.equity || [];
+    const k = _lnData.kpis || {};
+    const paid = equity.filter(e => e.equity_type === 'dividend_paid');
+    const planned = equity.filter(e => e.equity_type === 'dividend_planned');
+
+    // Summary KPIs
+    let html = `<div style="display:flex;gap:8px;margin-bottom:12px">
+      <div class="card" style="flex:1;margin:0;text-align:center;border-top:3px solid var(--b)"><div style="font-size:var(--fs-xxs);color:var(--t3)">Dividends Paid (YTD)</div><div style="font-size:20px;font-weight:700;color:var(--b)">${fm(k.dividends_paid_ytd)}</div></div>
+      <div class="card" style="flex:1;margin:0;text-align:center;border-top:3px solid var(--g)"><div style="font-size:var(--fs-xxs);color:var(--t3)">Retained Earnings</div><div style="font-size:20px;font-weight:700;color:var(--g)">${fm(k.retained_earnings)}</div></div>
+      <div class="card" style="flex:1;margin:0;text-align:center;border-top:3px solid var(--o)"><div style="font-size:var(--fs-xxs);color:var(--t3)">Planned (not yet paid)</div><div style="font-size:20px;font-weight:700;color:var(--o)">${fm(k.dividends_planned)}</div></div>
+    </div>`;
+
+    // Planned
+    if (planned.length > 0) {
+      html += `<div style="font-size:var(--fs-sm);font-weight:700;margin-bottom:6px;color:var(--o)">Planned Distributions</div>`;
+      planned.forEach(e => {
+        html += `<div class="card" style="border-left:4px solid var(--o);margin-bottom:8px"><div style="display:flex;justify-content:space-between;align-items:center"><div><div style="font-size:var(--fs-body);font-weight:700">${esc(e.description || e.period || 'Dividend')} — ${esc(e.person_name)}</div><div style="font-size:var(--fs-xs);color:var(--t3)">Planned: ${App.formatDateFull(e.transaction_date)}</div></div><div style="font-size:18px;font-weight:800;color:var(--o)">${fm(e.amount)}</div></div></div>`;
+      });
+    }
+
+    // Paid history
+    if (paid.length > 0) {
+      html += `<div style="font-size:var(--fs-sm);font-weight:700;margin-bottom:6px">Dividend History</div>
+        <div class="card" style="padding:0;overflow:hidden"><table class="tbl"><thead><tr><th>Date</th><th>Recipient</th><th>Description</th><th>Period</th><th style="text-align:right">Amount</th><th>Ref</th><th>Status</th></tr></thead><tbody>
+        ${paid.map(e => `<tr><td>${App.formatDateFull(e.transaction_date)}</td><td style="font-weight:600">${esc(e.person_name)}</td><td>${esc(e.description || '')}</td><td>${esc(e.period || '')}</td><td style="text-align:right;font-weight:600">${fm(e.amount)}</td><td style="font-size:var(--fs-xs)">${esc(e.reference || '—')}</td><td><span class="sts sts-c">Paid</span></td></tr>`).join('')}
+        </tbody></table></div>`;
+    }
+
+    html += `<div style="display:flex;gap:6px;margin-top:10px;justify-content:flex-end"><button class="bs" onclick="ScrAccounting._lnEquityModal('dividend_paid')">+ Record Dividend</button></div>`;
+    el.innerHTML = html;
+  }
+
+  // ── Modals ──
+  function _lnNewLoanModal() {
+    let bankOpts = '<option value="">— Select —</option>';
+    (App.S.bankAccounts || []).forEach(b => { bankOpts += `<option value="${b.id}">${esc(b.label)}</option>`; });
+
+    App.showDialog({
+      title: 'Record New Loan',
+      message: `<div style="text-align:left">
+        <div class="fr"><div class="fg"><label class="lb">Loan Name *</label><input class="inp" id="dlg_ln_name" placeholder="e.g. ANZ Business Loan"></div><div class="fg"><label class="lb">Lender *</label><input class="inp" id="dlg_ln_lender" placeholder="e.g. ANZ"></div></div>
+        <div class="fr"><div class="fg"><label class="lb">Type</label><select class="inp" id="dlg_ln_type"><option value="bank_loan">Bank Loan</option><option value="director_loan">Director Loan</option><option value="equipment_finance">Equipment Finance</option></select></div><div class="fg"><label class="lb">Amount *</label><input class="inp" id="dlg_ln_amt" type="number" step="0.01" placeholder="100000"></div></div>
+        <div class="fr"><div class="fg"><label class="lb">Interest Rate (%)</label><input class="inp" id="dlg_ln_rate" type="number" step="0.1" value="0"></div><div class="fg"><label class="lb">Monthly Repayment</label><input class="inp" id="dlg_ln_monthly" type="number" step="0.01"></div></div>
+        <div class="fr"><div class="fg"><label class="lb">Start Date *</label><input class="inp" id="dlg_ln_start" type="date" value="${App.today()}"></div><div class="fg"><label class="lb">Term (months)</label><input class="inp" id="dlg_ln_term" type="number" placeholder="60"></div></div>
+        <div class="fr"><div class="fg"><label class="lb">Brand</label><input class="inp" id="dlg_ln_brand" placeholder="e.g. Mango Coco"></div><div class="fg"><label class="lb">Purpose</label><input class="inp" id="dlg_ln_purpose" placeholder="e.g. Fit-out"></div></div>
+        <div class="fg"><label class="lb">Bank Account</label><select class="inp" id="dlg_ln_bank">${bankOpts}</select></div>
+      </div>`,
+      confirmText: 'Create Loan',
+      onConfirm: async () => {
+        try {
+          await API.call('fin_create_loan', {
+            loan_name: document.getElementById('dlg_ln_name')?.value?.trim(),
+            lender: document.getElementById('dlg_ln_lender')?.value?.trim(),
+            loan_type: document.getElementById('dlg_ln_type')?.value,
+            original_amount: parseFloat(document.getElementById('dlg_ln_amt')?.value) || 0,
+            interest_rate: parseFloat(document.getElementById('dlg_ln_rate')?.value) || 0,
+            monthly_repayment: parseFloat(document.getElementById('dlg_ln_monthly')?.value) || 0,
+            start_date: document.getElementById('dlg_ln_start')?.value,
+            term_months: parseInt(document.getElementById('dlg_ln_term')?.value) || null,
+            brand_id: document.getElementById('dlg_ln_brand')?.value?.trim() || null,
+            purpose: document.getElementById('dlg_ln_purpose')?.value?.trim() || null,
+            bank_account_id: document.getElementById('dlg_ln_bank')?.value || null,
+          });
+          App.toast('Loan created');
+          _lnLoad();
+        } catch (e) { App.toast(e.message || 'Create failed'); }
+      },
+    });
+  }
+
+  function _lnEditLoan(id) {
+    const loan = (_lnData.loans || []).find(l => l.id === id);
+    if (!loan) return;
+    App.showDialog({
+      title: 'Edit Loan: ' + (loan.loan_name || ''),
+      message: `<div style="text-align:left">
+        <div class="fr"><div class="fg"><label class="lb">Next Due Date</label><input class="inp" id="dlg_le_due" type="date" value="${loan.next_due_date || ''}"></div><div class="fg"><label class="lb">Monthly Repayment</label><input class="inp" id="dlg_le_monthly" type="number" step="0.01" value="${loan.monthly_repayment || 0}"></div></div>
+        <div class="fg"><label class="lb">Notes</label><input class="inp" id="dlg_le_notes" value="${esc(loan.notes || '')}"></div>
+        <div class="fg"><label class="lb">Status</label><select class="inp" id="dlg_le_status"><option value="active" ${loan.status==='active'?'selected':''}>Active</option><option value="paid_off" ${loan.status==='paid_off'?'selected':''}>Paid off</option></select></div>
+      </div>`,
+      confirmText: 'Save',
+      onConfirm: async () => {
+        try {
+          await API.call('fin_update_loan', {
+            id,
+            next_due_date: document.getElementById('dlg_le_due')?.value || null,
+            monthly_repayment: parseFloat(document.getElementById('dlg_le_monthly')?.value) || 0,
+            notes: document.getElementById('dlg_le_notes')?.value || null,
+            status: document.getElementById('dlg_le_status')?.value || 'active',
+          });
+          App.toast('Loan updated');
+          _lnLoad();
+        } catch (e) { App.toast(e.message || 'Update failed'); }
+      },
+    });
+  }
+
+  function _lnRepayModal(loanId) {
+    const loans = (_lnData?.loans || []).filter(l => l.status === 'active');
+    let loanOpts = '<option value="">— Select —</option>';
+    loans.forEach(l => { loanOpts += `<option value="${l.id}" ${l.id === loanId ? 'selected' : ''}>${esc(l.loan_name)} (${fm(l.outstanding_amount)})</option>`; });
+
+    App.showDialog({
+      title: 'Record Repayment',
+      message: `<div style="text-align:left">
+        <div class="fg"><label class="lb">Loan *</label><select class="inp" id="dlg_rp_loan">${loanOpts}</select></div>
+        <div class="fr"><div class="fg"><label class="lb">Principal *</label><input class="inp" id="dlg_rp_prin" type="number" step="0.01" placeholder="0.00"></div><div class="fg"><label class="lb">Interest</label><input class="inp" id="dlg_rp_int" type="number" step="0.01" placeholder="0.00"></div></div>
+        <div class="fr"><div class="fg"><label class="lb">Date</label><input class="inp" id="dlg_rp_date" type="date" value="${App.today()}"></div><div class="fg"><label class="lb">Reference</label><input class="inp" id="dlg_rp_ref" placeholder="e.g. PAY-1290"></div></div>
+      </div>`,
+      confirmText: 'Record Payment',
+      onConfirm: async () => {
+        try {
+          await API.call('fin_record_repayment', {
+            loan_id: document.getElementById('dlg_rp_loan')?.value,
+            principal_amount: parseFloat(document.getElementById('dlg_rp_prin')?.value) || 0,
+            interest_amount: parseFloat(document.getElementById('dlg_rp_int')?.value) || 0,
+            payment_date: document.getElementById('dlg_rp_date')?.value,
+            reference: document.getElementById('dlg_rp_ref')?.value?.trim() || null,
+          });
+          App.toast('Repayment recorded');
+          _lnLoad();
+        } catch (e) { App.toast(e.message || 'Failed'); }
+      },
+    });
+  }
+
+  function _lnEquityModal(type) {
+    const title = type === 'capital_in' ? 'Record Capital Injection' : type === 'capital_out' ? 'Record Capital Withdrawal' : 'Record Dividend';
+    App.showDialog({
+      title,
+      message: `<div style="text-align:left">
+        <div class="fr"><div class="fg"><label class="lb">Person / Investor *</label><input class="inp" id="dlg_eq_person" placeholder="e.g. Khun Or"></div><div class="fg"><label class="lb">Amount *</label><input class="inp" id="dlg_eq_amt" type="number" step="0.01"></div></div>
+        <div class="fr"><div class="fg"><label class="lb">Brand / Entity</label><input class="inp" id="dlg_eq_brand" placeholder="e.g. SPG Group"></div><div class="fg"><label class="lb">Date</label><input class="inp" id="dlg_eq_date" type="date" value="${App.today()}"></div></div>
+        <div class="fr"><div class="fg"><label class="lb">Description</label><input class="inp" id="dlg_eq_desc" placeholder=""></div><div class="fg"><label class="lb">Reference</label><input class="inp" id="dlg_eq_ref" placeholder="e.g. EQ-005"></div></div>
+        ${type.startsWith('dividend') ? '<div class="fg"><label class="lb">Period</label><input class="inp" id="dlg_eq_period" placeholder="e.g. Q1 2026"></div>' : '<div class="fg"><label class="lb">Purpose</label><input class="inp" id="dlg_eq_purpose" placeholder="e.g. Store fit-out"></div>'}
+      </div>`,
+      confirmText: title.replace('Record ', ''),
+      onConfirm: async () => {
+        try {
+          await API.call('fin_create_equity', {
+            equity_type: type,
+            person_name: document.getElementById('dlg_eq_person')?.value?.trim(),
+            amount: parseFloat(document.getElementById('dlg_eq_amt')?.value) || 0,
+            entity_id: document.getElementById('dlg_eq_brand')?.value?.trim() || null,
+            transaction_date: document.getElementById('dlg_eq_date')?.value,
+            description: document.getElementById('dlg_eq_desc')?.value?.trim() || null,
+            reference: document.getElementById('dlg_eq_ref')?.value?.trim() || null,
+            purpose: document.getElementById('dlg_eq_purpose')?.value?.trim() || null,
+            period: document.getElementById('dlg_eq_period')?.value?.trim() || null,
+            status: type === 'dividend_planned' ? 'pending' : 'completed',
+          });
+          App.toast('Recorded');
+          _lnLoad();
+        } catch (e) { App.toast(e.message || 'Failed'); }
+      },
+    });
+  }
+
+  // ══════════════════════════════════════════
   // REGISTER ROUTES
   // ══════════════════════════════════════════
   App.registerRoutes({
@@ -1225,41 +1563,23 @@
     ac_hub:        { render: renderBankingHub, onLoad: _hubLoad },
     ac_map:        { render: renderBankMap, onLoad: _bmLoad },
     ac_linked:     { render: renderLinkedCats, onLoad: _lcLoad },
+    ac_loan:       { render: renderLoans, onLoad: _lnLoad },
   });
 
   // ══════════════════════════════════════════
   // PUBLIC API — functions called from onclick
   // ══════════════════════════════════════════
   window.ScrAccounting = {
-    _setCoaTab,
-    _onSearch,
-    _toggleInactive,
-    _resetCoaFilters,
-    _toggleAllCoa,
-    _editCategory,
-    _goLinked,
-    _onTxTypeChange,
-    _saveCat,
-    _toggleActive,
-    _deleteCat,
-    _editTax,
-    // E3a: Bank Rules
-    _brToggleMenu,
-    _brOpenModal,
-    _brSetFilter,
-    _brResetFilters,
-    _brToggleActive,
-    _brSave,
-    _brDelete,
-    _brOnVendorChange,
-    _brUpdateSubCats,
-    // E3b: Bank Map
-    _bmSetTab,
-    _bmMarkDirty,
-    _bmSave,
-    // E3b: Linked Categories
-    _lcAdd,
-    _lcEdit,
+    _setCoaTab, _onSearch, _toggleInactive, _resetCoaFilters,
+    _toggleAllCoa, _editCategory, _goLinked, _onTxTypeChange,
+    _saveCat, _toggleActive, _deleteCat, _editTax,
+    // E3a
+    _brToggleMenu, _brOpenModal, _brSetFilter, _brResetFilters,
+    _brToggleActive, _brSave, _brDelete, _brOnVendorChange, _brUpdateSubCats,
+    // E3b
+    _bmSetTab, _bmMarkDirty, _bmSave, _lcAdd, _lcEdit,
+    // E3c: Loans
+    _lnSetTab, _lnNewLoanModal, _lnEditLoan, _lnRepayModal, _lnEquityModal,
   };
 
 })();

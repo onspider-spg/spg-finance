@@ -1,4 +1,4 @@
-/** Version 1.0.2 | 14 MAR 2026 | Siam Palette Group */
+/** Version 1.1 | 14 MAR 2026 | Siam Palette Group */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_accounting_fin.js
@@ -28,68 +28,8 @@
   let _editingCat = null;  // category being edited (full object)
   let _taxRows = [];
 
-  // ── Category type options — loaded from DB via App.S.accountTypes ──
-  // Fallback hard code in case DB hasn't loaded yet
-  const _FALLBACK_TYPES = [
-    { name: 'Bank', classification: 'Asset' },
-    { name: 'Account receivable', classification: 'Asset' },
-    { name: 'Other current asset', classification: 'Asset' },
-    { name: 'Fixed asset', classification: 'Asset' },
-    { name: 'Other asset', classification: 'Asset' },
-    { name: 'Credit card', classification: 'Liability' },
-    { name: 'Account payable', classification: 'Liability' },
-    { name: 'Other current liability', classification: 'Liability' },
-    { name: 'Long term liability', classification: 'Liability' },
-    { name: 'Equity', classification: 'Equity' },
-    { name: 'Income', classification: 'Income' },
-    { name: 'Cost of sales', classification: 'Cost of Sales' },
-    { name: 'Expense', classification: 'Expense' },
-    { name: 'Other income', classification: 'Other Income' },
-    { name: 'Other expense', classification: 'Other Expense' },
-  ];
-
-  /** Get account types — DB first, fallback if not loaded */
-  function _getAccountTypes() {
-    const fromDB = App.S.accountTypes;
-    return (fromDB && fromDB.length > 0) ? fromDB : _FALLBACK_TYPES;
-  }
-
-  /** Build TYPE_TO_CLASS map dynamically from account types */
-  function _buildTypeToClass() {
-    const map = {};
-    _getAccountTypes().forEach(t => { map[t.name] = t.classification; });
-    return map;
-  }
-
-  /** Infer account_type from transaction_type for old records that don't have account_type set */
-  function _inferAccountType(txType) {
-    if (!txType) return '';
-    // Try to find an account type whose classification matches this transaction_type
-    const types = _getAccountTypes();
-    const match = types.find(t => t.classification === txType);
-    if (match) return match.name;
-    // Fallback mapping for legacy transaction_types
-    const legacy = {
-      'Asset Purchase': 'Fixed asset', 'Transfer': 'Bank', 'Loan': 'Long term liability',
-    };
-    return legacy[txType] || '';
-  }
-
-  // Tab filter options
-  const COA_TABS = ['All', 'Asset', 'Liability', 'Equity', 'Income', 'Cost of Sales', 'Expense', 'Other Income', 'Other Expense'];
-
-  // Map tab label → transaction_type values to match
-  const TAB_FILTER_MAP = {
-    'All': null,
-    'Asset': ['Income', 'Expense', 'Asset Purchase', 'Transfer', 'Loan', 'Asset'],
-    'Liability': ['Liability'],
-    'Equity': ['Equity'],
-    'Income': ['Income'],
-    'Cost of Sales': ['Cost of Sales'],
-    'Expense': ['Expense'],
-    'Other Income': ['Other Income'],
-    'Other Expense': ['Other Expense'],
-  };
+  // Tab filter options — match transaction_type values in category_master
+  const COA_TABS = ['All', 'Income', 'Expense', 'Asset Purchase', 'Transfer', 'Loan'];
 
   // ══════════════════════════════════════════
   // SHARED: Skeleton
@@ -165,37 +105,42 @@
       return;
     }
 
-    // Group by transaction_type for Level 1 headers
-    let lastType = '';
+    // Group by main_category (P&L sections: Revenue, COGs, Payroll, etc.)
+    let lastMain = '';
     let html = '';
 
     _coaRows.forEach(r => {
-      // Level 1 header row
-      if (r.level === 1 || (r.transaction_type !== lastType && r.level !== 1)) {
-        if (r.transaction_type !== lastType) {
-          lastType = r.transaction_type;
-          // Insert a header row for each group
-          html += `<tr style="background:var(--bg2)"><td><input type="checkbox" style="accent-color:var(--acc)"></td><td></td><td style="font-weight:700;color:var(--acc);font-size:var(--fs-body)">${esc(r.transaction_type)}</td><td>${esc(r.transaction_type)}</td><td></td><td></td><td style="font-weight:600">Level 1</td><td style="text-align:right;font-weight:700">${fm(_coaRows.filter(x => x.transaction_type === r.transaction_type).reduce((s, x) => s + (x.current_balance || 0), 0))}</td></tr>`;
-        }
+      const mainCat = r.main_category || r.transaction_type || 'Other';
+
+      // Insert header row when main_category changes
+      if (mainCat !== lastMain) {
+        lastMain = mainCat;
+        const groupTotal = _coaRows
+          .filter(x => (x.main_category || x.transaction_type) === mainCat)
+          .reduce((s, x) => s + (x.current_balance || 0), 0);
+        html += `<tr style="background:var(--bg2)">
+          <td></td>
+          <td></td>
+          <td style="font-weight:700;color:var(--acc);font-size:var(--fs-body)">${esc(mainCat)}</td>
+          <td style="font-size:var(--fs-xs);color:var(--t3)">${esc(r.transaction_type)}</td>
+          <td></td><td></td><td></td>
+          <td style="text-align:right;font-weight:700">${fm(groupTotal)}</td>
+        </tr>`;
       }
 
-      if (r.level === 1) return; // skip rendering level 1 as data row — already shown as header
-
       const balColor = r.current_balance < 0 ? 'color:var(--r)' : '';
-      const balWeight = r.is_linked ? 'font-weight:600' : '';
-      const nameWeight = r.is_linked ? 'font-weight:600' : '';
       const inactive = !r.is_active ? 'opacity:0.45' : '';
       const linked = r.is_linked ? `<span class="sts sts-p" style="font-size:9px">Linked</span>` : '';
 
       html += `<tr style="cursor:pointer;${inactive}" onclick="ScrAccounting._editCategory('${r.id}')">
         <td onclick="event.stopPropagation()"><input type="checkbox" data-coa-id="${r.id}" style="accent-color:var(--acc)"></td>
-        <td style="${nameWeight}">${esc(r.account_code || '')}</td>
-        <td><a class="lk" style="${nameWeight}">${esc(r.sub_category)}</a></td>
-        <td style="font-size:var(--fs-xs)">${esc(r.account_type || r.transaction_type)}</td>
+        <td>${esc(r.account_code || '')}</td>
+        <td style="padding-left:24px"><a class="lk">${esc(r.sub_category)}</a></td>
+        <td style="font-size:var(--fs-xs)">${esc(r.transaction_type)}</td>
         <td>${esc(r.tax_code || '')}</td>
         <td>${linked}</td>
         <td style="font-size:var(--fs-xxs);color:var(--t3)">Level ${r.level || 2}</td>
-        <td style="text-align:right;${balColor};${balWeight}">${fm(r.current_balance || 0)}</td>
+        <td style="text-align:right;${balColor}">${fm(r.current_balance || 0)}</td>
       </tr>`;
     });
 
@@ -278,14 +223,10 @@
     const isEdit = !!cat;
     const c = cat || {};
 
-    // Resolve account_type: use stored value, or infer from transaction_type for old records
-    const TYPE_TO_CLASS = _buildTypeToClass();
-    const resolvedAccountType = c.account_type || _inferAccountType(c.transaction_type) || '';
-    const isBank = (resolvedAccountType === 'Bank');
-
-    // Category type options — from DB
-    const typeOpts = _getAccountTypes().map(t =>
-      `<option value="${t.name}"${t.name === resolvedAccountType ? ' selected' : ''}>${t.name}</option>`
+    // Transaction type options (Income, Expense, Asset Purchase, Transfer, Loan)
+    const TX_TYPES = ['Income', 'Expense', 'Asset Purchase', 'Transfer', 'Loan'];
+    const txTypeOpts = TX_TYPES.map(t =>
+      `<option value="${t}"${t === c.transaction_type ? ' selected' : ''}>${t}</option>`
     ).join('');
 
     // Tax code options
@@ -295,10 +236,7 @@
     ).join('');
 
     // Balance + linked info bar (edit only)
-    const infoBar = isEdit ? `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--bg3);border-radius:var(--rd);margin-bottom:14px"><div><div style="font-size:var(--fs-xs);font-weight:600">Linked category for</div><div style="font-size:var(--fs-xs);color:var(--t3)">${c.is_linked ? esc(c.linked_description || 'Linked') : '—'}</div></div><div style="text-align:right"><div style="font-size:var(--fs-xs);font-weight:600">Current balance</div><div style="font-size:var(--fs-h1);font-weight:700">${fm(c.current_balance || 0)}</div></div></div>` : '';
-
-    // Classification (auto from type)
-    const classDisplay = resolvedAccountType ? (TYPE_TO_CLASS[resolvedAccountType] || c.transaction_type || '—') : (c.transaction_type || '—');
+    const infoBar = isEdit ? `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--bg3);border-radius:var(--rd);margin-bottom:14px"><div><div style="font-size:var(--fs-xs);font-weight:600">Main Category</div><div style="font-size:var(--fs-xs);color:var(--t3)">${esc(c.main_category || '—')}</div></div><div style="text-align:right"><div style="font-size:var(--fs-xs);font-weight:600">Current balance</div><div style="font-size:var(--fs-h1);font-weight:700">${fm(c.current_balance || 0)}</div></div></div>` : '';
 
     // Form row helper
     const frow = (label, req, content) =>
@@ -307,40 +245,19 @@
     let html = `<div class="card" style="max-width:660px;margin:0 auto">
       ${infoBar}
       <div style="font-size:var(--fs-body);font-weight:700;margin-bottom:2px">Category details</div>
-      <div style="font-size:var(--fs-xs);color:var(--t3);margin-bottom:14px">These details impact the category and its priority order in the Chart of Accounts.</div>
+      <div style="font-size:var(--fs-xs);color:var(--t3);margin-bottom:14px">Transaction Type → Main Category → Account Name (Sub Category)</div>
 
-      <div style="display:flex;align-items:center;margin-bottom:10px">
-        <div style="width:150px;text-align:right;padding-right:14px;font-size:var(--fs-sm);color:var(--t2)">Category level <span style="color:var(--acc)">*</span></div>
-        <div>
-          <label style="font-size:var(--fs-sm);display:flex;align-items:center;gap:6px"><input type="radio" name="cat_level" value="2"${(c.level || 2) === 2 ? ' checked' : ''} style="accent-color:var(--acc)"> Detail category</label>
-          <label style="font-size:var(--fs-sm);display:flex;align-items:center;gap:6px;margin-top:4px"><input type="radio" name="cat_level" value="1"${c.level === 1 ? ' checked' : ''} style="accent-color:var(--acc)"> Header category</label>
-        </div>
-      </div>
-
-      <div style="display:flex;align-items:center;margin-bottom:10px">
-        <div style="width:150px;text-align:right;padding-right:14px;font-size:var(--fs-sm);color:var(--t2)">Classification</div>
-        <div id="cat_class" style="font-size:var(--fs-sm);font-weight:600">${esc(classDisplay)}</div>
-      </div>
-
-      ${frow('Category type', true, `<select class="inp" id="cat_type" onchange="ScrAccounting._onTypeChange(this.value)"><option value="">Select an option</option>${typeOpts}</select>`)}
-      ${frow('Parent header', true, `<select class="inp" id="cat_parent"><option value="">Select an option</option></select>`)}
-      ${frow('Category code', true, `<input class="inp" id="cat_code" value="${esc(c.account_code || '')}" placeholder="e.g. 688" style="max-width:140px">`)}
-      ${frow('Category name', true, `<input class="inp" id="cat_name" value="${esc(c.sub_category || '')}" placeholder="e.g. Term Deposit #5015">`)}
-      ${frow('Opening balance ($)', false, `<input class="inp" id="cat_balance" value="${(c.current_balance || 0).toFixed(2)}" style="text-align:right">`)}
+      ${frow('Transaction Type', true, `<select class="inp" id="cat_txtype" onchange="ScrAccounting._onTxTypeChange(this.value)"><option value="">Select an option</option>${txTypeOpts}</select>`)}
+      ${frow('Main Category', true, `<select class="inp" id="cat_main"><option value="">Select an option</option></select>`)}
+      ${frow('Account Name', true, `<input class="inp" id="cat_name" value="${esc(c.sub_category || '')}" placeholder="e.g. Packaging, Rent, Electricity">`)}
+      ${frow('Account Code', false, `<input class="inp" id="cat_code" value="${esc(c.account_code || '')}" placeholder="e.g. 27010 (optional)" style="max-width:140px">`)}
       ${frow('Tax code', true, `<select class="inp" id="cat_tax" style="max-width:100px"><option value=""></option>${tcOpts}</select>`)}
+      ${frow('Opening balance ($)', false, `<input class="inp" id="cat_balance" value="${(c.current_balance || 0).toFixed(2)}" style="text-align:right">`)}
 
       <div style="display:flex;align-items:flex-start;margin-bottom:10px">
         <div style="width:150px;text-align:right;padding-right:14px;font-size:var(--fs-sm);color:var(--t2);padding-top:6px">Notes</div>
         <div style="max-width:340px;flex:1"><textarea class="inp" id="cat_notes" style="min-height:50px;resize:vertical">${esc(c.notes || '')}</textarea></div>
       </div>`;
-
-    // Bank details section (edit only, when type = Bank)
-    if (isEdit && isBank) {
-      html += `
-      <div style="font-size:var(--fs-body);font-weight:700;margin:18px 0 10px;padding-top:10px;border-top:1px solid var(--bd2)">Bank account details</div>
-      <div style="font-size:var(--fs-xs);color:var(--t3);margin-bottom:10px">These details are linked from the bank_accounts table.</div>
-      <div style="padding:10px 14px;background:var(--bg2);border-radius:var(--rd);font-size:var(--fs-xs);color:var(--t3)">Bank account details are managed in Banking Hub. <a class="lk" onclick="App.go('ac_hub')">Go to Banking Hub →</a></div>`;
-    }
 
     // Footer buttons
     if (isEdit) {
@@ -364,89 +281,62 @@
   }
 
   function _onCreateLoad() {
-    // Ensure COA data is available for parent header dropdown
+    // Ensure COA data is available for main_category dropdown
     if (_coaRows.length === 0) {
       API.getCoa({ show_inactive: false }).then(res => {
         _coaRows = res.rows || [];
-        _populateParentHeaders();
+        _populateMainCategories();
       });
     } else {
-      _populateParentHeaders();
+      _populateMainCategories();
     }
   }
 
   function _onEditLoad() {
-    // Ensure COA data is available for parent header dropdown
     if (_coaRows.length === 0) {
       API.getCoa({ show_inactive: false }).then(res => {
         _coaRows = res.rows || [];
-        _populateParentHeaders();
+        _populateMainCategories();
       });
     } else {
-      _populateParentHeaders();
+      _populateMainCategories();
     }
   }
 
-  function _onTypeChange(val) {
-    // Update classification display
-    const TYPE_TO_CLASS = _buildTypeToClass();
-    const clEl = document.getElementById('cat_class');
-    if (clEl) clEl.textContent = TYPE_TO_CLASS[val] || '—';
-    _populateParentHeaders();
+  /** When transaction_type changes → update main_category dropdown */
+  function _onTxTypeChange(val) {
+    _populateMainCategories();
   }
 
-  /** Populate parent header dropdown from existing categories */
-  function _populateParentHeaders() {
-    const sel = document.getElementById('cat_parent');
+  /** Populate main_category dropdown from existing unique main_categories matching transaction_type */
+  function _populateMainCategories() {
+    const sel = document.getElementById('cat_main');
     if (!sel) return;
-    const TYPE_TO_CLASS = _buildTypeToClass();
-    const typeEl = document.getElementById('cat_type');
-    const selectedType = typeEl ? typeEl.value : '';
-    const classification = TYPE_TO_CLASS[selectedType] || '';
+    const txTypeEl = document.getElementById('cat_txtype');
+    const selectedTxType = txTypeEl ? txTypeEl.value : '';
 
-    // Strategy: find Level 1 headers first, fallback to unique main_categories
-    let headers = _coaRows.filter(r => r.level === 1 && r.transaction_type === classification);
+    // Collect unique main_categories that match this transaction_type
+    const seen = new Set();
+    const mains = [];
+    _coaRows.forEach(r => {
+      if (selectedTxType && r.transaction_type !== selectedTxType) return;
+      if (r.main_category && !seen.has(r.main_category)) {
+        seen.add(r.main_category);
+        mains.push(r.main_category);
+      }
+    });
 
-    // Fallback: if no Level 1 headers, collect unique main_category values for this classification
-    if (headers.length === 0 && classification) {
-      const matchingRows = _coaRows.filter(r => {
-        // Match by transaction_type OR by inferred classification
-        const rowClass = TYPE_TO_CLASS[r.account_type] || r.transaction_type || '';
-        return rowClass === classification || r.transaction_type === classification;
-      });
-      const seen = new Set();
-      headers = [];
-      matchingRows.forEach(r => {
-        if (r.main_category && !seen.has(r.main_category)) {
-          seen.add(r.main_category);
-          headers.push({ sub_category: r.main_category });
-        }
-      });
-    }
-
-    let opts = '<option value="">Select an option</option>';
     const editMain = _editingCat ? _editingCat.main_category : '';
-    if (headers.length > 0) {
-      headers.forEach(h => {
-        const label = h.sub_category || h.main_category || '';
-        const selected = label === editMain ? ' selected' : '';
-        opts += `<option value="${esc(label)}"${selected}>${esc(label)}</option>`;
-      });
-      // If editing and current main_category not in list, add it
-      if (editMain && !headers.some(h => (h.sub_category || h.main_category) === editMain)) {
-        opts += `<option value="${esc(editMain)}" selected>${esc(editMain)}</option>`;
-      }
-    } else if (classification) {
-      // No headers at all — offer the classification as default
-      const selected = editMain === classification || !editMain ? ' selected' : '';
-      opts += `<option value="${esc(classification)}"${selected}>${esc(classification)}</option>`;
-      if (editMain && editMain !== classification) {
-        opts += `<option value="${esc(editMain)}" selected>${esc(editMain)}</option>`;
-      }
-    } else if (editMain) {
-      // No classification resolved — just show current value
+    let opts = '<option value="">Select or type new...</option>';
+    mains.forEach(m => {
+      const selected = m === editMain ? ' selected' : '';
+      opts += `<option value="${esc(m)}"${selected}>${esc(m)}</option>`;
+    });
+    // If editing and current main not in list, add it
+    if (editMain && !seen.has(editMain)) {
       opts += `<option value="${esc(editMain)}" selected>${esc(editMain)}</option>`;
     }
+
     sel.innerHTML = opts;
   }
 
@@ -458,37 +348,32 @@
     btnEl.textContent = 'Saving...';
 
     try {
-      const level = parseInt(document.querySelector('input[name="cat_level"]:checked')?.value || '2');
-      const account_type = document.getElementById('cat_type')?.value || '';
-      const classification = _buildTypeToClass()[account_type] || account_type;
-      const main_category = document.getElementById('cat_parent')?.value || classification;
-      const account_code = document.getElementById('cat_code')?.value?.trim() || '';
+      const transaction_type = document.getElementById('cat_txtype')?.value || '';
+      const main_category = document.getElementById('cat_main')?.value || '';
       const sub_category = document.getElementById('cat_name')?.value?.trim() || '';
-      const current_balance = parseFloat(document.getElementById('cat_balance')?.value) || 0;
+      const account_code = document.getElementById('cat_code')?.value?.trim() || '';
       const tax_code = document.getElementById('cat_tax')?.value || 'FRE';
+      const current_balance = parseFloat(document.getElementById('cat_balance')?.value) || 0;
 
-      if (!sub_category) { App.toast('Category name is required'); return; }
-      if (!account_type) { App.toast('Category type is required'); return; }
+      if (!transaction_type) { App.toast('Transaction Type is required'); return; }
+      if (!main_category) { App.toast('Main Category is required'); return; }
+      if (!sub_category) { App.toast('Account Name is required'); return; }
 
       const data = {
-        transaction_type: classification,
+        transaction_type,
         main_category,
         sub_category,
-        account_type,
-        level,
         account_code: account_code || null,
-        current_balance,
         tax_code,
+        current_balance,
       };
 
       if (id) {
-        // Update
         data.id = id;
         if (_editingCat) data.expected_updated_at = _editingCat.updated_at;
         await API.updateCategory(data);
         App.toast('Category updated');
       } else {
-        // Create
         await API.createCategory(data);
         App.toast('Category created');
       }
@@ -635,7 +520,7 @@
     _toggleAllCoa,
     _editCategory,
     _goLinked,
-    _onTypeChange,
+    _onTxTypeChange,
     _saveCat,
     _toggleActive,
     _deleteCat,

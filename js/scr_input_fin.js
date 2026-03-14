@@ -1,4 +1,4 @@
-/** Version 1.6.3 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 1.6.4 | 14 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_input_fin.js
@@ -586,11 +586,62 @@
   // ══════════════════════════════════════════
   const MOCK_CATS = ['', '27002 Purchases-GST Free', '27010 Packaging', '42700 Rent', '43000 Utilities', '46000 Wages'];
 
-  /** Get categories — prefer S.categories from API, fallback to MOCK */
+  /** Get categories for expense screens — filter out Income, group by main_category */
   function _getCats() {
     const cats = App.S.categories;
-    if (cats && cats.length > 0) return ['', ...cats.map(c => c.code + ' ' + c.name)];
-    return MOCK_CATS;
+    if (!cats || cats.length === 0) return MOCK_CATS;
+
+    // Filter: only Expense + Asset Purchase + Loan (no Income)
+    const expCats = cats.filter(c =>
+      c.transaction_type !== 'Income'
+    );
+
+    // Group by main_category
+    const groups = {};
+    expCats.forEach(c => {
+      const grp = c.main_category || 'Other';
+      if (!groups[grp]) groups[grp] = [];
+      groups[grp].push(c.sub_category);
+    });
+
+    // Build flat array with group headers: ['', '── COGs ──', 'Food', 'Beverage', ...]
+    const result = [''];
+    Object.keys(groups).forEach(grp => {
+      result.push('── ' + grp + ' ──');
+      groups[grp].forEach(name => result.push(name));
+    });
+    return result;
+  }
+
+  /** Get categories as <option> HTML with optgroup for select elements */
+  function _getCatOptsHTML() {
+    const cats = App.S.categories;
+    if (!cats || cats.length === 0) {
+      return MOCK_CATS.map(c => `<option>${esc(c)}</option>`).join('');
+    }
+
+    // Filter: only Expense types (no Income for Bill creation)
+    const expCats = cats.filter(c =>
+      c.transaction_type !== 'Income'
+    );
+
+    // Group by main_category
+    const groups = {};
+    expCats.forEach(c => {
+      const grp = c.main_category || 'Other';
+      if (!groups[grp]) groups[grp] = [];
+      groups[grp].push(c);
+    });
+
+    let html = '<option value=""></option>';
+    Object.keys(groups).forEach(grp => {
+      html += `<optgroup label="${esc(grp)}">`;
+      groups[grp].forEach(c => {
+        html += `<option value="${esc(c.id)}">${esc(c.sub_category)}</option>`;
+      });
+      html += '</optgroup>';
+    });
+    return html;
   }
 
   /** Get vendor options — prefer S.vendors from API, fallback to MOCK */
@@ -798,7 +849,7 @@
   function _buildOneRow(idx, isOB) {
     const C = 'padding:0;border:1px solid #e5e7eb';
     const ST = 'width:100%;padding:8px 10px;border:none;font-size:var(--fs-body);font-family:inherit';
-    const catOpts = _getCats().map(c => `<option>${esc(c)}</option>`).join('');
+    const catOpts = _getCatOptsHTML();
     const brands = App.S.brands && App.S.brands.length > 0 ? App.S.brands : MOCK.brands;
     const brandOpts = brands.map(b => `<option>${esc(b)}</option>`).join('');
 
@@ -1056,7 +1107,7 @@
   // 5. CREATE RECURRING TRANSACTION
   // ══════════════════════════════════════════
   function renderCreateRecurring() {
-    const catOpts = MOCK_CATS.map(c => `<option>${esc(c)}</option>`).join('');
+    const catOpts = _getCatOptsHTML();
     const tcOpts = (App.S.taxCodes || []).map(tc => `<option>${esc(tc.code)}</option>`).join('');
 
     return {
@@ -1175,7 +1226,7 @@
   // 6. CREATE FROM UPLOAD (Scan→Create split view)
   // ══════════════════════════════════════════
   function renderCreateUpload() {
-    const catOpts = MOCK_CATS.map(c => `<option>${esc(c)}</option>`).join('');
+    const catOpts = _getCatOptsHTML();
     const tcOpts = (App.S.taxCodes || []).map(tc => `<option>${esc(tc.code)}</option>`).join('');
 
     return {

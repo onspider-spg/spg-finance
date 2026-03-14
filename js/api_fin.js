@@ -1,4 +1,4 @@
-/** Version 1.5.2 | 14 MAR 2026 | Siam Palette Group | Created 13 MAR 2026 */
+/** Version 1.5.3 | 14 MAR 2026 | Siam Palette Group | Created 13 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — api_fin.js
@@ -752,6 +752,13 @@ const API = (() => {
     updateTaxCode,
     // E2: Contacts — thin wrappers using _call
     call: _call,
+    // E5a: Review Monitor — thin wrappers using _call
+    getReviewDashboard: (filters) => _call('fin_get_review_dashboard', filters || {}),
+    getRecurringRules: (filters) => _call('fin_get_recurring_rules', filters || {}),
+    createRecurringRule: (data) => _call('fin_create_recurring_rule', data),
+    updateRecurringRule: (data) => _call('fin_update_recurring_rule', data),
+    getExpectedInvoices: (filters) => _call('fin_get_expected_invoices', filters || {}),
+    createExpectedInvoice: (data) => _call('fin_create_expected_invoice', data),
   };
 
 })();

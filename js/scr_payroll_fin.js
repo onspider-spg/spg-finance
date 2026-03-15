@@ -1,9 +1,15 @@
-/** Version 1.2.1 | 15 MAR 2026 | Siam Palette Group */
+/** Version 1.3 | 15 MAR 2026 | Siam Palette Group */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_payroll_fin.js
  * Payroll: Pay Runs, Create Pay Run (3-step), Pay Run Detail
  * Lazy-loaded by app_fin.js on first visit to pr_* routes
+ * ═══════════════════════════════════════════
+ *
+ * CHANGED v1.2.1 → v1.3:
+ * - [ADDED] Brand filter in Pay Runs (id=pr_fl_brand)
+ * - [ADDED] Brand filter in Superannuation (id=pr_sp_brand)
+ * - [ADDED] Brand filter in PAYG (id=pr_pg_brand)
  * ═══════════════════════════════════════════
  */
 
@@ -84,6 +90,7 @@
         </div>
         <div style="display:flex;gap:8px;margin-bottom:10px;align-items:flex-end">
           <div><div class="fl-l">Status</div><select class="fl" id="pr_fl_status" onchange="ScrPayroll._applyFilter()"><option>All</option><option>Draft</option><option>Approved</option><option>Paid</option></select></div>
+          <div><div class="fl-l">Brand</div><select class="fl" id="pr_fl_brand" onchange="ScrPayroll._applyFilter()" style="width:140px"><option value="">All Brands</option>${(App.S.brands||[]).map(b=>'<option>'+App.esc(b)+'</option>').join('')}</select></div>
           <div><div class="fl-l">Date from</div><input class="fl" type="date" id="pr_fl_from" style="width:120px" onchange="ScrPayroll._applyFilter()"></div>
           <div><div class="fl-l">Date to</div><input class="fl" type="date" id="pr_fl_to" style="width:120px" onchange="ScrPayroll._applyFilter()"></div>
         </div>
@@ -1174,7 +1181,7 @@
 
   function renderSuper() {
     return {
-      tb: '<div class="tb"><div class="tb-t">Superannuation</div><button class="bs" onclick="App.go(\'py_record\')">Record Super Payment</button></div>',
+      tb: `<div class="tb"><div class="tb-t">Superannuation</div><select class="fl" id="pr_sp_brand" style="width:140px"><option value="">All Brands</option>${(App.S.brands||[]).map(b=>'<option>'+esc(b)+'</option>').join('')}</select><button class="bs" onclick="App.go('py_record')">Record Super Payment</button></div>`,
       ct: `<div style="max-width:1060px;margin:0 auto">
         <div class="kpi">
           <div class="kpi-c" style="border-top:3px solid var(--r)"><div class="kpi-v" style="color:var(--r)" id="pr_sp_outstanding">$0</div><div class="kpi-l">Outstanding</div></div>
@@ -1205,7 +1212,7 @@
 
   function renderPayg() {
     return {
-      tb: '<div class="tb"><div class="tb-t">Withholding Tax (PAYG)</div><button class="bs" onclick="App.go(\'py_record\')">Record PAYG Payment</button></div>',
+      tb: `<div class="tb"><div class="tb-t">Withholding Tax (PAYG)</div><select class="fl" id="pr_pg_brand" style="width:140px"><option value="">All Brands</option>${(App.S.brands||[]).map(b=>'<option>'+esc(b)+'</option>').join('')}</select><button class="bs" onclick="App.go('py_record')">Record PAYG Payment</button></div>`,
       ct: `<div style="max-width:1060px;margin:0 auto">
         <div class="kpi">
           <div class="kpi-c" style="border-top:3px solid var(--r)"><div class="kpi-v" style="color:var(--r)" id="pr_pg_outstanding">$0</div><div class="kpi-l">Outstanding</div></div>

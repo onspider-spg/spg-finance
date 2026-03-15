@@ -1,9 +1,15 @@
-/** Version 1.0.1 | 15 MAR 2026 | Siam Palette Group */
+/** Version 1.1 | 15 MAR 2026 | Siam Palette Group */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_reconcile_fin.js
  * Reconciliation: Statement Upload, Cash Collection, Bank Reconcile
  * Lazy-loaded by app_fin.js on first visit to rc_* routes
+ * ═══════════════════════════════════════════
+ *
+ * CHANGED v1.0.1 → v1.1:
+ * - [ADDED] _brandFilterOpts() — Brand filter dropdown builder
+ * - [ADDED] Brand filter in Bank Reconcile (id=rc_brand) + wider account select
+ * - [ADDED] Brand filter in Cash Reconcile (id=cr_brand) + wider account select
  * ═══════════════════════════════════════════
  */
 
@@ -250,7 +256,8 @@
   function renderCashReconcile() {
     return {
       tb: `<div class="tb"><div class="tb-t">Cash Reconcile</div>
-        <select class="fl" id="cr_account" onchange="ScrReconcile._switchCashAccount(this.value)">${_bankOptions('')}</select>
+        <select class="fl" id="cr_account" onchange="ScrReconcile._switchCashAccount(this.value)" style="min-width:200px">${_bankOptions('')}</select>
+        <select class="fl" id="cr_brand" style="width:140px">${_brandFilterOpts()}</select>
         <button class="btn bo" onclick="ScrReconcile._showJournalEntry()">+ Journal Entry</button>
         <button class="bs" onclick="ScrReconcile._switchCashTab('collect')">Record Collection</button>
       </div>`,
@@ -517,10 +524,16 @@
   let _rcMatches = [];
   let _rcSummary = {};
 
+  function _brandFilterOpts() {
+    const brands = App.S.brands || [];
+    return '<option value="">All Brands</option>' + brands.map(b => `<option>${esc(b)}</option>`).join('');
+  }
+
   function renderBankRecon() {
     return {
       tb: `<div class="tb"><div class="tb-t">Bank Reconciliation</div>
-        <select class="fl" id="rc_bank" onchange="ScrReconcile._switchRcBank(this.value)">${_bankOptions('')}</select>
+        <select class="fl" id="rc_bank" onchange="ScrReconcile._switchRcBank(this.value)" style="min-width:200px">${_bankOptions('')}</select>
+        <select class="fl" id="rc_brand" style="width:140px">${_brandFilterOpts()}</select>
         <button class="btn bo" onclick="App.go('rc_stmt')">Upload Statement</button>
         <button class="bs" id="rc_automatch_btn" onclick="ScrReconcile._runAutoMatch()">Auto-Match</button>
       </div>`,

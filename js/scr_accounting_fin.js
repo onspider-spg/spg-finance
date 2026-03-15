@@ -1,9 +1,14 @@
-/** Version 2.2 | 15 MAR 2026 | Siam Palette Group */
+/** Version 2.3 | 15 MAR 2026 | Siam Palette Group */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_accounting_fin.js
  * Accounting: COA, Tax, Bank Rules, Hub, Map, Linked,
  * Loans & Finance, General Journal
+ * ═══════════════════════════════════════════
+ *
+ * CHANGED v2.2 → v2.3:
+ * - [ADDED] Brand filter in Banking Hub (id=hub_brand) + _hubSetBrand() + client-side filter
+ * - [ADDED] Brand filter in Bank Map (id=bm_brand) + _bmSetBrand()
  * ═══════════════════════════════════════════
  */
 
@@ -819,11 +824,25 @@
 
   let _hubAccounts = [];
 
+  function _hubBrandOpts() {
+    const brands = App.S.brands || [];
+    return '<option value="">All Brands</option>' + brands.map(b => `<option>${esc(b)}</option>`).join('');
+  }
+
+  let _hubBrandFilter = '';
+
   function renderBankingHub() {
+    _hubBrandFilter = '';
     return {
-      tb: `<div class="tb"><div class="tb-t">Banking Hub</div><button class="bs" onclick="App.go('ac_coa_create')">+ Add Bank Account</button></div>`,
+      tb: `<div class="tb"><div class="tb-t">Banking Hub</div><select class="fl" id="hub_brand" onchange="ScrAccounting._hubSetBrand()" style="width:140px">${_hubBrandOpts()}</select><button class="bs" onclick="App.go('ac_coa_create')">+ Add Bank Account</button></div>`,
       ct: `<div style="max-width:1000px;margin:0 auto" id="hub_content">${_skeleton(1).replace('<tr><td', '<div style="text-align:center;padding:40px;color:var(--t3)"><div class="fin-spinner" style="margin:0 auto 8px"></div>').replace('</td></tr>', '</div>')}</div>`,
     };
+  }
+
+  function _hubSetBrand() {
+    _hubBrandFilter = document.getElementById('hub_brand')?.value || '';
+    const el = document.getElementById('hub_content');
+    if (el) _hubRender(el);
   }
 
   async function _hubLoad() {
@@ -840,13 +859,21 @@
   }
 
   function _hubRender(el) {
-    if (_hubAccounts.length === 0) {
-      el.innerHTML = '<div class="empty" style="padding:40px">No bank accounts found. Add one in Categories (COA).</div>';
+    let accounts = _hubAccounts;
+    // Brand filter by entity_id
+    if (_hubBrandFilter) {
+      accounts = accounts.filter(a => (a.entity_name || '') === _hubBrandFilter);
+    }
+
+    if (accounts.length === 0) {
+      el.innerHTML = _hubBrandFilter
+        ? '<div class="empty" style="padding:40px">No bank accounts for this brand.</div>'
+        : '<div class="empty" style="padding:40px">No bank accounts found. Add one in Categories (COA).</div>';
       return;
     }
 
-    const active = _hubAccounts.filter(a => a.is_active !== false);
-    const inactive = _hubAccounts.filter(a => a.is_active === false);
+    const active = accounts.filter(a => a.is_active !== false);
+    const inactive = accounts.filter(a => a.is_active === false);
 
     let html = '';
     if (active.length > 0) {
@@ -903,12 +930,20 @@
       + '</div>';
   }
 
+  let _bmBrandFilter = '';
+
   function renderBankMap() {
     _bmTab = 'mapping';
+    _bmBrandFilter = '';
     return {
-      tb: `<div class="tb"><div class="tb-t">Bank Mapping</div><button class="bs" id="bm_save_btn" onclick="ScrAccounting._bmSave()">Save Changes</button></div>`,
+      tb: `<div class="tb"><div class="tb-t">Bank Mapping</div><select class="fl" id="bm_brand" onchange="ScrAccounting._bmSetBrand()" style="width:140px">${_hubBrandOpts()}</select><button class="bs" id="bm_save_btn" onclick="ScrAccounting._bmSave()">Save Changes</button></div>`,
       ct: `<div style="max-width:1100px;margin:0 auto" id="bm_wrap"><div id="bm_tabs">${_bmTabs('mapping')}</div><div id="bm_content">${_skeleton(1).replace('<tr><td', '<div style="text-align:center;padding:40px;color:var(--t3)"><div class="fin-spinner" style="margin:0 auto 8px"></div>').replace('</td></tr>', '</div>')}</div></div>`,
     };
+  }
+
+  function _bmSetBrand() {
+    _bmBrandFilter = document.getElementById('bm_brand')?.value || '';
+    _bmLoad();
   }
 
   async function _bmLoad() {
@@ -1763,8 +1798,10 @@
     // E3a
     _brToggleMenu, _brOpenModal, _brSetFilter, _brResetFilters,
     _brToggleActive, _brSave, _brDelete, _brOnVendorChange, _brUpdateSubCats,
+    // E3a: Hub brand filter
+    _hubSetBrand,
     // E3b
-    _bmSetTab, _bmMarkDirty, _bmSave, _lcAdd, _lcEdit,
+    _bmSetTab, _bmMarkDirty, _bmSave, _bmSetBrand, _lcAdd, _lcEdit,
     // E3c: Loans
     _lnSetTab, _lnNewLoanModal, _lnEditLoan, _lnRepayModal, _lnEquityModal,
     // E3c-1: Journal

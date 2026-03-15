@@ -1,9 +1,20 @@
-/** Version 1.7.1 | 15 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 1.8 | 15 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_input_fin.js
  * Create screens: Sale, Bill, Transfer, Debit Note,
  * Recurring, Upload Create (E4), Import (E4)
+ * ═══════════════════════════════════════════
+ *
+ * CHANGED v1.7.1 → v1.8:
+ * - [ADDED] _brandOpts() — shared Brand dropdown builder (App.S.brands → fallback MOCK)
+ * - [ADDED] Brand dropdown (required) in Create Bill before Supplier
+ * - [ADDED] Brand dropdown (required) in Create Debit Note before Supplier
+ * - [ADDED] Brand dropdown in Create Recurring before Supplier
+ * - [ADDED] Brand dropdown (required) in Create Upload before Supplier
+ * - [FIXED] _saveBill sends paying_entity from Brand selector (was null/TODO)
+ * - [ADDED] _saveDebit sends paying_entity + validates Brand
+ * - [ADDED] _saveUploadBill sends paying_entity + validates Brand
  * ═══════════════════════════════════════════
  */
 
@@ -47,6 +58,12 @@
   /** Build <option> list from [{id, label}] */
   function optsObj(arr, selectedId) {
     return arr.map(o => `<option value="${esc(o.id)}"${o.id === selectedId ? ' selected' : ''}>${esc(o.label)}</option>`).join('');
+  }
+
+  /** Brand dropdown options — prefer App.S.brands from API, fallback to MOCK */
+  function _brandOpts(selected) {
+    const brands = App.S.brands && App.S.brands.length > 0 ? App.S.brands : MOCK.brands;
+    return brands.map(b => `<option${b === selected ? ' selected' : ''}>${esc(b)}</option>`).join('');
   }
 
   /** Double-submit guard — disable button during save */
@@ -387,6 +404,11 @@
           </div>
 
           <div class="fg">
+            <label class="lb">Brand *</label>
+            <select class="inp" id="cd_brand" style="font-size:14px;padding:8px">${_brandOpts()}</select>
+          </div>
+
+          <div class="fg">
             <label class="lb">Supplier *</label>
             <select class="inp" id="cd_supplier" style="font-size:14px;padding:8px">${opts(MOCK.suppliers)}</select>
           </div>
@@ -464,6 +486,14 @@
     btnEl.textContent = 'Saving...';
 
     try {
+      const brandEl = document.getElementById('cd_brand');
+      if (!brandEl || !brandEl.value) {
+        App.toast('Please select a Brand');
+        btnEl.disabled = false;
+        btnEl.textContent = origText;
+        return;
+      }
+
       // Validate
       const supplierEl = document.getElementById('cd_supplier');
       if (!supplierEl || !supplierEl.value) {
@@ -499,6 +529,7 @@
       const data = {
         vendor_id: null,
         vendor_name: supplierEl.value,
+        paying_entity: document.getElementById('cd_brand')?.value || '',
         inv_no: document.getElementById('cd_inv_no')?.value || '',
         amount: debitExGst,
         gst: debitGst,
@@ -706,6 +737,10 @@
                     <option>Expense / Bill</option>
                     <option>Asset Purchase</option>
                   </select>
+                </div>
+                <div class="fg">
+                  <label class="lb">Brand *</label>
+                  <select class="inp" id="cb_brand" style="width:280px">${_brandOpts()}</select>
                 </div>
                 <div class="fg">
                   <label class="lb">Supplier *</label>
@@ -987,6 +1022,9 @@
       // ★ VALIDATION — header fields
       const _vFail = (msg) => { App.toast(msg); saveBtn.disabled = false; saveBtn.textContent = origText; };
 
+      const brandCheck = document.getElementById('cb_brand');
+      if (!brandCheck || !brandCheck.value) { _vFail('Please select a Brand'); return; }
+
       const supplierCheck = document.getElementById('cb_supplier');
       if (!supplierCheck || !supplierCheck.value) { _vFail('Please select a Supplier'); return; }
 
@@ -1071,7 +1109,7 @@
         issue_date: document.getElementById('cb_issue_date')?.value || App.today(),
         due_date: document.getElementById('cb_due_date')?.value || null,
         accrual_month: document.getElementById('cb_accrual')?.value || null,
-        brand: null, // TODO: from allocation
+        paying_entity: document.getElementById('cb_brand')?.value || null,
         allocation: _billAllocMode,
         notes: document.getElementById('cb_notes')?.value || '',
         total: totalExGst + totalGst,
@@ -1140,6 +1178,10 @@
           <!-- Transaction Details card -->
           <div class="card">
             <div style="font-size:var(--fs-body);font-weight:700;margin-bottom:10px">Create a transaction with this information</div>
+            <div class="fg" style="max-width:280px">
+              <label class="lb">Brand *</label>
+              <select class="inp" id="cr_brand">${_brandOpts()}</select>
+            </div>
             <div class="fr">
               <div class="fg" style="flex:2">
                 <label class="lb">Supplier *</label>
@@ -1264,6 +1306,11 @@
               </div>
 
               <div class="fg">
+                <label class="lb">Brand *</label>
+                <select class="inp" id="upl_brand">${_brandOpts()}</select>
+              </div>
+
+              <div class="fg">
                 <label class="lb">Supplier *</label>
                 <select class="inp" id="upl_vendor" onchange="ScrInput._uplVendorChange()">${vendorOpts}</select>
               </div>
@@ -1369,6 +1416,8 @@
 
   async function _saveUploadBill(btnEl) {
     if (!btnEl || btnEl.disabled) return;
+    const brandVal = document.getElementById('upl_brand')?.value || '';
+    if (!brandVal) { App.toast('Brand is required'); return; }
     const vendorSel = document.getElementById('upl_vendor');
     const vendorId = vendorSel?.value || null;
     const vendorName = vendorId ? vendorSel.options[vendorSel.selectedIndex]?.text : null;
@@ -1388,6 +1437,7 @@
       await API.createBill({
         vendor_id: vendorId,
         vendor_name: vendorName,
+        paying_entity: brandVal,
         supplier_inv_no: document.getElementById('upl_inv_no')?.value?.trim() || '',
         issue_date: document.getElementById('upl_date')?.value || today(),
         due_date: document.getElementById('upl_due')?.value || null,

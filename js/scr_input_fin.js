@@ -1,4 +1,4 @@
-/** Version 1.8 | 15 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 1.8.1 | 15 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_input_fin.js
@@ -12,9 +12,9 @@
  * - [ADDED] Brand dropdown (required) in Create Debit Note before Supplier
  * - [ADDED] Brand dropdown in Create Recurring before Supplier
  * - [ADDED] Brand dropdown (required) in Create Upload before Supplier
- * - [FIXED] _saveBill sends paying_entity from Brand selector (was null/TODO)
- * - [ADDED] _saveDebit sends paying_entity + validates Brand
- * - [ADDED] _saveUploadBill sends paying_entity + validates Brand
+ * - [FIXED] _saveBill sends brand_id from Brand selector (was paying_entity — backend reads brand_id)
+ * - [ADDED] _saveDebit sends brand_id + validates Brand
+ * - [ADDED] _saveUploadBill sends brand_id + validates Brand
  * ═══════════════════════════════════════════
  */
 
@@ -529,7 +529,7 @@
       const data = {
         vendor_id: null,
         vendor_name: supplierEl.value,
-        paying_entity: document.getElementById('cd_brand')?.value || '',
+        brand_id: document.getElementById('cd_brand')?.value || '',
         inv_no: document.getElementById('cd_inv_no')?.value || '',
         amount: debitExGst,
         gst: debitGst,
@@ -1109,7 +1109,7 @@
         issue_date: document.getElementById('cb_issue_date')?.value || App.today(),
         due_date: document.getElementById('cb_due_date')?.value || null,
         accrual_month: document.getElementById('cb_accrual')?.value || null,
-        paying_entity: document.getElementById('cb_brand')?.value || null,
+        brand_id: document.getElementById('cb_brand')?.value || null,
         allocation: _billAllocMode,
         notes: document.getElementById('cb_notes')?.value || '',
         total: totalExGst + totalGst,
@@ -1437,7 +1437,7 @@
       await API.createBill({
         vendor_id: vendorId,
         vendor_name: vendorName,
-        paying_entity: brandVal,
+        brand_id: brandVal,
         supplier_inv_no: document.getElementById('upl_inv_no')?.value?.trim() || '',
         issue_date: document.getElementById('upl_date')?.value || today(),
         due_date: document.getElementById('upl_due')?.value || null,

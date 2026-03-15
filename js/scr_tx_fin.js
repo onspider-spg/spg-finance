@@ -1,4 +1,4 @@
-/** Version 1.6.2 | 15 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 1.7 | 15 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_tx_fin.js
@@ -6,10 +6,12 @@
  * Bill Detail, SD Bridge, Find Transactions
  * ═══════════════════════════════════════════
  *
- * CHANGED v1.6.1 → v1.6.2:
- * - [MOVED] _sortTable, sth, sthR → App.sortTable, App.sth, App.sthR (shared in app_fin.js)
- * - [FIXED] Arrow indicator changed from ⇅ to ▲/▼ (active column only)
- * - [ADDED] Sort support for Find DC and Find FT tables
+ * CHANGED v1.6.2 → v1.7:
+ * - [ADDED] _brandFilterOpts() — shared Brand filter dropdown builder
+ * - [ADDED] Brand filter dropdown in SD Bridge (id=sd_brand) + _sdSetBrandFilter()
+ * - [ADDED] Brand filter dropdown in Purchase Returns (id=ret_brand)
+ * - [ADDED] Brand filter dropdown in Find Transactions (id=find_brand)
+ * - [ADDED] Brand disabled field in Bill Detail (reads paying_entity/brand)
  * ═══════════════════════════════════════════
  */
 (() => {
@@ -58,6 +60,12 @@ function reconBadge(v) {
 
 const TW = 'max-width:1000px;margin:0 auto';
 const sth = App.sth, sthR = App.sthR;
+
+/** Brand filter <option> list — from App.S.brands */
+function _brandFilterOpts() {
+  const brands = App.S.brands || [];
+  return '<option value="">All Brands</option>' + brands.map(b => `<option>${esc(b)}</option>`).join('');
+}
 
 /** Skeleton loading row for tables */
 function _skeletonRow(cols) {
@@ -238,7 +246,7 @@ function renderTxReturn() {
 
   return {
     tb: `<div class="tb"><div class="tb-t">Purchase Returns and Debits</div><button class="bs" onclick="App.go('cr_debit')">Create debit note</button></div>`,
-    ct: `<div style="${TW}"><div class="card"><div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:6px"><div><div class="fl-l">Supplier</div><select class="fl" style="width:160px"><option>All</option></select></div><div><div class="fl-l">Search</div><input class="fl" placeholder="Search..." style="width:140px"></div><div style="flex:1"></div><button class="bg" style="color:var(--acc)">Reset</button></div><div id="ret_total" style="text-align:right;font-size:var(--fs-sm);color:var(--t2)">Total debit: <b>${fm(tA)}</b></div></div><div class="card" style="padding:0"><table class="tbl" id="tbl_ret"><thead><tr>${sth('Date', 'date', 'tbl_ret')}${sth('Bill no', 'bill', 'tbl_ret')}${sth('Supplier', 'supplier', 'tbl_ret')}${sth('Inv no', 'inv', 'tbl_ret')}<th>Notes</th>${sthR('Amount ($)', 'amount', 'tbl_ret')}<th style="text-align:right">Balance</th><th>Status</th><th>Refund</th><th>Apply</th></tr></thead><tbody id="ret_tbody">${rows}</tbody></table></div><div id="txret_lm" style="text-align:center;padding:10px;display:none"><button class="btn bo" style="font-size:var(--fs-sm)">Load more</button></div><div id="debit_detail" style="display:none"></div></div>`,
+    ct: `<div style="${TW}"><div class="card"><div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:6px"><div><div class="fl-l">Supplier</div><select class="fl" style="width:160px"><option>All</option></select></div><div><div class="fl-l">Brand</div><select class="fl" id="ret_brand" style="width:140px">${_brandFilterOpts()}</select></div><div><div class="fl-l">Search</div><input class="fl" placeholder="Search..." style="width:140px"></div><div style="flex:1"></div><button class="bg" style="color:var(--acc)">Reset</button></div><div id="ret_total" style="text-align:right;font-size:var(--fs-sm);color:var(--t2)">Total debit: <b>${fm(tA)}</b></div></div><div class="card" style="padding:0"><table class="tbl" id="tbl_ret"><thead><tr>${sth('Date', 'date', 'tbl_ret')}${sth('Bill no', 'bill', 'tbl_ret')}${sth('Supplier', 'supplier', 'tbl_ret')}${sth('Inv no', 'inv', 'tbl_ret')}<th>Notes</th>${sthR('Amount ($)', 'amount', 'tbl_ret')}<th style="text-align:right">Balance</th><th>Status</th><th>Refund</th><th>Apply</th></tr></thead><tbody id="ret_tbody">${rows}</tbody></table></div><div id="txret_lm" style="text-align:center;padding:10px;display:none"><button class="btn bo" style="font-size:var(--fs-sm)">Load more</button></div><div id="debit_detail" style="display:none"></div></div>`,
   };
 }
 
@@ -319,6 +327,10 @@ function renderTxBillDetail() {
             <div class="fg">
               <label class="lb">Transaction Type</label>
               <input class="inp" ${DS} value="Expense / Bill" style="width:280px">
+            </div>
+            <div class="fg">
+              <label class="lb">Brand</label>
+              <input class="inp" ${DS} value="${esc(b.paying_entity || b.brand || '—')}" style="width:280px">
             </div>
             <div class="fg">
               <label class="lb">Supplier</label>
@@ -451,6 +463,7 @@ function _bdSplitView() { return ''; }
 let _sdFilter = 'all'; // 'all', 'pending', 'synced'
 let _sdMonth = new Date().toISOString().substring(0, 7); // '2026-03'
 let _sdChecked = new Set();
+let _sdBrandFilter = ''; // brand name filter
 
 function renderTxSdBridge() {
   _sdChecked = new Set();
@@ -463,6 +476,7 @@ function renderTxSdBridge() {
           <button class="btn bo" style="padding:6px 16px;font-size:12px" onclick="ScrTx._sdSetFilter('pending',this)">Pending</button>
           <button class="btn bo" style="padding:6px 16px;font-size:12px" onclick="ScrTx._sdSetFilter('synced',this)">Done</button>
         </div>
+        <div><div class="fl-l">Brand</div><select class="fl" id="sd_brand" onchange="ScrTx._sdSetBrandFilter()" style="width:140px">${_brandFilterOpts()}</select></div>
         <div style="flex:1"></div>
       </div>
       <div class="kpi" id="sd_kpi">
@@ -511,6 +525,11 @@ async function _loadSdBridge() {
     let filtered = rows;
     if (_sdFilter === 'pending') filtered = rows.filter(r => r.status === 'pending');
     else if (_sdFilter === 'synced') filtered = rows.filter(r => r.status === 'synced');
+
+    // Brand filter (paying_entity from SD bridge data)
+    if (_sdBrandFilter) {
+      filtered = filtered.filter(r => (r.paying_entity || r.store || '') === _sdBrandFilter);
+    }
 
     // Group by date + store
     const groups = {};
@@ -642,6 +661,11 @@ function _sdSetFilter(f, btn) {
   _loadSdBridge();
 }
 
+function _sdSetBrandFilter() {
+  _sdBrandFilter = document.getElementById('sd_brand')?.value || '';
+  _loadSdBridge();
+}
+
 function _sdChangeMonth() {
   const el = document.getElementById('sd_month');
   if (el) _sdMonth = el.value;
@@ -694,7 +718,7 @@ function renderTxFind() {
   const dr = dateRange();
   return {
     tb: '<div class="tb"><div class="tb-t">Find Transactions</div></div>',
-    ct: `<div class="card" style="max-width:1000px;margin:0 auto"><div class="tabs" id="find_tabs"><div class="tab a" onclick="ScrTx._switchFindTab('dc')">Debit and Credit</div><div class="tab" onclick="ScrTx._switchFindTab('ft')">Find Transaction</div></div><div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px"><div><div class="fl-l">Period</div><select class="fl"><option>This month</option><option>Last month</option></select></div><div><div class="fl-l">Date from</div><input class="fl" type="date" value="${dr.from}" style="width:130px"></div><div><div class="fl-l">Date to</div><input class="fl" type="date" value="${dr.to}" style="width:130px"></div><div><div class="fl-l">Contact</div><select class="fl" style="width:100px"><option>All</option></select></div><div><div class="fl-l">Search</div><input class="fl" placeholder="" style="width:100px"></div><div style="flex:1"></div><button class="bg" style="color:var(--acc)">Reset</button></div><div id="find_ct">${_skeletonRow(7).replace('<tr>', '<table class="tbl"><tr>').replace('</tr>', '</tr></table>')}</div></div>`,
+    ct: `<div class="card" style="max-width:1000px;margin:0 auto"><div class="tabs" id="find_tabs"><div class="tab a" onclick="ScrTx._switchFindTab('dc')">Debit and Credit</div><div class="tab" onclick="ScrTx._switchFindTab('ft')">Find Transaction</div></div><div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px"><div><div class="fl-l">Period</div><select class="fl"><option>This month</option><option>Last month</option></select></div><div><div class="fl-l">Date from</div><input class="fl" type="date" value="${dr.from}" style="width:130px"></div><div><div class="fl-l">Date to</div><input class="fl" type="date" value="${dr.to}" style="width:130px"></div><div><div class="fl-l">Contact</div><select class="fl" style="width:100px"><option>All</option></select></div><div><div class="fl-l">Brand</div><select class="fl" id="find_brand" style="width:140px">${_brandFilterOpts()}</select></div><div><div class="fl-l">Search</div><input class="fl" placeholder="" style="width:100px"></div><div style="flex:1"></div><button class="bg" style="color:var(--acc)">Reset</button></div><div id="find_ct">${_skeletonRow(7).replace('<tr>', '<table class="tbl"><tr>').replace('</tr>', '</tr></table>')}</div></div>`,
   };
 }
 
@@ -762,6 +786,7 @@ window.ScrTx = {
   _loadMoreBills,
   _sdToggleGroup,
   _sdSetFilter,
+  _sdSetBrandFilter,
   _sdChangeMonth,
   _sdCheckToggle,
   _sdSyncSelected,

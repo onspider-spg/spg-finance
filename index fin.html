@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- Version 1.0.4 | 15 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 -->
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SPG Finance">
+<link rel="icon" href="favicon.ico" type="image/x-icon">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<title>SPG Finance</title>
+<link rel="stylesheet" href="css/styles_fin.css">
+</head>
+<body>
+
+  <!-- Toast -->
+  <div id="toast" class="fin-toast"></div>
+
+  <!-- Loading Overlay -->
+  <div id="loader" class="fin-loader hidden">
+    <div class="fin-spinner"></div>
+  </div>
+
+  <!-- App Shell -->
+  <div id="app" class="fin-app">
+    <!-- Topbar -->
+    <div class="gt" id="topbar"></div>
+
+    <!-- Body = Sidebar + Main -->
+    <div class="fin-body">
+      <!-- Sidebar -->
+      <nav class="sd" id="sidebar"></nav>
+
+      <!-- Main Content Area -->
+      <main class="mn">
+        <div id="toolbar"></div>
+        <div class="ct" id="content"></div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Core scripts — app_fin first (defines App.S), then api_fin (reads App.S) -->
+  <script src="js/app_fin.js" defer></script>
+  <script src="js/api_fin.js" defer></script>
+  <!-- Screen scripts — lazy loaded by app_fin.js when needed -->
+  <!-- js/scr_input_fin.js — loaded on first Create screen visit -->
+  <!-- js/scr_tx_fin.js — loaded on first Transaction screen visit -->
+</body>
+</html>

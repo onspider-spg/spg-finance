@@ -1,4 +1,4 @@
-/** Version 1.7 | 15 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 1.7.1 | 16 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_tx_fin.js
@@ -6,12 +6,8 @@
  * Bill Detail, SD Bridge, Find Transactions
  * ═══════════════════════════════════════════
  *
- * CHANGED v1.6.2 → v1.7:
- * - [ADDED] _brandFilterOpts() — shared Brand filter dropdown builder
- * - [ADDED] Brand filter dropdown in SD Bridge (id=sd_brand) + _sdSetBrandFilter()
- * - [ADDED] Brand filter dropdown in Purchase Returns (id=ret_brand)
- * - [ADDED] Brand filter dropdown in Find Transactions (id=find_brand)
- * - [ADDED] Brand disabled field in Bill Detail (reads paying_entity/brand)
+ * CHANGED v1.7 → v1.7.1:
+ * - [FIXED] _sdSyncSelected — show created bill_nos (FIN-xxxx) in toast
  * ═══════════════════════════════════════════
  */
 (() => {
@@ -697,7 +693,12 @@ async function _sdSyncSelected() {
 
   try {
     const result = await API.syncSd(ids);
-    App.toast('Synced ' + (result.synced || ids.length) + ' records');
+    const count = result.synced || ids.length;
+    const billNos = (result.created || []).map(c => c.bill_no).filter(Boolean);
+    const msg = billNos.length > 0
+      ? `Synced ${count} → ${billNos.join(', ')}`
+      : `Synced ${count} records`;
+    App.toast(msg);
     _sdChecked = new Set();
     // Reload to reflect new state
     await _loadSdBridge();

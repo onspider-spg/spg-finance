@@ -1,4 +1,4 @@
-/** Version 1.6.3 | 15 MAR 2026 | Siam Palette Group | Created 13 MAR 2026 */
+/** Version 1.6.4 | 16 MAR 2026 | Siam Palette Group | Created 13 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — api_fin.js
@@ -131,11 +131,7 @@ const API = (() => {
     { id: 'R-001', date: '2026-03-09', bill_no: 'FIN-0047', supplier_name: 'Siam Pacific Food', inv_no: 'INV00003237-CR', orig_inv: 'FIN-0048 · INV00003237', amount: -50, balance: -50, apply_status: 'Unused', updated_at: '2026-03-09T07:00:00Z' },
   ];
 
-  const _MOCK_SD_PENDING = [
-    { id: 'SD-001', date: '2026-03-12', store: 'Mango Coco Mac', channel: 'In-store', type: 'revenue', amount: 2340.50, status: 'pending' },
-    { id: 'SD-002', date: '2026-03-12', store: 'Mango Coco Mac', channel: 'UberEats', type: 'revenue', amount: 890.20, status: 'pending' },
-    { id: 'SD-003', date: '2026-03-11', store: 'Flying Tigress', channel: 'In-store', type: 'revenue', amount: 1560.00, status: 'synced' },
-  ];
+  // SD MOCK removed — using real sd_finance_bridge data via API
 
   // ═══════════════════════════════════════
   // INIT — 2 phases
@@ -397,21 +393,17 @@ const API = (() => {
     }
   }
 
-  /** Get SD pending records → DB จริง */
+  /** Get SD pending records → DB จริง (sd_finance_bridge) */
   async function getSdPending(filters = {}) {
     if (_loading.sd) return { rows: _S()._sdPending || [], kpi: _sdKpi() };
     _loading.sd = true;
     try {
-      let result;
-      try {
-        result = await _call('fin_get_sd_pending', filters);
-      } catch (e) {
-        console.warn('getSdPending API failed, using MOCK:', e.message);
-        result = { rows: _MOCK_SD_PENDING, kpi: _sdKpi() };
-      }
-
+      const result = await _call('fin_get_sd_pending', filters);
       _S()._sdPending = result.rows;
       return { rows: _S()._sdPending, kpi: result.kpi || _sdKpi() };
+    } catch (e) {
+      console.warn('getSdPending failed:', e.message);
+      return { rows: _S()._sdPending || [], kpi: _sdKpi() };
     } finally {
       _loading.sd = false;
     }
@@ -426,28 +418,17 @@ const API = (() => {
     };
   }
 
-  /** Sync SD records → Finance → DB จริง */
+  /** Sync SD records → Finance → creates fin_transactions */
   async function syncSd(ids) {
-    try {
-      const result = await _call('fin_sync_sd', { ids });
-      // Update memory: mark synced
-      if (_S()._sdPending) {
-        ids.forEach(id => {
-          const r = _S()._sdPending.find(x => x.id === id);
-          if (r) r.status = 'synced';
-        });
-      }
-      return result;
-    } catch (e) {
-      console.warn('syncSd API failed, using MOCK:', e.message);
-      if (_S()._sdPending) {
-        ids.forEach(id => {
-          const r = _S()._sdPending.find(x => x.id === id);
-          if (r) r.status = 'synced';
-        });
-      }
-      return { success: true, synced: ids.length };
+    const result = await _call('fin_sync_sd', { ids });
+    // Update memory: mark synced + remove from pending
+    if (_S()._sdPending) {
+      ids.forEach(id => {
+        const r = _S()._sdPending.find(x => x.id === id);
+        if (r) r.status = 'synced';
+      });
     }
+    return result;
   }
 
   /** Get debit credits (Find Tx: DC tab) */

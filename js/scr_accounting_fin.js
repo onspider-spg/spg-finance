@@ -1,4 +1,4 @@
-/** Version 2.3 | 15 MAR 2026 | Siam Palette Group */
+/** Version 2.3.1 | 16 MAR 2026 | Siam Palette Group */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_accounting_fin.js
@@ -6,15 +6,15 @@
  * Loans & Finance, General Journal
  * ═══════════════════════════════════════════
  *
- * CHANGED v2.2 → v2.3:
- * - [ADDED] Brand filter in Banking Hub (id=hub_brand) + _hubSetBrand() + client-side filter
- * - [ADDED] Brand filter in Bank Map (id=bm_brand) + _bmSetBrand()
+ * CHANGED v2.3 → v2.3.1:
+ * - [DELETED] _skeleton() — use App.skeleton()
  * ═══════════════════════════════════════════
  */
 
 (() => {
   const esc = App.esc;
   const fm = App.formatMoney;
+  const _skeleton = App.skeleton;
 
   // ── Local state ──
   let _coaRows = [];
@@ -26,13 +26,6 @@
 
   // Tab filter options — match transaction_type values in category_master
   const COA_TABS = ['All', 'Income', 'Expense', 'Asset Purchase', 'Transfer', 'Loan'];
-
-  // ══════════════════════════════════════════
-  // SHARED: Skeleton
-  // ══════════════════════════════════════════
-  function _skeleton(cols) {
-    return `<tr><td colspan="${cols}" style="text-align:center;padding:20px;color:var(--t3)"><div class="fin-spinner" style="margin:0 auto 8px"></div>Loading...</td></tr>`;
-  }
 
   // ══════════════════════════════════════════
   // 1. COA LIST — ★ CONNECTED TO DB

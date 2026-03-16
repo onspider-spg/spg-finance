@@ -1,4 +1,4 @@
-/** Version 1.8.1 | 16 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 1.9 | 16 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_tx_fin.js
@@ -6,8 +6,10 @@
  * Bill Detail, SD Bridge, Find Transactions
  * ═══════════════════════════════════════════
  *
- * CHANGED v1.8 → v1.8.1:
- * - [DELETED] TX_MOCK — all screens use API data; mock no longer needed
+ * CHANGED v1.8.1 → v1.9:
+ * - [DELETED] _brandFilterOpts() — use App.brandFilterOpts()
+ * - [DELETED] _skeletonRow() — use App.skeleton()
+ * - [DELETED] _fmtDate() — use App.formatDateFull()
  * ═══════════════════════════════════════════
  */
 (() => {
@@ -33,11 +35,10 @@ function reconBadge(v) {
 const TW = 'max-width:1000px;margin:0 auto';
 const sth = App.sth, sthR = App.sthR;
 
-/** Brand filter <option> list — from App.S.brands */
-function _brandFilterOpts() {
-  const brands = App.S.brands || [];
-  return '<option value="">All Brands</option>' + brands.map(b => `<option>${esc(b)}</option>`).join('');
-}
+// Aliases — shared helpers from App
+const _brandFilterOpts = App.brandFilterOpts;
+const _skeletonRow = App.skeleton;
+const _fmtDate = App.formatDateFull;
 
 /** Supplier filter <option> list — from App.S.vendors */
 function _supplierFilterOpts() {
@@ -49,19 +50,6 @@ function _supplierFilterOpts() {
 function _channelFilterOpts() {
   const channels = App.S.channels || [];
   return '<option value="">All Channels</option>' + channels.map(c => `<option>${esc(c)}</option>`).join('');
-}
-
-/** Skeleton loading row for tables */
-function _skeletonRow(cols) {
-  return `<tr><td colspan="${cols}" style="text-align:center;padding:20px;color:var(--t3)"><div class="fin-spinner" style="margin:0 auto 8px"></div>Loading...</td></tr>`;
-}
-
-/** Format ISO date to DD/MM/YYYY for display */
-function _fmtDate(d) {
-  if (!d) return '';
-  if (d.includes('/')) return d; // already formatted
-  const p = d.split('-');
-  return p.length >= 3 ? p[2] + '/' + p[1] + '/' + p[0] : d;
 }
 
 // ═══════════════════════════════════════

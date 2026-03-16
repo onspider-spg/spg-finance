@@ -1,9 +1,14 @@
-/** Version 2.7 | 15 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 2.8 | 16 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — app_fin.js
  * Router + Sidebar + Topbar + Shared Utilities
  * ═══════════════════════════════════════════
+ *
+ * CHANGED v2.7 → v2.8:
+ * - [ADDED] App.skeleton(cols) — shared skeleton loading row for tables
+ * - [ADDED] App.brandFilterOpts() — Brand filter <option> with "All Brands"
+ * - [ADDED] App.brandOpts(selected) — Brand form <option> without "All"
  *
  * FUNCTION MAP (P1):
  *   App.init()            — entry point, call API.init, build shell, start router
@@ -689,6 +694,27 @@ const App = (() => {
   }
 
   // ═══════════════════════════
+  // SHARED HELPERS (used across scr_xxx files)
+  // ═══════════════════════════
+
+  /** Skeleton loading row for tables */
+  function skeleton(cols) {
+    return `<tr><td colspan="${cols}" style="text-align:center;padding:20px;color:var(--t3)"><div class="fin-spinner" style="margin:0 auto 8px"></div>Loading...</td></tr>`;
+  }
+
+  /** Brand <option> list for filter dropdowns — value="" for All */
+  function brandFilterOpts() {
+    const brands = S.brands || [];
+    return '<option value="">All Brands</option>' + brands.map(b => `<option>${esc(b)}</option>`).join('');
+  }
+
+  /** Brand <option> list for form selects — no "All" option */
+  function brandOpts(selected) {
+    const brands = S.brands || [];
+    return brands.map(b => `<option${b === selected ? ' selected' : ''}>${esc(b)}</option>`).join('');
+  }
+
+  // ═══════════════════════════
   // BOOT
   // ═══════════════════════════
   document.addEventListener('DOMContentLoaded', init);
@@ -715,6 +741,9 @@ const App = (() => {
     _toggleSidebar,
     _hardRefresh,
     NAV,
+    skeleton,
+    brandOpts,
+    brandFilterOpts,
   };
 
 })();

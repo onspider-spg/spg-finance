@@ -1,9 +1,14 @@
-/** Version 1.0.1 | 15 MAR 2026 | Siam Palette Group */
+/** Version 1.0.2 | 16 MAR 2026 | Siam Palette Group */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_payment_fin.js
  * Payment: Record Payment, Payment History, Remittance Advice
  * Lazy-loaded by app_fin.js on first visit to py_* routes
+ * ═══════════════════════════════════════════
+ *
+ * CHANGED v1.0.1 → v1.0.2:
+ * - [DELETED] _skeleton() — use App.skeleton()
+ * - [FIXED] _today() UTC bug — use App.today() (Sydney timezone)
  * ═══════════════════════════════════════════
  */
 
@@ -30,11 +35,8 @@
   // ══════════════════════════════════════════
   // SHARED HELPERS
   // ══════════════════════════════════════════
-  function _skeleton(cols) {
-    return `<tr><td colspan="${cols}" style="text-align:center;padding:20px;color:var(--t3)"><div class="fin-spinner" style="margin:0 auto 8px"></div>Loading...</td></tr>`;
-  }
-
-  function _today() { return new Date().toISOString().substring(0, 10); }
+  const _skeleton = App.skeleton;
+  const _today = App.today;
 
   function _bankOptions() {
     return (App.S.bankAccounts || []).map(b =>

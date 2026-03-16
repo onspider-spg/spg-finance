@@ -1,4 +1,4 @@
-/** Version 1.1 | 15 MAR 2026 | Siam Palette Group */
+/** Version 1.1.1 | 16 MAR 2026 | Siam Palette Group */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_reconcile_fin.js
@@ -6,10 +6,11 @@
  * Lazy-loaded by app_fin.js on first visit to rc_* routes
  * ═══════════════════════════════════════════
  *
- * CHANGED v1.0.1 → v1.1:
- * - [ADDED] _brandFilterOpts() — Brand filter dropdown builder
- * - [ADDED] Brand filter in Bank Reconcile (id=rc_brand) + wider account select
- * - [ADDED] Brand filter in Cash Reconcile (id=cr_brand) + wider account select
+ * CHANGED v1.1 → v1.1.1:
+ * - [DELETED] _skeleton() — use App.skeleton()
+ * - [FIXED] _today() UTC bug — use App.today() (Sydney timezone)
+ * - [DELETED] _fmtDate() — use App.formatDate() with '—' fallback
+ * - [DELETED] _brandFilterOpts() — use App.brandFilterOpts()
  * ═══════════════════════════════════════════
  */
 
@@ -19,19 +20,17 @@
   const fd = App.formatDate;
 
   // ══════════════════════════════════════════
-  // SHARED
+  // SHARED — aliases from App
   // ══════════════════════════════════════════
-  function _skeleton(cols) {
-    return `<tr><td colspan="${cols}" style="text-align:center;padding:20px;color:var(--t3)"><div class="fin-spinner" style="margin:0 auto 8px"></div>Loading...</td></tr>`;
-  }
-  function _today() { return new Date().toISOString().substring(0, 10); }
+  const _skeleton = App.skeleton;
+  const _today = App.today;
+  const _fmtDate = (d) => App.formatDate(d) || '—';
+  const _brandFilterOpts = App.brandFilterOpts;
   function _bankOptions(selected) {
     return (App.S.bankAccounts || []).map(b =>
       `<option value="${esc(b.id)}"${b.id === selected ? ' selected' : ''}>${esc(b.account_name || b.name)} #${esc(b.account_number || '')}</option>`
     ).join('');
   }
-  function _fmtDate(d) { if (!d) return '—'; const p = d.split('-'); return p[2] + '/' + p[1]; }
-
   // ══════════════════════════════════════════
   // 1. STATEMENT UPLOAD (rc_stmt) — Upload CSV → parse → import
   // ══════════════════════════════════════════
@@ -523,11 +522,6 @@
   let _rcStmtLines = [];
   let _rcMatches = [];
   let _rcSummary = {};
-
-  function _brandFilterOpts() {
-    const brands = App.S.brands || [];
-    return '<option value="">All Brands</option>' + brands.map(b => `<option>${esc(b)}</option>`).join('');
-  }
 
   function renderBankRecon() {
     return {

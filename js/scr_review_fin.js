@@ -1,9 +1,14 @@
-/** Version 1.0.1 | 15 MAR 2026 | Siam Palette Group */
+/** Version 1.0.2 | 16 MAR 2026 | Siam Palette Group */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_review_fin.js
  * Review Monitor: Pending Tracker, Recurring Setup, Expected Invoices
  * Lazy-loaded by app_fin.js on first visit to rv_* routes
+ * ═══════════════════════════════════════════
+ *
+ * CHANGED v1.0.1 → v1.0.2:
+ * - [DELETED] _skeleton() — use App.skeleton()
+ * - [DELETED] _fmtDate() — use App.formatDate() with '—' fallback
  * ═══════════════════════════════════════════
  */
 
@@ -78,11 +83,10 @@
   }
 
   // ══════════════════════════════════════════
-  // SHARED: Skeleton loader
+  // SHARED — aliases from App
   // ══════════════════════════════════════════
-  function _skeleton(cols) {
-    return `<tr><td colspan="${cols}" style="text-align:center;padding:20px;color:var(--t3)"><div class="fin-spinner" style="margin:0 auto 8px"></div>Loading...</td></tr>`;
-  }
+  const _skeleton = App.skeleton;
+  const _fmtDate = (d) => App.formatDate(d) || '—';
 
   // Short money format
   function _fmtShort(n) {
@@ -98,13 +102,6 @@
     const now = new Date();
     now.setHours(0, 0, 0, 0);
     return Math.round((now - d) / 86400000);
-  }
-
-  // Format date as DD/MM
-  function _fmtDate(d) {
-    if (!d) return '—';
-    const p = d.split('-');
-    return p[2] + '/' + p[1];
   }
 
   // ══════════════════════════════════════════

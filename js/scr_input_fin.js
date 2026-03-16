@@ -1,4 +1,4 @@
-/** Version 1.9 | 16 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 1.9.1 | 16 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_input_fin.js
@@ -6,17 +6,8 @@
  * Recurring, Upload Create (E4), Import (E4)
  * ═══════════════════════════════════════════
  *
- * CHANGED v1.8.1 → v1.9:
- * - [DELETED] MOCK object (brands, channels, bankAccounts, suppliers, unpaidBills, recentSales, nextBillNo)
- * - [DELETED] MOCK_CATS fallback array
- * - [FIXED] Create Sale — brands/channels/bankAccounts → App.S.xxx
- * - [FIXED] Create Transfer — bankAccounts → App.S.bankAccounts
- * - [FIXED] _updateTransferBal() — MOCK.bankAccounts → App.S.bankAccounts
- * - [FIXED] Create Debit — suppliers → _vendorOpts(), unpaidBills → async load
- * - [FIXED] _brandOpts() — removed MOCK fallback
- * - [FIXED] _vendorOpts() — removed MOCK fallback
- * - [FIXED] _getCats()/_getCatOptsHTML() — removed MOCK_CATS fallback
- * - [FIXED] Create Recurring supplier — MOCK.suppliers → _vendorOpts()
+ * CHANGED v1.9 → v1.9.1:
+ * - [DELETED] _brandOpts() — use App.brandOpts() alias
  * ═══════════════════════════════════════════
  */
 
@@ -40,11 +31,8 @@
     return arr.map(o => `<option value="${esc(o.id)}"${o.id === selectedId ? ' selected' : ''}>${esc(o.label)}</option>`).join('');
   }
 
-  /** Brand dropdown options — from App.S.brands */
-  function _brandOpts(selected) {
-    const brands = App.S.brands || [];
-    return brands.map(b => `<option${b === selected ? ' selected' : ''}>${esc(b)}</option>`).join('');
-  }
+  // Alias — shared helper from App
+  const _brandOpts = App.brandOpts;
 
   /** Double-submit guard — disable button during save */
   function guardedSave(btnEl, saveFn) {

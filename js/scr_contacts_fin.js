@@ -1,23 +1,19 @@
-/** Version 1.0.1 | 15 MAR 2026 | Siam Palette Group */
+/** Version 1.0.2 | 16 MAR 2026 | Siam Palette Group */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_contacts_fin.js
  * Contacts screens: List, Detail (3 tabs), Create
  * ═══════════════════════════════════════════
  *
- * SCREENS:
- *   contacts   — Contact list + filter + balance/overdue (S50)
- *   ct_detail  — Contact detail: 3 tabs Details/Transactions/Balance (S50b)
- *   ct_create  — Create new contact form (S50c)
- *
- * ALL screens connect to DB via API (no MOCK fallback).
- * Concurrency: 4 ACC simultaneous — list views always fresh, save has stale check.
+ * CHANGED v1.0.1 → v1.0.2:
+ * - [DELETED] _skeleton() — use App.skeleton()
  * ═══════════════════════════════════════════
  */
 
 (() => {
   const esc = App.esc;
   const fm = App.formatMoney;
+  const _skeleton = App.skeleton;
 
   // ── Local state ──
   let _contacts = [];
@@ -29,13 +25,6 @@
   let _detailTxns = [];         // transactions for detail tab 2
   let _detailBalance = null;    // balance/aging for detail tab 3
   let _saving = false;          // double-submit guard
-
-  // ══════════════════════════════════════════
-  // SHARED: Skeleton + Section Header
-  // ══════════════════════════════════════════
-  function _skeleton(cols) {
-    return `<tr><td colspan="${cols}" style="text-align:center;padding:20px;color:var(--t3)"><div class="fin-spinner" style="margin:0 auto 8px"></div>Loading...</td></tr>`;
-  }
 
   function _sectionHdr(label) {
     return `<div style="font-size:var(--fs-body);font-weight:700;color:var(--acc);margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--bd2)">${esc(label)}</div>`;

@@ -1,4 +1,4 @@
-/* Version 1.7.1 | 15 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/* Version 1.8 | 17 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /* ═══════════════════════════════════════════
    SPG Finance Module — styles_fin.css
    Desktop-first · System Font · MYOB Purple
@@ -916,4 +916,82 @@ html, body {
 @media (max-width: 600px) {
   .sd { display: none; }
   .ct { padding: 8px; }
+
+  /* ── Topbar: tighter on mobile ── */
+  .gt { padding: 6px 12px; }
+  .gt-logo { font-size: 13px; }
+
+  /* ── Toolbar: wrap filters ── */
+  .tb { padding: 8px 10px; flex-wrap: wrap; gap: 6px; }
+  .tb .fl { font-size: 12px; min-width: 0; }
+
+  /* ── Cards: less padding ── */
+  .card { padding: 10px; margin-bottom: 8px; }
+
+  /* ── Font scale boost for mobile readability ── */
+  :root {
+    --fs-body: 13px;
+    --fs-sm: 11px;
+    --fs-xs: 10px;
+    --fs-xxs: 9px;
+    --fs-kpi-xl: 28px;
+    --fs-kpi-lg: 20px;
+    --fs-kpi-md: 16px;
+  }
+
+  /* ── Dashboard: Brand cards → horizontal scroll ── */
+  #dash_content > div:first-child {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+    padding-bottom: 4px;
+  }
+  #dash_content > div:first-child > .card {
+    min-width: 130px;
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+    padding: 10px;
+  }
+  #dash_content > div:first-child > .card [style*="font-size:11px"] { font-size: 12px !important; }
+  #dash_content > div:first-child > .card [style*="font-size:9px"] { font-size: 10px !important; }
+  #dash_content > div:first-child > .card [style*="font-size:16px"] { font-size: 18px !important; }
+
+  /* ── Dashboard: KPI grids → 1 col on small, 2 col on medium ── */
+  #dash_content [style*="grid-template-columns:1fr 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+  #dash_content .card [style*="font-size:24px"] { font-size: 20px !important; }
+  #dash_content .card [style*="font-size:16px"] { font-size: 14px !important; }
+  #dash_content .card [style*="font-size:9px"] { font-size: 10px !important; }
+  #dash_content .card [style*="font-size:10px"] { font-size: 11px !important; }
+
+  /* ── Dashboard: Action items → 1 col ── */
+  #dash_content [style*="grid-template-columns:1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* ── Dashboard: Indicator badges → wrap nicely ── */
+  #dash_content > div:nth-child(2) {
+    gap: 4px !important;
+  }
+
+  /* ── Tables: allow horizontal scroll ── */
+  .card:has(.tbl) { overflow-x: auto; -webkit-overflow-scrolling: touch; padding: 0; }
+  .tbl { font-size: 12px; min-width: 600px; }
+  .tbl th { font-size: 10px; padding: 6px 8px; white-space: nowrap; }
+  .tbl td { padding: 6px 8px; }
+
+  /* ── Filter bar: smaller inputs ── */
+  .fl { font-size: 12px !important; padding: 5px 6px !important; }
+  .fl-l { font-size: 10px; }
+
+  /* ── KPI row: scroll horizontal ── */
+  .kpi { overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap !important; gap: 6px; padding-bottom: 4px; }
+  .kpi-c { min-width: 100px; flex: 0 0 auto; padding: 8px 10px; }
+
+  /* ── Create forms: full width ── */
+  .fr { flex-direction: column; }
+  .fg { width: 100% !important; }
+  .inp { font-size: 14px !important; }
+  .lb { font-size: 11px; }
 }

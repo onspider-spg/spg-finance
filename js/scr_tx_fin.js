@@ -1,4 +1,4 @@
-/** Version 1.8 | 16 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 1.8.1 | 16 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_tx_fin.js
@@ -6,49 +6,14 @@
  * Bill Detail, SD Bridge, Find Transactions
  * ═══════════════════════════════════════════
  *
- * CHANGED v1.7.1 → v1.8:
- * - [ADDED] _filterLog() — collect filter values → call _loadLog(filters)
- * - [ADDED] _filterSales() — collect filter values → call _loadSales(filters)
- * - [ADDED] _filterBills() — collect filter values → call _loadBills(filters)
- * - [ADDED] _filterReturns() — collect filter values → call _loadReturns(filters)
- * - [ADDED] _resetLog/Sales/Bills/Returns() — clear filters + reload
- * - [ADDED] _supplierFilterOpts() — supplier <option> list from App.S.vendors
- * - [ADDED] _channelFilterOpts() — channel <option> list from App.S.channels
- * - [FIXED] renderTxLog — Brand dropdown hardcode → _brandFilterOpts()
- * - [FIXED] renderTxSale — Brand/Channel hardcode → dynamic from App.S
- * - [FIXED] renderTxBill — Supplier/Brand dropdown not populated → dynamic
- * - [FIXED] renderTxReturn — Supplier dropdown not populated → dynamic
- * - [FIXED] All filters: added id + onchange to every filter element
+ * CHANGED v1.8 → v1.8.1:
+ * - [DELETED] TX_MOCK — all screens use API data; mock no longer needed
  * ═══════════════════════════════════════════
  */
 (() => {
 const esc = App.esc, fm = App.formatMoney, sb = App.statusBadge;
 
-// ═══════════════════════════════════════
-// MOCK DATA — still used for screens not yet connected to DB
-// ═══════════════════════════════════════
-const TX_MOCK = {
-  log: [
-    { date: '12/03/2026', ref: '1277', type: 'Pay run', desc: 'Wage Mar W2', brand: 'Mango Coco', contact: 'Watcharapol D.', amount: 609, recon: 'Match' },
-    { date: '11/03/2026', ref: '1284', type: 'Bill payment', desc: 'Mind.RBuakl', brand: 'Mango Coco', contact: 'Mind.RBuakl xx_M...', amount: 582.82, recon: 'Group Match' },
-    { date: '11/03/2026', ref: '1282', type: 'Bill payment', desc: 'Rental Mar 2026', brand: 'Mango Coco', contact: 'Dencal Pty Ltd', amount: 23558.32, recon: 'Match' },
-    { date: '11/03/2026', ref: 'FIN-0050', type: 'Bill', desc: 'Purchase; Dencal', brand: 'Mango Coco', contact: 'Dencal Pty Ltd', amount: 23558.32, recon: '' },
-    { date: '10/03/2026', ref: 'FIN-0049', type: 'Bill', desc: 'Siam Pacific Food', brand: 'Flying Tigress', contact: 'Siam Pacific Food', amount: 86.44, recon: 'Unmatch' },
-  ],
-  sales: [
-    { date: '12/03/2026', brand: 'Mango Coco', channel: 'Cash', amount: 2340.50, gst: 234.05, status: 'Received' },
-    { date: '12/03/2026', brand: 'Mango Coco', channel: 'UberEats', amount: 890.20, gst: 89.02, status: 'Received' },
-    { date: '11/03/2026', brand: 'Flying Tigress', channel: 'Card', amount: 1560, gst: 156, status: 'Received' },
-    { date: '11/03/2026', brand: 'Mango Coco', channel: 'Easi', amount: 340, gst: 34, status: 'Received' },
-  ],
-  returns: [{ date: '09/03/2026', bill: 'FIN-0047', supplier: 'Siam Pacific Food', inv: 'INV00003237-CR', origInv: 'FIN-0048 · INV00003237', amount: -50, balance: -50, applyStatus: 'Unused' }],
-  debitCredits: [{ date: '09/03/2026', debitRef: 'FIN-0047', creditRef: 'FIN-0048', supplier: 'Siam Pacific Food', debitAmt: -50, creditAmt: 654.16, status: 'Linked' }],
-  groupedTx: [
-    { date: '11/03/2026', ref: 'PAY-001', type: 'Group Payment', desc: 'Pro Bros — 7 bills', contact: 'Pro Bros Providore', amount: 4150, items: 7 },
-    { date: '10/03/2026', ref: 'FIN-0050', type: 'Single Payment', desc: 'Attakor Trading', contact: 'Attakor Trading', amount: 200, items: 1 },
-    { date: '09/03/2026', ref: 'FIN-0049', type: 'Unpaid', desc: 'Siam Pacific Food', contact: 'Siam Pacific Food', amount: 86.44, items: 1 },
-  ],
-};
+// (TX_MOCK removed — all screens use API data via _loadXxx)
 
 // ═══════════════════════════════════════
 // SHARED HELPERS

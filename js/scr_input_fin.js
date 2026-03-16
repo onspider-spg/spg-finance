@@ -1,4 +1,4 @@
-/** Version 1.8.1 | 15 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 1.9 | 16 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_input_fin.js
@@ -6,15 +6,17 @@
  * Recurring, Upload Create (E4), Import (E4)
  * ═══════════════════════════════════════════
  *
- * CHANGED v1.7.1 → v1.8:
- * - [ADDED] _brandOpts() — shared Brand dropdown builder (App.S.brands → fallback MOCK)
- * - [ADDED] Brand dropdown (required) in Create Bill before Supplier
- * - [ADDED] Brand dropdown (required) in Create Debit Note before Supplier
- * - [ADDED] Brand dropdown in Create Recurring before Supplier
- * - [ADDED] Brand dropdown (required) in Create Upload before Supplier
- * - [FIXED] _saveBill sends brand_id from Brand selector (was paying_entity — backend reads brand_id)
- * - [ADDED] _saveDebit sends brand_id + validates Brand
- * - [ADDED] _saveUploadBill sends brand_id + validates Brand
+ * CHANGED v1.8.1 → v1.9:
+ * - [DELETED] MOCK object (brands, channels, bankAccounts, suppliers, unpaidBills, recentSales, nextBillNo)
+ * - [DELETED] MOCK_CATS fallback array
+ * - [FIXED] Create Sale — brands/channels/bankAccounts → App.S.xxx
+ * - [FIXED] Create Transfer — bankAccounts → App.S.bankAccounts
+ * - [FIXED] _updateTransferBal() — MOCK.bankAccounts → App.S.bankAccounts
+ * - [FIXED] Create Debit — suppliers → _vendorOpts(), unpaidBills → async load
+ * - [FIXED] _brandOpts() — removed MOCK fallback
+ * - [FIXED] _vendorOpts() — removed MOCK fallback
+ * - [FIXED] _getCats()/_getCatOptsHTML() — removed MOCK_CATS fallback
+ * - [FIXED] Create Recurring supplier — MOCK.suppliers → _vendorOpts()
  * ═══════════════════════════════════════════
  */
 
@@ -22,29 +24,7 @@
   const esc = App.esc;
   const today = App.today;
 
-  // ══════════════════════════════════════════
-  // MOCK DATA — will be replaced by API later
-  // ══════════════════════════════════════════
-  const MOCK = {
-    brands: ['Mango Coco', 'Flying Tigress', 'Issho Cafe', 'Cheese Cottage', 'Redwork'],
-    channels: ['Cash', 'Card (Eftpos1)', 'Card (Eftpos2)', 'UberEats', 'Easi', 'Union Pay', 'Card Prepaid'],
-    bankAccounts: [
-      { id: '7134', label: '7134 Mango Coco Westpac' },
-      { id: '4429', label: '680 Flying Tigress #4429', balance: 22360.99 },
-      { id: '1997', label: '682 Flying Tigress (Petty Cash) #1997', balance: -3849.70 },
-    ],
-    suppliers: ['', 'Pro Bros Providore', 'Siam Pacific Food', 'B&E Food Distributors', 'Dencal Pty Ltd', 'Akipan'],
-    unpaidBills: [
-      { bill: 'FIN-0048', inv: 'INV00003237', amount: 654.16, status: 'Open' },
-      { bill: 'FIN-0046', inv: 'INV1050790', amount: 190.55, status: 'Open' },
-      { bill: 'FIN-0045', inv: 'INV1050836', amount: 128.10, status: 'Overdue' },
-    ],
-    recentSales: [
-      { date: '12/03', channel: 'UberEats', brand: 'Mango Coco', amount: 890.20 },
-      { date: '12/03', channel: 'Cash', brand: 'Mango Coco', amount: 2340.50 },
-    ],
-    nextBillNo: 'FIN-0052',
-  };
+  // (MOCK data removed — all screens use App.S.xxx from API)
 
   // ══════════════════════════════════════════
   // SHARED HELPERS (used across Create screens)
@@ -60,9 +40,9 @@
     return arr.map(o => `<option value="${esc(o.id)}"${o.id === selectedId ? ' selected' : ''}>${esc(o.label)}</option>`).join('');
   }
 
-  /** Brand dropdown options — prefer App.S.brands from API, fallback to MOCK */
+  /** Brand dropdown options — from App.S.brands */
   function _brandOpts(selected) {
-    const brands = App.S.brands && App.S.brands.length > 0 ? App.S.brands : MOCK.brands;
+    const brands = App.S.brands || [];
     return brands.map(b => `<option${b === selected ? ' selected' : ''}>${esc(b)}</option>`).join('');
   }
 
@@ -92,12 +72,12 @@
 
           <div class="fg">
             <label class="lb">Brand *</label>
-            <select class="inp" id="cs_brand" style="font-size:14px;font-weight:600;padding:8px">${opts(MOCK.brands)}</select>
+            <select class="inp" id="cs_brand" style="font-size:14px;font-weight:600;padding:8px">${_brandOpts()}</select>
           </div>
 
           <div class="fg">
             <label class="lb">Channel *</label>
-            <select class="inp" id="cs_channel">${opts(MOCK.channels)}</select>
+            <select class="inp" id="cs_channel">${opts(App.S.channels || [])}</select>
           </div>
 
           <div class="fa">Auto: Income → Revenue → selected channel</div>
@@ -125,7 +105,7 @@
             </div>
             <div class="fg">
               <label class="lb">Bank Account *</label>
-              <select class="inp" id="cs_bank">${optsObj(MOCK.bankAccounts)}</select>
+              <select class="inp" id="cs_bank">${optsObj(App.S.bankAccounts || [])}</select>
             </div>
           </div>
 
@@ -148,10 +128,7 @@
           <table class="tbl">
             <thead><tr><th>Date</th><th>Channel</th><th>Brand</th><th style="text-align:right">Amount</th></tr></thead>
             <tbody id="cs_recent">
-              ${MOCK.recentSales.map(s => `<tr>
-                <td>${esc(s.date)}</td><td>${esc(s.channel)}</td><td>${esc(s.brand)}</td>
-                <td style="text-align:right;color:var(--g)">+${App.formatMoney(s.amount)}</td>
-              </tr>`).join('')}
+              <tr><td colspan="4" style="text-align:center;color:var(--t3);font-size:var(--fs-xs)">No recent sales</td></tr>
             </tbody>
           </table>
         </div>`,
@@ -285,12 +262,12 @@
           <div class="fr">
             <div class="fg">
               <label class="lb">Bank account from *</label>
-              <select class="inp" id="ct_from" onchange="ScrInput._updateTransferBal()">${optsObj(MOCK.bankAccounts)}</select>
+              <select class="inp" id="ct_from" onchange="ScrInput._updateTransferBal()">${optsObj(App.S.bankAccounts || [])}</select>
               <div id="ct_from_bal" style="font-size:var(--fs-xs);margin-top:4px"></div>
             </div>
             <div class="fg">
               <label class="lb">Bank account to *</label>
-              <select class="inp" id="ct_to" onchange="ScrInput._updateTransferBal()">${optsObj(MOCK.bankAccounts)}</select>
+              <select class="inp" id="ct_to" onchange="ScrInput._updateTransferBal()">${optsObj(App.S.bankAccounts || [])}</select>
               <div id="ct_to_bal" style="font-size:var(--fs-xs);margin-top:4px"></div>
             </div>
           </div>
@@ -319,8 +296,8 @@
     const toBal = document.getElementById('ct_to_bal');
     if (!fromEl || !toEl) return;
 
-    const fromAcc = MOCK.bankAccounts.find(b => b.id === fromEl.value);
-    const toAcc = MOCK.bankAccounts.find(b => b.id === toEl.value);
+    const fromAcc = (App.S.bankAccounts || []).find(b => b.id === fromEl.value);
+    const toAcc = (App.S.bankAccounts || []).find(b => b.id === toEl.value);
 
     if (fromBal && fromAcc?.balance != null) {
       fromBal.innerHTML = `Current balance <b>${App.formatMoney(fromAcc.balance)}</b>`;
@@ -391,10 +368,6 @@
   // 3. CREATE DEBIT NOTE
   // ══════════════════════════════════════════
   function renderCreateDebit() {
-    const billOpts = MOCK.unpaidBills.map(b =>
-      `<option value="${esc(b.bill)}">${esc(b.bill)} · ${esc(b.inv)} · ${App.formatMoney(b.amount)} · ${esc(b.status)}</option>`
-    ).join('');
-
     return {
       tb: '<div class="tb"><div class="tb-t">Create Debit Note</div></div>',
       ct: `
@@ -410,14 +383,13 @@
 
           <div class="fg">
             <label class="lb">Supplier *</label>
-            <select class="inp" id="cd_supplier" style="font-size:14px;padding:8px">${opts(MOCK.suppliers)}</select>
+            <select class="inp" id="cd_supplier" style="font-size:14px;padding:8px">${_vendorOpts()}</select>
           </div>
 
           <div class="fg">
             <label class="lb">Select Invoice to Debit *</label>
             <select class="inp" id="cd_invoice">
-              <option></option>
-              ${billOpts}
+              <option>Loading...</option>
             </select>
           </div>
 
@@ -447,7 +419,7 @@
             </div>
             <div class="fg">
               <label class="lb">Bill Number *</label>
-              <input class="inp" value="${esc(MOCK.nextBillNo)}" readonly style="background:var(--bg3);color:var(--t3)">
+              <input class="inp" value="(auto)" readonly style="background:var(--bg3);color:var(--t3)">
             </div>
           </div>
 
@@ -477,6 +449,21 @@
           </div>
         </div>`,
     };
+  }
+
+  /** onLoad: fetch unpaid bills from API for invoice dropdown */
+  async function _loadDebitInvoices() {
+    const sel = document.getElementById('cd_invoice');
+    if (!sel) return;
+    try {
+      const bills = await API.getUnpaidBills();
+      const html = '<option value=""></option>' + (bills || []).map(b =>
+        `<option value="${esc(b.bill_no || b.bill)}">${esc(b.bill_no || b.bill)} · ${esc(b.inv_no || b.inv || '')} · ${App.formatMoney(b.amount)} · ${esc(b.status)}</option>`
+      ).join('');
+      sel.innerHTML = html;
+    } catch (e) {
+      sel.innerHTML = '<option value="">Error loading invoices</option>';
+    }
   }
 
   async function _saveDebit(btnEl) {
@@ -615,15 +602,12 @@
   // ══════════════════════════════════════════
   // SHARED: CATEGORIES (used by Bill, Recurring, Upload)
   // ══════════════════════════════════════════
-  const MOCK_CATS = ['', '27002 Purchases-GST Free', '27010 Packaging', '42700 Rent', '43000 Utilities', '46000 Wages'];
-
   /** Get categories for Bill screens — only Expense + Asset Purchase */
   function _getCats() {
     const cats = App.S.categories;
-    if (!cats || cats.length === 0) return MOCK_CATS;
+    if (!cats || cats.length === 0) return [''];
 
     // Filter: only Expense + Asset Purchase (Bill creation context)
-    // Transfer → has its own screen, Loan → has its own section, Income → not a bill
     const billCats = cats.filter(c =>
       c.transaction_type === 'Expense' || c.transaction_type === 'Asset Purchase'
     );
@@ -648,7 +632,7 @@
   function _getCatOptsHTML() {
     const cats = App.S.categories;
     if (!cats || cats.length === 0) {
-      return MOCK_CATS.map(c => `<option>${esc(c)}</option>`).join('');
+      return '<option value="">No categories loaded</option>';
     }
 
     // Filter: only Expense + Asset Purchase (Bill creation context)
@@ -675,7 +659,7 @@
     return html;
   }
 
-  /** Get vendor options — prefer S.vendors from API, fallback to MOCK */
+  /** Get vendor options — from App.S.vendors */
   function _vendorOpts() {
     const vendors = App.S.vendors;
     if (vendors && vendors.length > 0) {
@@ -683,7 +667,7 @@
         `<option value="${esc(v.id)}" data-name="${esc(v.name)}">${esc(v.name)}</option>`
       ).join('');
     }
-    return opts(MOCK.suppliers);
+    return '<option value="">No suppliers loaded</option>';
   }
 
   // ══════════════════════════════════════════
@@ -885,7 +869,7 @@
     const C = 'padding:0;border:1px solid #e5e7eb';
     const ST = 'width:100%;padding:8px 10px;border:none;font-size:var(--fs-body);font-family:inherit';
     const catOpts = _getCatOptsHTML();
-    const brands = App.S.brands && App.S.brands.length > 0 ? App.S.brands : MOCK.brands;
+    const brands = App.S.brands || [];
     const brandOpts = brands.map(b => `<option>${esc(b)}</option>`).join('');
 
     let ownerCol = '';
@@ -1185,7 +1169,7 @@
             <div class="fr">
               <div class="fg" style="flex:2">
                 <label class="lb">Supplier *</label>
-                <select class="inp">${opts(MOCK.suppliers)}</select>
+                <select class="inp">${_vendorOpts()}</select>
               </div>
               <div class="fg">
                 <label class="lb">Payment *</label>
@@ -1663,7 +1647,7 @@
   App.registerRoutes({
     cr_sale:      { render: renderCreateSale },
     cr_transfer:  { render: renderCreateTransfer },
-    cr_debit:     { render: renderCreateDebit },
+    cr_debit:     { render: renderCreateDebit, onLoad: _loadDebitInvoices },
     cr_bill:      { render: renderCreateBill },
     cr_recurring: { render: renderCreateRecurring },
     cr_upload:    { render: renderCreateUpload },

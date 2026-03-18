@@ -597,6 +597,8 @@ function renderTxSdBridge() {
       </div>
       <div id="sd_cards"><div style="text-align:center;padding:30px;color:var(--t3)"><div class="fin-spinner" style="margin:0 auto 8px"></div>Loading SD Bridge...</div></div>
       <div id="sd_actions" style="display:none;display:flex;align-items:center;padding:10px 0;gap:8px">
+        <button class="btn bo" style="padding:5px 12px;font-size:11px" onclick="ScrTx._sdSelectAll()">Select All Pending</button>
+        <button class="bg" style="font-size:11px" onclick="ScrTx._sdDeselectAll()">Deselect All</button>
         <div style="flex:1;font-size:var(--fs-xs);color:var(--t3)" id="sd_sel_count">0 selected</div>
         <button class="bs" style="padding:6px 16px;font-size:12px" onclick="ScrTx._sdSyncSelected()">Sync selected</button>
       </div>
@@ -732,7 +734,9 @@ async function _loadSdBridge() {
 
       // Group footer — sync buttons (only if has pending)
       if (pendingItems.length > 0) {
+        const pendingIds = pendingItems.map(r => r.id);
         html += `<div style="display:flex;align-items:center;padding:10px 16px;background:var(--bg2);border-top:1px solid var(--bd2);gap:8px">`;
+        html += `<label style="font-size:10px;display:flex;align-items:center;gap:4px;cursor:pointer;color:var(--acc);font-weight:600"><input type="checkbox" style="accent-color:var(--acc)" onchange="ScrTx._sdSelectGroup(this,${gi})"> Select all (${pendingItems.length})</label>`;
         html += `<div style="flex:1;font-size:10px;color:var(--t3)">${syncedItems.length} of ${totalItems} synced</div>`;
         html += `<button class="bs" style="padding:6px 16px;font-size:12px" onclick="ScrTx._sdSyncSelected()">Sync selected</button>`;
         html += `</div>`;
@@ -795,7 +799,45 @@ function _sdUpdateSelCount() {
   const el = document.getElementById('sd_sel_count');
   const actEl = document.getElementById('sd_actions');
   if (el) el.textContent = _sdChecked.size + ' selected';
-  if (actEl) actEl.style.display = _sdChecked.size > 0 ? 'flex' : 'none';
+  // Always show actions bar if there are pending items on the page
+  const hasPending = document.querySelectorAll('[data-sdid]').length > 0;
+  if (actEl) actEl.style.display = hasPending ? 'flex' : 'none';
+}
+
+/** Select all pending items across all groups */
+function _sdSelectAll() {
+  document.querySelectorAll('[data-sdid]').forEach(cb => {
+    if (!cb.disabled) {
+      cb.checked = true;
+      _sdChecked.add(cb.dataset.sdid);
+    }
+  });
+  // Check all group checkboxes too
+  document.querySelectorAll('#sd_cards input[type="checkbox"][onchange*="_sdSelectGroup"]').forEach(cb => { cb.checked = true; });
+  _sdUpdateSelCount();
+}
+
+/** Deselect all */
+function _sdDeselectAll() {
+  _sdChecked = new Set();
+  document.querySelectorAll('[data-sdid]').forEach(cb => { cb.checked = false; });
+  document.querySelectorAll('#sd_cards input[type="checkbox"][onchange*="_sdSelectGroup"]').forEach(cb => { cb.checked = false; });
+  _sdUpdateSelCount();
+}
+
+/** Select/deselect all pending items in a specific group */
+function _sdSelectGroup(masterCb, groupIdx) {
+  const grp = document.getElementById('sd_grp_' + groupIdx);
+  if (!grp) return;
+  const checkboxes = grp.querySelectorAll('[data-sdid]');
+  checkboxes.forEach(cb => {
+    if (!cb.disabled) {
+      cb.checked = masterCb.checked;
+      if (masterCb.checked) _sdChecked.add(cb.dataset.sdid);
+      else _sdChecked.delete(cb.dataset.sdid);
+    }
+  });
+  _sdUpdateSelCount();
 }
 
 async function _sdSyncSelected() {
@@ -908,6 +950,9 @@ window.ScrTx = {
   _sdChangeMonth,
   _sdCheckToggle,
   _sdSyncSelected,
+  _sdSelectAll,
+  _sdDeselectAll,
+  _sdSelectGroup,
   // Filter + Reset (Task 1)
   _filterLog,
   _resetLog,

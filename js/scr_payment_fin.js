@@ -23,6 +23,7 @@
   let _pySelected = new Set();   // selected bill IDs
   let _pyBankId = '';
   let _pySaving = false;
+  let _pyDupConfirmed = false;
 
   let _phType = 'all';           // all | bills | emp | super | payg
   let _phRows = [];
@@ -38,6 +39,7 @@
   const _skeleton = App.skeleton;
   const _today = App.today;
 
+  // TODO: replace with App.bankOpts() when available
   function _bankOptions() {
     return (App.S.bankAccounts || []).map(b =>
       `<option value="${esc(b.id)}">${esc(b.account_name || b.name)} #${esc(b.account_number || '')}</option>`
@@ -46,7 +48,7 @@
 
   function _brandOptions() {
     return '<option value="">All Brands</option>' + (App.S.brands || []).map(b =>
-      `<option value="${esc(b.brand_id || b.id)}">${esc(b.brand_name || b.name)}</option>`
+      `<option value="${App.esc(b)}">${App.esc(b)}</option>`
     ).join('');
   }
 
@@ -299,6 +301,20 @@
   async function _savePayment() {
     if (_pySaving) return;
 
+    // Check if any selected bills have been partially/fully paid
+    const alreadyPaid = _pyBills.filter(b => _pySelected.has(b.id) && b.amount_paid > 0);
+    if (alreadyPaid.length > 0 && !_pyDupConfirmed) {
+      App.showDialog({
+        title: 'Duplicate Payment Warning',
+        message: `${alreadyPaid.length} bill(s) already have partial payments recorded. Are you sure you want to continue?`,
+        confirmText: 'Yes, proceed',
+        cancelText: 'Cancel',
+        onConfirm: () => { _pyDupConfirmed = true; _savePayment(); },
+      });
+      return;
+    }
+    _pyDupConfirmed = false;
+
     const ref = document.getElementById('py_ref')?.value.trim();
     const date = document.getElementById('py_date')?.value;
     const bankId = document.getElementById('py_bank')?.value;
@@ -366,7 +382,7 @@
   // ══════════════════════════════════════════
   function renderHistory() {
     return {
-      tb: '<div class="tb"><div class="tb-t">Payment History</div><button class="bs" onclick="App.go(\'py_record\')">+ Record Payment</button></div>',
+      tb: '<div class="tb"><div class="tb-t">Payment History</div><button class="btn bo" disabled title="Coming soon — ABA file export for batch payment">Export .aba</button><button class="bs" onclick="App.go(\'py_record\')">+ Record Payment</button></div>',
       ct: `<div style="max-width:1060px;margin:0 auto">
         <!-- Filters -->
         <div class="card">

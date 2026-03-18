@@ -444,7 +444,7 @@ const App = (() => {
     sd.classList.toggle('cl', _sidebarCollapsed);
     document.body.classList.toggle('sd-collapsed', _sidebarCollapsed);
     const icon = sd.querySelector('.sd-toggle-icon');
-    if (icon) icon.textContent = _sidebarCollapsed ? '☰' : '☰';
+    if (icon) icon.textContent = _sidebarCollapsed ? '▸' : '☰';
   }
 
   function _highlightNav(route) {
@@ -714,6 +714,14 @@ const App = (() => {
     return brands.map(b => `<option${b === selected ? ' selected' : ''}>${esc(b)}</option>`).join('');
   }
 
+  /** Bank account <option> list for form selects */
+  function bankOpts(selected) {
+    const banks = S.bankAccounts || [];
+    return banks.map(b =>
+      `<option value="${esc(b.id)}"${b.id === selected ? ' selected' : ''}>${esc(b.label || b.account_name || '')} ${b.account_number ? '#' + esc(b.account_number) : ''}</option>`
+    ).join('');
+  }
+
   // ═══════════════════════════
   // BOOT
   // ═══════════════════════════
@@ -744,6 +752,7 @@ const App = (() => {
     skeleton,
     brandOpts,
     brandFilterOpts,
+    bankOpts,
   };
 
 })();

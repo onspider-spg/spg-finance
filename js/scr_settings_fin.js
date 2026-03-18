@@ -34,6 +34,7 @@
       ct: `
         <div style="max-width:900px;margin:0 auto">
           ${settingsTabs('st_alert')}
+          <div style="background:var(--obg);border-radius:var(--rd);padding:6px 10px;font-size:var(--fs-xxs);color:var(--o);margin-bottom:10px">\u26a0\ufe0f Settings data is currently static. Dynamic configuration will be available in the next release.</div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
             <div style="font-size:var(--fs-xs);color:var(--t3)">Configure alert thresholds for CFO Brief</div>
             <button class="bs" onclick="ScrSettings._addAlert()">+ Add New</button>
@@ -89,6 +90,7 @@
       ct: `
         <div style="max-width:900px;margin:0 auto">
           ${settingsTabs('st_perm')}
+          <div style="background:var(--obg);border-radius:var(--rd);padding:6px 10px;font-size:var(--fs-xxs);color:var(--o);margin-bottom:10px">\u26a0\ufe0f Settings data is currently static. Dynamic configuration will be available in the next release.</div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
             <div style="font-size:var(--fs-xs);color:var(--t3)">Manage user access to Finance module</div>
             <button class="bs" onclick="ScrSettings._addUser()">+ Add User</button>
@@ -144,6 +146,7 @@
       ct: `
         <div style="max-width:1000px;margin:0 auto">
           ${settingsTabs('st_audit')}
+          <div style="background:var(--obg);border-radius:var(--rd);padding:6px 10px;font-size:var(--fs-xxs);color:var(--o);margin-bottom:10px">\u26a0\ufe0f Settings data is currently static. Dynamic configuration will be available in the next release.</div>
           <div style="display:flex;gap:6px;margin-bottom:10px">
             <select class="fl" id="st_audit_user"><option value="">All Users</option></select>
             <select class="fl" id="st_audit_action">
@@ -201,7 +204,7 @@
   }
 
   function _exportAudit() {
-    App.toast('Export Audit — coming soon');
+    App.toast('Export Audit Log — coming soon');
   }
 
   // ══════════════════════════════════════════

@@ -34,20 +34,6 @@
   // Alias — shared helper from App
   const _brandOpts = App.brandOpts;
 
-  /** Double-submit guard — disable button during save */
-  function guardedSave(btnEl, saveFn) {
-    if (!btnEl || btnEl.disabled) return;
-    const origText = btnEl.textContent;
-    btnEl.disabled = true;
-    btnEl.textContent = 'Saving...';
-    // Mock save delay — replace with real API later
-    setTimeout(() => {
-      saveFn();
-      btnEl.disabled = false;
-      btnEl.textContent = origText;
-    }, 600);
-  }
-
   // ══════════════════════════════════════════
   // 1. CREATE SALE — Quick Entry for Income
   // ══════════════════════════════════════════
@@ -138,20 +124,39 @@
 
   async function _saveSale(btnEl, mode) {
     if (!btnEl || btnEl.disabled) return;
+
+    // Validate amount before anything else
+    const amtEl = document.getElementById('cs_amount');
+    const inputAmt = parseFloat((amtEl?.value || '').replace(/,/g, '')) || 0;
+    if (inputAmt <= 0) {
+      App.toast('Please enter an amount');
+      return;
+    }
+
+    // Backdate warning — if date is more than 7 days in the past, confirm first
+    const dateVal = document.getElementById('cs_date')?.value;
+    const daysDiff = Math.round((new Date() - new Date(dateVal + 'T00:00:00')) / 86400000);
+    if (daysDiff > 7) {
+      App.showDialog({
+        title: 'Backdate Warning',
+        message: `This date is ${daysDiff} days in the past. Are you sure?`,
+        confirmText: 'Yes, continue',
+        onConfirm: () => _doSaveSale(btnEl, mode, inputAmt),
+      });
+      return;
+    }
+
+    await _doSaveSale(btnEl, mode, inputAmt);
+  }
+
+  /** Internal: performs the actual sale save after validation + backdate check */
+  async function _doSaveSale(btnEl, mode, inputAmt) {
     const origText = btnEl.textContent;
     btnEl.disabled = true;
     btnEl.textContent = 'Saving...';
 
     try {
-      // Validate
       const amtEl = document.getElementById('cs_amount');
-      const inputAmt = parseFloat((amtEl?.value || '').replace(/,/g, '')) || 0;
-      if (inputAmt <= 0) {
-        App.toast('Please enter an amount');
-        btnEl.disabled = false;
-        btnEl.textContent = origText;
-        return;
-      }
 
       // Calculate correct amount_ex_gst based on GST toggle
       const hasGst = document.getElementById('cs_has_gst')?.checked;
@@ -742,7 +747,7 @@
                   <input class="inp" id="cb_due_date" type="date" style="width:180px">
                 </div>
                 <div style="display:flex;align-items:center;margin-bottom:10px;justify-content:flex-end;gap:10px">
-                  <span class="lb" style="margin:0">Accrual Month</span>
+                  <span class="lb" style="margin:0">Accrual Month <span title="เดือนที่ต้องการบันทึกค่าใช้จ่ายนี้ในบัญชี อาจต่างจาก Issue Date เช่น bill มาเดือน มี.ค. แต่เป็นค่าใช้จ่ายของ ก.พ." style="cursor:help;color:var(--b)">ℹ️</span></span>
                   <input class="inp" id="cb_accrual" type="month" value="" style="width:180px">
                 </div>
               </div>
@@ -921,6 +926,18 @@
 
   function _setBillTaxMode(mode) {
     _billTaxMode = mode;
+
+    // Warn if any amount is already entered
+    let hasValue = false;
+    for (let i = 0; i < 100; i++) {
+      const amtEl = document.getElementById('cb_amt_' + i);
+      if (!amtEl) continue;
+      if ((parseFloat(amtEl.value.replace(/,/g, '')) || 0) > 0) { hasValue = true; break; }
+    }
+    if (hasValue) {
+      App.toast('Tax mode changed \u2014 please verify amounts');
+    }
+
     // Recalculate all rows with new mode
     for (let i = 0; i < 100; i++) {
       const tcWrap = document.getElementById('tcw_' + i);
@@ -985,57 +1002,71 @@
   async function _saveBill(mode, btnEl) {
     const saveBtn = btnEl || document.querySelector('.bs');
     if (!saveBtn || saveBtn.disabled) return;
+
+    // ★ VALIDATION — header fields (before disabling button)
+    const brandCheck = document.getElementById('cb_brand');
+    if (!brandCheck || !brandCheck.value) { App.toast('Please select a Brand'); return; }
+
+    const supplierCheck = document.getElementById('cb_supplier');
+    if (!supplierCheck || !supplierCheck.value) { App.toast('Please select a Supplier'); return; }
+
+    const invNoCheck = document.getElementById('cb_inv_no');
+    if (!invNoCheck || !invNoCheck.value.trim()) { App.toast('Please enter Supplier Invoice Number'); return; }
+
+    const issueDateCheck = document.getElementById('cb_issue_date');
+    if (!issueDateCheck || !issueDateCheck.value) { App.toast('Please enter Issue Date'); return; }
+
+    const dueDateCheck = document.getElementById('cb_due_date');
+    if (!dueDateCheck || !dueDateCheck.value) { App.toast('Please enter Due Date'); return; }
+
+    if (dueDateCheck.value < issueDateCheck.value) { App.toast('Due Date cannot be before Issue Date'); return; }
+
+    const accrualCheck = document.getElementById('cb_accrual');
+    if (!accrualCheck || !accrualCheck.value) { App.toast('Please enter Accrual Month'); return; }
+
+    // ★ VALIDATION — line items (amount + category + tax code)
+    let hasAmount = false;
+    for (let i = 0; i < 100; i++) {
+      const a = document.getElementById('cb_amt_' + i);
+      if (!a) continue;
+      const amt = parseFloat(a.value.replace(/,/g, '')) || 0;
+      if (amt <= 0) continue;
+      hasAmount = true;
+
+      const row = a.closest('tr');
+      const selects = row?.querySelectorAll('select') || [];
+      const catSel = _billAllocMode === 'ob' ? selects[1] : selects[0];
+      if (!catSel || !catSel.value) { App.toast('Line ' + (i + 1) + ': Please select a Category'); return; }
+
+      const tcWrap = document.getElementById('tcw_' + i);
+      const tcVal = tcWrap?.querySelector('.tc-val');
+      if (!tcVal || !tcVal.value) { App.toast('Line ' + (i + 1) + ': Please select a Tax Code'); return; }
+    }
+    if (!hasAmount) { App.toast('Please enter at least one line item amount'); return; }
+
+    // Backdate warning — if issue date is more than 7 days in the past, confirm first
+    const dateVal = issueDateCheck.value;
+    const daysDiff = Math.round((new Date() - new Date(dateVal + 'T00:00:00')) / 86400000);
+    if (daysDiff > 7) {
+      App.showDialog({
+        title: 'Backdate Warning',
+        message: `This date is ${daysDiff} days in the past. Are you sure?`,
+        confirmText: 'Yes, continue',
+        onConfirm: () => _doSaveBill(mode, saveBtn),
+      });
+      return;
+    }
+
+    await _doSaveBill(mode, saveBtn);
+  }
+
+  /** Internal: performs the actual bill save after validation + backdate check */
+  async function _doSaveBill(mode, saveBtn) {
     const origText = saveBtn.textContent;
     saveBtn.disabled = true;
     saveBtn.textContent = 'Saving...';
 
     try {
-
-      // ★ VALIDATION — header fields
-      const _vFail = (msg) => { App.toast(msg); saveBtn.disabled = false; saveBtn.textContent = origText; };
-
-      const brandCheck = document.getElementById('cb_brand');
-      if (!brandCheck || !brandCheck.value) { _vFail('Please select a Brand'); return; }
-
-      const supplierCheck = document.getElementById('cb_supplier');
-      if (!supplierCheck || !supplierCheck.value) { _vFail('Please select a Supplier'); return; }
-
-      const invNoCheck = document.getElementById('cb_inv_no');
-      if (!invNoCheck || !invNoCheck.value.trim()) { _vFail('Please enter Supplier Invoice Number'); return; }
-
-      const issueDateCheck = document.getElementById('cb_issue_date');
-      if (!issueDateCheck || !issueDateCheck.value) { _vFail('Please enter Issue Date'); return; }
-
-      const dueDateCheck = document.getElementById('cb_due_date');
-      if (!dueDateCheck || !dueDateCheck.value) { _vFail('Please enter Due Date'); return; }
-
-      if (dueDateCheck.value < issueDateCheck.value) { _vFail('Due Date cannot be before Issue Date'); return; }
-
-      const accrualCheck = document.getElementById('cb_accrual');
-      if (!accrualCheck || !accrualCheck.value) { _vFail('Please enter Accrual Month'); return; }
-
-      // ★ VALIDATION — line items (amount + category + tax code)
-      let hasAmount = false;
-      for (let i = 0; i < 100; i++) {
-        const a = document.getElementById('cb_amt_' + i);
-        if (!a) continue;
-        const amt = parseFloat(a.value.replace(/,/g, '')) || 0;
-        if (amt <= 0) continue;
-        hasAmount = true;
-
-        // Category — check the first <select> in the row (skip cost owner select in OB mode)
-        const row = a.closest('tr');
-        const selects = row?.querySelectorAll('select') || [];
-        const catSel = _billAllocMode === 'ob' ? selects[1] : selects[0];
-        if (!catSel || !catSel.value) { _vFail('Line ' + (i + 1) + ': Please select a Category'); return; }
-
-        // Tax code
-        const tcWrap = document.getElementById('tcw_' + i);
-        const tcVal = tcWrap?.querySelector('.tc-val');
-        if (!tcVal || !tcVal.value) { _vFail('Line ' + (i + 1) + ': Please select a Tax Code'); return; }
-      }
-      if (!hasAmount) { _vFail('Please enter at least one line item amount'); return; }
-
       // Collect form data
       const supplierEl = document.getElementById('cb_supplier');
       const supplierOpt = supplierEl?.selectedOptions[0];
@@ -1229,11 +1260,18 @@
     };
   }
 
-  function _saveRecurring(btnEl) {
-    guardedSave(btnEl, () => {
+  async function _saveRecurring(btnEl) {
+    if (!btnEl || btnEl.disabled) return;
+    const origText = btnEl.textContent;
+    btnEl.disabled = true;
+    btnEl.textContent = 'Saving...';
+    try {
       App.toast('Recurring transaction saved');
       App.go('rv_recurring');
-    });
+    } finally {
+      btnEl.disabled = false;
+      btnEl.textContent = origText;
+    }
   }
 
   // ══════════════════════════════════════════
@@ -1632,11 +1670,26 @@
   // ══════════════════════════════════════════
   // REGISTER ROUTES
   // ══════════════════════════════════════════
+  /** onLoad for Create Bill: ensure master data is loaded, then re-populate vendor dropdown */
+  async function _onLoadBill() {
+    await API.waitMaster();
+    const supplierEl = document.getElementById('cb_supplier');
+    if (supplierEl) supplierEl.innerHTML = _vendorOpts();
+  }
+
+  /** onLoad for Create Debit: ensure master data is loaded, then re-populate vendor dropdown + load invoices */
+  async function _onLoadDebit() {
+    await API.waitMaster();
+    const supplierEl = document.getElementById('cd_supplier');
+    if (supplierEl) supplierEl.innerHTML = _vendorOpts();
+    await _loadDebitInvoices();
+  }
+
   App.registerRoutes({
     cr_sale:      { render: renderCreateSale },
     cr_transfer:  { render: renderCreateTransfer },
-    cr_debit:     { render: renderCreateDebit, onLoad: _loadDebitInvoices },
-    cr_bill:      { render: renderCreateBill },
+    cr_debit:     { render: renderCreateDebit, onLoad: _onLoadDebit },
+    cr_bill:      { render: renderCreateBill, onLoad: _onLoadBill },
     cr_recurring: { render: renderCreateRecurring },
     cr_upload:    { render: renderCreateUpload },
     cr_import:    { render: renderImport },

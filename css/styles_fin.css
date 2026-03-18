@@ -504,17 +504,31 @@ html, body {
 .sts-p { background: var(--obg); color: var(--o); }  /* Pending */
 
 /* ═══ 12. KPI ═══ */
-.kpi { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.kpi { display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
 .kpi-c {
   flex: 1;
   min-width: 120px;
   padding: 12px;
-  border: 1px solid var(--bd2);
+  border: 1px solid var(--bd);
   border-radius: var(--rd);
   text-align: center;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  min-height: 72px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 .kpi-v { font-size: var(--fs-kpi-md); font-weight: 700; margin-bottom: 2px; }
-.kpi-l { font-size: var(--fs-xs); color: var(--t3); }
+.kpi-l { font-size: 11px; color: var(--t3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Finance tooltip */
+.fin-tip {
+  cursor: help;
+  color: var(--b);
+  font-size: var(--fs-xxs);
+  margin-left: 2px;
+}
 
 /* ═══ 13. TABS ═══ */
 .tabs {

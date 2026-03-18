@@ -26,6 +26,7 @@
   const _today = App.today;
   const _fmtDate = (d) => App.formatDate(d) || '—';
   const _brandFilterOpts = App.brandFilterOpts;
+  // TODO: replace with App.bankOpts() when available
   function _bankOptions(selected) {
     return (App.S.bankAccounts || []).map(b =>
       `<option value="${esc(b.id)}"${b.id === selected ? ' selected' : ''}>${esc(b.account_name || b.name)} #${esc(b.account_number || '')}</option>`
@@ -43,6 +44,12 @@
       tb: '<div class="tb"><div class="tb-t">Statement Upload</div></div>',
       ct: `<div class="card" style="max-width:720px;margin:0 auto">
         <div style="font-size:var(--fs-xs);color:var(--t3);margin-bottom:8px">Upload bank statement to reconcile. Stays on this page after upload.</div>
+        <div style="background:var(--bbg);border-radius:var(--rd);padding:8px 12px;font-size:var(--fs-xxs);color:var(--b);margin-bottom:10px;line-height:1.6">
+          <b>Supported formats:</b> CSV, OFX<br>
+          <b>CSV columns:</b> Date, Description, Debit, Credit, Balance (or Date, Description, Amount, Balance)<br>
+          <b>Date format:</b> DD/MM/YYYY or YYYY-MM-DD<br>
+          <a class="lk" style="font-size:var(--fs-xxs)" href="#" onclick="ScrReconcile._downloadTemplate();return false">Download CSV template</a>
+        </div>
         <div class="fg">
           <label class="lb">Bank Account *</label>
           <select class="inp" id="st_bank" style="max-width:350px">${_bankOptions('')}</select>
@@ -742,6 +749,17 @@
     }
   }
 
+  function _downloadTemplate() {
+    const csv = 'Date,Description,Debit,Credit,Balance\n17/03/2026,Example transaction,100.00,,5000.00\n18/03/2026,Another transaction,,50.00,5050.00';
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'bank_statement_template.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   // ══════════════════════════════════════════
   // REGISTER ROUTES
   // ══════════════════════════════════════════
@@ -768,6 +786,7 @@
     _confirmMatch,
     _manualMatch,
     _createAndMatch,
+    _downloadTemplate,
   };
 
 })();

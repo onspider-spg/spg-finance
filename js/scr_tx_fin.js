@@ -61,7 +61,7 @@ function _logRows(rows) {
   if (!rows || rows.length === 0) {
     return '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--t3)">No transactions found</td></tr>';
   }
-  return rows.map(r => `<tr><td>${_fmtDate(r.date)}</td><td><a class="lk">${esc(r.ref)}</a></td><td>${esc(r.type)}</td><td>${esc(r.desc)}</td><td>${esc(r.brand)}</td><td>${esc(r.contact)}</td><td style="text-align:right">${fm(r.amount)}</td><td>${reconBadge(r.recon)}</td></tr>`).join('');
+  return rows.map(r => `<tr><td>${_fmtDate(r.date)}</td><td><a class="lk" onclick="ScrTx._goBillDetail('${esc(r.bill_id || r.id || '')}')">${esc(r.ref)}</a></td><td>${esc(r.type)}</td><td>${esc(r.desc)}</td><td>${esc(r.brand)}</td><td>${esc(r.contact)}</td><td style="text-align:right">${fm(r.amount)}</td><td>${reconBadge(r.recon)}</td></tr>`).join('');
 }
 
 function renderTxLog() {
@@ -484,6 +484,7 @@ function renderTxBillDetail() {
       <div style="display:flex;align-items:center;gap:6px;padding:8px 0">
         <button class="btn bo">View PDF</button>
         <button class="btn bo">Print</button>
+        <button class="btn bo" style="color:var(--r);border-color:var(--r)" onclick="ScrTx._voidBill('${esc(b.id || '')}')">Void</button>
         <div style="flex:1"></div>
         <button class="btn bo" onclick="App.go('tx_bill')">Back to Bills</button>
         <button class="bs">Record Payment</button>
@@ -540,6 +541,32 @@ function _bdDoc() { return ''; }
 function _bdSelfView() { return ''; }
 function _bdObView() { return ''; }
 function _bdSplitView() { return ''; }
+
+/** Navigate to bill detail by bill ID (issue #5) */
+let _currentBillId = null;
+function _goBillDetail(billId) {
+  if (!billId) return;
+  _currentBillId = billId;
+  _openBillDetail(billId);
+}
+
+/** Void/Reverse a bill (issue #7) */
+function _voidBill(billId) {
+  App.showDialog({
+    title: 'Void Transaction',
+    message: 'This will reverse this transaction and create a credit entry. This cannot be undone.',
+    confirmText: 'Void',
+    onConfirm: async () => {
+      try {
+        await API.call('fin_void_bill', { bill_id: billId });
+        App.toast('Transaction voided');
+        App.go('tx_log');
+      } catch (e) {
+        App.toast(e.message || 'Void failed');
+      }
+    },
+  });
+}
 
 // ═══════════════════════════════════════
 // 6. SD BRIDGE — ★ CONNECTED TO DB
@@ -872,6 +899,8 @@ window.ScrTx = {
   _switchFindTab,
   _sort: App.sortTable,
   _openBillDetail,
+  _goBillDetail,
+  _voidBill,
   _loadMoreBills,
   _sdToggleGroup,
   _sdSetFilter,

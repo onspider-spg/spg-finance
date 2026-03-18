@@ -269,19 +269,7 @@
     return html;
   }
 
-  function _onCreateLoad() {
-    // Ensure COA data is available for main_category dropdown
-    if (_coaRows.length === 0) {
-      API.getCoa({ show_inactive: false }).then(res => {
-        _coaRows = res.rows || [];
-        _populateMainCategories();
-      });
-    } else {
-      _populateMainCategories();
-    }
-  }
-
-  function _onEditLoad() {
+  function _onCatFormLoad() {
     if (_coaRows.length === 0) {
       API.getCoa({ show_inactive: false }).then(res => {
         _coaRows = res.rows || [];
@@ -1770,8 +1758,8 @@
   // ══════════════════════════════════════════
   App.registerRoutes({
     ac_coa:        { render: renderCOA, onLoad: _loadCOA },
-    ac_coa_create: { render: renderCreateCategory, onLoad: _onCreateLoad },
-    ac_coa_edit:   { render: renderEditCategory, onLoad: _onEditLoad },
+    ac_coa_create: { render: renderCreateCategory, onLoad: _onCatFormLoad },
+    ac_coa_edit:   { render: renderEditCategory, onLoad: _onCatFormLoad },
     ac_tax:        { render: renderTaxCodes, onLoad: _loadTax },
     ac_rules:      { render: renderBankRules, onLoad: _brLoad },
     ac_hub:        { render: renderBankingHub, onLoad: _hubLoad },

@@ -117,7 +117,8 @@
 
   function _onSearch(val) {
     _searchQ = val;
-    _loadContacts();
+    clearTimeout(_onSearch._t);
+    _onSearch._t = setTimeout(() => _loadContacts(), 300);
   }
 
   function _toggleInactive(checked) {

@@ -145,8 +145,10 @@
         brand: _filters.brand === 'All' ? null : _filters.brand,
       });
     } catch (e) {
-      console.warn('getPnlSummary failed, using mock:', e.message);
-      _pnlData = _mockPnlSummary();
+      console.warn('getPnlSummary failed:', e.message);
+      const el = document.getElementById('rp_pnl_content');
+      if (el) el.innerHTML = '<div class="empty" style="padding:40px;color:var(--r)">Failed to load P&L data. Please try again.</div>';
+      return;
     }
 
     const d = _pnlData;
@@ -184,19 +186,19 @@
 
     el.innerHTML = `
       <div class="kpi" style="flex-wrap:nowrap;margin-bottom:14px">
-        <div class="kpi-c" style="border-top:3px solid var(--g);background:#fff"><div class="kpi-l">Revenue</div>
+        <div class="kpi-c" style="border-top:3px solid var(--g);background:#fff"><div class="kpi-l" title="Total income from all sales channels">Revenue</div>
           <div class="kpi-v">${fm(rev, 0)}</div>
           <div style="font-size:9px;color:var(--g)">${_pctBadge(revChg)} vs prev</div></div>
-        <div class="kpi-c" style="border-top:3px solid var(--o)"><div class="kpi-l">Gross Profit</div>
+        <div class="kpi-c" style="border-top:3px solid var(--o)"><div class="kpi-l" title="Revenue minus Cost of Goods Sold (COGS)">Gross Profit</div>
           <div class="kpi-v">${fm(gp, 0)}</div>
           <div style="font-size:9px">GP margin: ${gpPct}%</div></div>
-        <div class="kpi-c" style="border-top:3px solid var(--b);background:#fff"><div class="kpi-l">EBITDA</div>
+        <div class="kpi-c" style="border-top:3px solid var(--b);background:#fff"><div class="kpi-l" title="Earnings Before Interest, Tax, Depreciation &amp; Amortisation">EBITDA</div>
           <div class="kpi-v">${fm(ebitda, 0)}</div>
           <div style="font-size:9px">EBITDA margin: ${ebitdaPct}%</div></div>
-        <div class="kpi-c" style="border-top:3px solid var(--acc);background:#fff"><div class="kpi-l">Net Profit</div>
+        <div class="kpi-c" style="border-top:3px solid var(--acc);background:#fff"><div class="kpi-l" title="Final profit after all expenses, depreciation, and interest">Net Profit</div>
           <div class="kpi-v" style="color:${net >= 0 ? 'var(--g)' : 'var(--r)'}">${fm(net, 0)}</div>
           <div style="font-size:9px">${_pctBadge(netChg)} vs prev</div></div>
-        <div class="kpi-c" style="background:#fff"><div class="kpi-l">COL / Revenue</div>
+        <div class="kpi-c" style="background:#fff"><div class="kpi-l" title="Cost of Living (COGS) as a percentage of Revenue — F&amp;B target: 30-35%">COL / Revenue</div>
           <div class="kpi-v" style="color:${Number(colPct) > 30 ? 'var(--r)' : 'var(--o)'}">${colPct}%</div>
           <div style="font-size:9px">Target &lt;30% ${Number(colPct) <= 30 ? '<span style="color:var(--g)">OK</span>' : '<span style="color:var(--r)">Over</span>'}</div></div>
       </div>
@@ -337,8 +339,9 @@
     try {
       _pnlBrandData = await API.getPnlBrandCompare({ month: _filters.month });
     } catch (e) {
-      console.warn('getPnlBrandCompare failed, using mock:', e.message);
-      _pnlBrandData = _mockBrandCompare();
+      console.warn('getPnlBrandCompare failed:', e.message);
+      if (el) el.innerHTML = '<div class="empty" style="padding:40px;color:var(--r)">Failed to load brand comparison data. Please try again.</div>';
+      return;
     }
 
     const d = _pnlBrandData;
@@ -465,8 +468,9 @@
         brand: _filters.brand === 'All' ? null : _filters.brand,
       });
     } catch (e) {
-      console.warn('getProfitFlow failed, using mock:', e.message);
-      _flowData = _mockProfitFlow();
+      console.warn('getProfitFlow failed:', e.message);
+      if (el) el.innerHTML = '<div class="empty" style="padding:40px;color:var(--r)">Failed to load profit flow data. Please try again.</div>';
+      return;
     }
 
     const d = _flowData;
@@ -559,13 +563,27 @@
         brand: brand === 'All' ? null : brand,
       });
     } catch (e) {
-      console.warn('getPnlFull failed, using mock:', e.message);
-      _fullData = _mockPnlFull();
+      console.warn('getPnlFull failed:', e.message);
+      if (el) el.innerHTML = '<div class="empty" style="padding:40px;color:var(--r)">Failed to load Full P&L data. Please try again.</div>';
+      return;
     }
 
     const d = _fullData;
     const cols = d.columns || []; // e.g. ['Jan 2026', 'Feb 2026', 'Mar 2026']
     const groups = d.groups || []; // hierarchical data
+
+    // Issue #18: Check if all values are zero — show empty state instead of rows of zeros
+    const allZero = groups.every(grp => {
+      const itemsZero = (grp.items || []).every(item => (item.values || []).every(v => !v || v === 0));
+      const totalsZero = (grp.totals || []).every(v => !v || v === 0);
+      const subtotalZero = !grp.subtotal || (grp.subtotal.values || []).every(v => !v || v === 0);
+      return itemsZero && totalsZero && subtotalZero;
+    });
+    if (allZero) {
+      el.innerHTML = '<div class="empty" style="padding:40px;color:var(--t3);text-align:center"><div style="font-size:24px;margin-bottom:8px">📊</div>No financial data recorded for this period</div>';
+      return;
+    }
+
     const S = 'style="text-align:right"';
     const N = 'style="text-align:right;color:var(--r)"';
     const G = 'style="text-align:right;color:var(--g)"';
@@ -652,89 +670,7 @@
   function _exportPdf() { App.toast('Export PDF — coming soon'); }
   function _exportCsv() { App.toast('Export CSV — coming soon'); }
 
-  // ══════════════════════════════════════════
-  // MOCK DATA (fallback if API not connected)
-  // ══════════════════════════════════════════
-  function _mockPnlSummary() {
-    return {
-      revenue: 211000, cogs: 142700, opex: 57700, wages: 30100, rent: 12000,
-      depreciation: 800, interest: 330,
-      prev_revenue: 201700, prev_net: 6560,
-      cogs_chg: 3.6, gp_chg: 6.7, opex_chg: 2.5, wages_chg: 3.1, ebitda_chg: 37.7,
-      months: [
-        { label: 'Jan', revenue: 192000, expenses: 188000 },
-        { label: 'Feb', revenue: 202000, expenses: 195000 },
-        { label: 'Mar', revenue: 211000, expenses: 201000 },
-      ],
-    };
-  }
-
-  function _mockBrandCompare() {
-    return {
-      brands: [
-        { name: 'Mango Coco', revenue: 107500, cogs: 69900, gp: 37600, wages: 15200, rent: 5000, other_opex: 9400, ebitda: 8000, net: 6200, gp_pct: 35.0, net_pct: 5.8, ebitda_pct: 7.4 },
-        { name: 'Flying Tigress', revenue: 64200, cogs: 44100, gp: 20100, wages: 9400, rent: 4500, other_opex: 3700, ebitda: 2500, net: 2100, gp_pct: 31.3, net_pct: 3.1, ebitda_pct: 3.9 },
-        { name: 'Issho Cafe', revenue: 39300, cogs: 28700, gp: 10600, wages: 5500, rent: 2500, other_opex: 2500, ebitda: 100, net: 1170, gp_pct: 27.0, net_pct: 3.0, ebitda_pct: 0.3 },
-      ],
-      totals: { revenue: 211000, cogs: 142700, gp: 68300, wages: 30100, rent: 12000, other_opex: 15600, ebitda: 10600, net: 9470 },
-    };
-  }
-
-  function _mockProfitFlow() {
-    return {
-      revenue: 211000, total_costs: 201530, net: 9470,
-      waterfall: [
-        { label: 'Revenue', color: 'var(--g)', amount: 211000, display: '$211,000', is_subtotal: false },
-        { label: 'Food & Beverage', color: 'var(--r)', amount: 105800, display: '($105,800)' },
-        { label: 'Packaging', color: 'var(--r)', amount: 13600, display: '($13,600)' },
-        { label: 'Other COGs', color: 'var(--r)', amount: 23300, display: '($23,300)' },
-        { label: '= Gross Profit', color: 'var(--g)', amount: 68300, display: '$68,300 · 32.4%', is_subtotal: true },
-        { label: 'Wages & Salaries', color: 'var(--o)', amount: 30100, display: '($30,100)' },
-        { label: 'Rent', color: 'var(--o)', amount: 12000, display: '($12,000)' },
-        { label: 'Other OpEx', color: 'var(--o)', amount: 15600, display: '($15,600)' },
-        { label: '= EBITDA', color: 'var(--b)', amount: 10600, display: '$10,600 · 5.0%', is_subtotal: true },
-        { label: 'Depreciation + Interest', color: 'var(--t3)', amount: 1130, display: '($1,130)' },
-        { label: '= Net Profit', color: 'var(--acc)', amount: 9470, display: '$9,470 · 4.5%', is_subtotal: true },
-      ],
-      cost_drivers: ['Food & Beverage (50.1% of revenue)', 'Wages (14.3%)', 'Rent (5.7%)', 'Platform commissions (2.6%)'],
-    };
-  }
-
-  function _mockPnlFull() {
-    return {
-      columns: ['Jan 2026', 'Feb 2026', 'Mar 2026', 'YTD Total'],
-      groups: [
-        { label: 'Revenue', is_negative: false, items: [
-          { label: 'In-store Cash', values: [58200, 62100, 64800, 185100] },
-          { label: 'Card (Eftpos)', values: [95400, 98300, 102500, 296200] },
-          { label: 'UberEats', values: [22800, 24500, 26200, 73500] },
-          { label: 'Easi', values: [8900, 9600, 10100, 28600] },
-          { label: 'Other channels', values: [6700, 7200, 7400, 21300] },
-        ], totals: [192000, 201700, 211000, 604700], total_label: 'Total Revenue' },
-        { label: 'Cost of Goods Sold', is_negative: true, items: [
-          { label: 'Food & Beverage', values: [98500, 102200, 105800, 306500] },
-          { label: 'Packaging', values: [12400, 13100, 13600, 39100] },
-          { label: 'Ingredients', values: [18200, 19000, 19800, 57000] },
-          { label: 'Other COGs', values: [3200, 3400, 3500, 10100] },
-        ], totals: [132300, 137700, 142700, 412700], total_label: 'Total COGs',
-        subtotal: { label: 'Gross Profit', values: [59700, 64000, 68300, 192000], pcts: ['31.1', '31.7', '32.4', '31.7'] } },
-        { label: 'Operating Expenses', is_negative: true, items: [
-          { label: 'Wages & Salaries', values: [28500, 29200, 30100, 87800] },
-          { label: 'Rent & Occupancy', values: [12000, 12000, 12000, 36000] },
-          { label: 'Utilities', values: [3800, 4100, 3900, 11800] },
-          { label: 'Marketing', values: [2200, 2500, 2800, 7500] },
-          { label: 'Platform commissions', values: [4700, 5100, 5400, 15200] },
-          { label: 'Insurance', values: [1800, 1800, 1800, 5400] },
-          { label: 'Other OpEx', values: [1500, 1600, 1700, 4800] },
-        ], totals: [54500, 56300, 57700, 168500], total_label: 'Total Operating Expenses',
-        subtotal: { label: 'EBITDA', values: [5200, 7700, 10600, 23500], pcts: ['2.7', '3.8', '5.0', '3.9'] } },
-        { label: 'Below EBITDA', is_negative: true, items: [
-          { label: 'Depreciation', values: [800, 800, 800, 2400] },
-          { label: 'Interest', values: [350, 340, 330, 1020] },
-        ], subtotal: { label: 'Net Profit', values: [4050, 6560, 9470, 20080], pcts: ['2.1', '3.3', '4.5', '3.3'] } },
-      ],
-    };
-  }
+  // (Mock data functions removed — all screens use live API data)
 
   // ══════════════════════════════════════════
   // rp_bs: BALANCE SHEET
@@ -761,8 +697,9 @@
         brand: _filters.brand === 'All' ? null : _filters.brand,
       });
     } catch (e) {
-      console.warn('getBalanceSheet failed, using mock:', e.message);
-      _bsData = _mockBalanceSheet();
+      console.warn('getBalanceSheet failed:', e.message);
+      if (el) el.innerHTML = '<div class="empty" style="padding:40px;color:var(--r)">Failed to load Balance Sheet data. Please try again.</div>';
+      return;
     }
 
     const d = _bsData;
@@ -859,8 +796,9 @@
         brand: _filters.brand === 'All' ? null : _filters.brand,
       });
     } catch (e) {
-      console.warn('getCashFlow failed, using mock:', e.message);
-      _cfData = _mockCashFlow();
+      console.warn('getCashFlow failed:', e.message);
+      if (el) el.innerHTML = '<div class="empty" style="padding:40px;color:var(--r)">Failed to load Cash Flow data. Please try again.</div>';
+      return;
     }
 
     const d = _cfData;
@@ -916,61 +854,12 @@
     _loadCashFlow();
   }
 
-  // ══════════════════════════════════════════
-  // MOCK: Balance Sheet
-  // ══════════════════════════════════════════
-  function _mockBalanceSheet() {
-    return {
-      total_assets: 311319, total_liabilities: 436820, equity: -125501,
-      columns: [_monthLabel(_filters.month)],
-      prev_column: _monthLabel(_prevMonthStr(_filters.month)),
-      sections: [
-        { label: 'Assets', total_label: 'Total Assets', total_current: 311319, total_previous: 185675, items: [
-          { label: 'Cash & Bank', current: 225611, previous: 49345 },
-          { label: 'Accounts Receivable', current: 71205, previous: 120828 },
-          { label: 'Fixed Assets (net)', current: 14503, previous: 15502 },
-        ]},
-        { label: 'Liabilities', total_label: 'Total Liabilities', total_current: 436820, total_previous: 339840, total_color: 'var(--r)', items: [
-          { label: 'Accounts Payable', current: 302982, previous: 272107 },
-          { label: 'PAYG + Super + GST Payable', current: 133838, previous: 67733 },
-        ]},
-        { label: 'Equity', total_label: 'Total Equity', total_current: -125501, total_previous: -154165, total_color: 'var(--r)', items: [
-          { label: 'Share Capital + Retained Earnings', current: 95983, previous: 95983 },
-          { label: 'Current Year P&L', current: -221483, previous: -250148 },
-        ]},
-      ],
-      le_total: { current: 311319, previous: 185675 },
-    };
-  }
-
   /** Helper: prev month string */
   function _prevMonthStr(ym) {
     if (!ym) return '';
     const [y, m] = ym.split('-').map(Number);
     const d = new Date(y, m - 2, 1);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-  }
-
-  // ══════════════════════════════════════════
-  // MOCK: Cash Flow
-  // ══════════════════════════════════════════
-  function _mockCashFlow() {
-    return {
-      operating: 44987, investing: -12000, financing: -8000, net_cash: 24987, net_cash_ytd: 108381,
-      sections: [
-        { label: 'Operating Activities', total_label: 'Net Operating', total_month: 44987, total_ytd: 168381, items: [
-          { label: 'Cash from Sales', month: 604695, ytd: 1806267 },
-          { label: 'Cash paid to Suppliers', month: -484708, ytd: -1412886 },
-          { label: 'Cash paid for Wages', month: -75000, ytd: -225000 },
-        ]},
-        { label: 'Investing', items: [
-          { label: 'Equipment Purchase', month: -12000, ytd: -36000 },
-        ]},
-        { label: 'Financing', items: [
-          { label: 'Loan Repayment', month: -8000, ytd: -24000 },
-        ]},
-      ],
-    };
   }
 
   // ══════════════════════════════════════════
@@ -996,8 +885,10 @@
     try {
       _aparData = await API.getApArTracker({ brand: _filters.brand === 'All' ? null : _filters.brand });
     } catch (e) {
-      console.warn('getApArTracker failed, using mock:', e.message);
-      _aparData = _mockApar();
+      console.warn('getApArTracker failed:', e.message);
+      const el = document.getElementById('rp_apar_content');
+      if (el) el.innerHTML = '<div class="empty" style="padding:40px;color:var(--r)">Failed to load AP/AR data. Please try again.</div>';
+      return;
     }
     _renderAparKpi();
     _renderAparTable();
@@ -1078,8 +969,9 @@
     try {
       _assetData = await API.getAssetSummary({});
     } catch (e) {
-      console.warn('getAssetSummary failed, using mock:', e.message);
-      _assetData = _mockAsset();
+      console.warn('getAssetSummary failed:', e.message);
+      if (el) el.innerHTML = '<div class="empty" style="padding:40px;color:var(--r)">Failed to load asset data. Please try again.</div>';
+      return;
     }
     const d = _assetData;
     let html = `<div class="kpi" style="flex-wrap:nowrap">
@@ -1120,8 +1012,9 @@
     try {
       _bankData = await API.getBankSummary({ brand: _filters.brand === 'All' ? null : _filters.brand });
     } catch (e) {
-      console.warn('getBankSummary failed, using mock:', e.message);
-      _bankData = _mockBank();
+      console.warn('getBankSummary failed:', e.message);
+      if (el) el.innerHTML = '<div class="empty" style="padding:40px;color:var(--r)">Failed to load bank summary data. Please try again.</div>';
+      return;
     }
     const d = _bankData;
     let html = '<table class="tbl" id="rp_bank_tbl"><thead><tr>' + App.sth('Account','acct','rp_bank_tbl') + App.sth('Brand','brand','rp_bank_tbl') + App.sthR('SPG Balance','spg','rp_bank_tbl') + App.sthR('Bank Balance','bank','rp_bank_tbl') + App.sthR('Difference','diff','rp_bank_tbl') + App.sth('Reconciled?','recon','rp_bank_tbl') + App.sth('Last reconciled','last','rp_bank_tbl') + '</tr></thead><tbody>';
@@ -1166,8 +1059,9 @@
     try {
       _cashData = await API.getCashSummary({ brand: _filters.brand === 'All' ? null : _filters.brand });
     } catch (e) {
-      console.warn('getCashSummary failed, using mock:', e.message);
-      _cashData = _mockCash();
+      console.warn('getCashSummary failed:', e.message);
+      if (el) el.innerHTML = '<div class="empty" style="padding:40px;color:var(--r)">Failed to load cash summary data. Please try again.</div>';
+      return;
     }
     let html = '<table class="tbl" id="rp_cash_tbl"><thead><tr>' + App.sth('Account','acct','rp_cash_tbl') + App.sth('Brand','brand','rp_cash_tbl') + App.sthR('System Balance','sys','rp_cash_tbl') + App.sthR('Last Count','count','rp_cash_tbl') + App.sthR('Difference','diff','rp_cash_tbl') + App.sth('Last counted','last','rp_cash_tbl') + App.sth('Status','status','rp_cash_tbl') + '</tr></thead><tbody>';
     (_cashData.rows || []).forEach(r => {
@@ -1210,8 +1104,10 @@
     try {
       _loanData = await API.getLoanReport({});
     } catch (e) {
-      console.warn('getLoanReport failed, using mock:', e.message);
-      _loanData = _mockLoan();
+      console.warn('getLoanReport failed:', e.message);
+      const el = document.getElementById('rp_loan_content');
+      if (el) el.innerHTML = '<div class="empty" style="padding:40px;color:var(--r)">Failed to load loan data. Please try again.</div>';
+      return;
     }
     _renderLoanTab();
   }
@@ -1271,71 +1167,7 @@
 
   function _loanTabSwitch(tab) { _loanTab = tab; _renderLoanTab(); }
 
-  // ══════════════════════════════════════════
-  // MOCK DATA: E6b-3 screens
-  // ══════════════════════════════════════════
-  function _mockApar() {
-    return {
-      total_ap: 14200, overdue_ap: 560, total_ar: 3800, overdue_ar: 0,
-      ap_rows: [
-        { name: 'Pro Bros Providore', current: 318.65, d30: 128.10, d60: 0, d90: 0, total: 446.75 },
-        { name: 'Siam Pacific Food', current: 740.60, d30: 0, d60: 0, d90: 0, total: 740.60 },
-        { name: 'B&E Food Distributors', current: 0, d30: 212, d60: 0, d90: 0, total: 212 },
-      ],
-      ar_rows: [],
-      aging: { current: 1059.25, d30: 340.10, d60: 0, d90: 0 },
-    };
-  }
-
-  function _mockAsset() {
-    return {
-      count: 12, total_cost: 86400, total_dep: 31200, total_nbv: 55200,
-      rows: [
-        { asset_id: 'AST-001', name: 'Commercial Oven', category: 'Kitchen Equipment', brand: 'Mango Coco', purchase_date: '01/07/2023', cost: 15000, nbv: 9643 },
-        { asset_id: 'AST-002', name: 'POS System x2', category: 'POS System', brand: 'Mango Coco', purchase_date: '15/03/2024', cost: 4800, nbv: 2800 },
-        { asset_id: 'AST-003', name: 'Renovation Fit-out', category: 'Leasehold Improvement', brand: 'Flying Tigress', purchase_date: '01/11/2025', cost: 45000, nbv: 42000 },
-        { asset_id: 'AST-004', name: 'Old Fridge', category: 'Kitchen Equipment', brand: 'Mango Coco', purchase_date: '01/01/2020', cost: 3200, nbv: 0 },
-      ],
-    };
-  }
-
-  function _mockBank() {
-    return { rows: [
-      { account: '680 #4429', brand: 'Flying Tigress', spg_balance: 68011.31, bank_balance: 64153.50, last_reconciled: '28/02/2026' },
-      { account: '682 Petty Cash #1997', brand: 'Flying Tigress', spg_balance: 2414.83, bank_balance: 2143.08, last_reconciled: '05/03/2026' },
-      { account: '7134 Westpac', brand: 'Mango Coco', spg_balance: 22360.99, bank_balance: 22360.99, last_reconciled: '10/03/2026' },
-      { account: '5976 Westpac', brand: 'Issho Cafe', spg_balance: 45890.00, bank_balance: 45890.00, last_reconciled: '10/03/2026' },
-    ]};
-  }
-
-  function _mockCash() {
-    return { rows: [
-      { account: '4410 PettyCash', brand: 'Mango Coco', system: 1250, count: 1250, last_counted: '08/03/2026' },
-      { account: '9392 PettyCash', brand: 'Red Wok', system: 800, count: 732, last_counted: '05/03/2026' },
-      { account: '5941 PettyCash', brand: 'Issho Cafe', system: 500, count: 500, last_counted: '07/03/2026' },
-    ]};
-  }
-
-  function _mockLoan() {
-    return {
-      brand_names: ['Mango', 'Flying', 'Issho', 'Cheese', 'Redwork', 'SPG'],
-      intercompany_rows: [
-        { from: 'Mango', amounts: [null, 13570, 12, 0, 749, 172] },
-        { from: 'Issho', amounts: [244775, 210432, null, 0, 0, 0] },
-        { from: 'Cheese', amounts: [17067, 0, 0, null, 0, 0] },
-      ],
-      interco_note: 'Red = high concentration risk · Issho is the largest lender ($455K outstanding)',
-      director_loans: [
-        { director: 'Khun Or', entity: 'Mango Coco', lent: 50000, repaid: 5000, outstanding: 45000, is_capital: 'Partial ($20K flagged)' },
-        { director: 'Khun Or', entity: 'Flying Tigress', lent: 30000, repaid: 0, outstanding: 30000, is_capital: 'Yes — Capital Injection' },
-      ],
-      capital_structure: [
-        { entity: 'Mango Coco', share_capital: 10000, director_loans: 45000, retained: -50000, total_equity: 5000 },
-        { entity: 'Flying Tigress', share_capital: 5000, director_loans: 30000, retained: -80000, total_equity: -45000 },
-        { entity: 'Issho Cafe', share_capital: 5000, director_loans: 0, retained: 20000, total_equity: 25000 },
-      ],
-    };
-  }
+  // (Mock data functions for E6b-3 screens removed — all screens use live API data)
 
   // ══════════════════════════════════════════
   // fp_brand: BRAND COMPARISON (Performance)
@@ -1357,8 +1189,9 @@
     try {
       _fpBrandData = await API.getBrandComparison({ month: _filters.month });
     } catch (e) {
-      console.warn('getBrandComparison failed, using mock:', e.message);
-      _fpBrandData = _mockFpBrand();
+      console.warn('getBrandComparison failed:', e.message);
+      if (el) el.innerHTML = '<div class="empty" style="padding:40px;color:var(--r)">Failed to load brand comparison data. Please try again.</div>';
+      return;
     }
     const d = _fpBrandData;
     const brands = d.brands || [];
@@ -1431,8 +1264,9 @@
     try {
       _fpBudgetData = await API.getBudgetVsActual({ month: _filters.month, brand: _filters.brand === 'All' ? null : _filters.brand });
     } catch (e) {
-      console.warn('getBudgetVsActual failed, using mock:', e.message);
-      _fpBudgetData = _mockFpBudget();
+      console.warn('getBudgetVsActual failed:', e.message);
+      if (el) el.innerHTML = '<div class="empty" style="padding:40px;color:var(--r)">Failed to load budget data. Please try again.</div>';
+      return;
     }
     const d = _fpBudgetData;
     const achievement = d.budget_rev ? ((d.actual_rev / d.budget_rev) * 100).toFixed(0) : '0';
@@ -1486,8 +1320,9 @@
     try {
       _fpRevData = await API.getRevenueAnalysis({ month: _filters.month, brand: _filters.brand === 'All' ? null : _filters.brand });
     } catch (e) {
-      console.warn('getRevenueAnalysis failed, using mock:', e.message);
-      _fpRevData = _mockFpRev();
+      console.warn('getRevenueAnalysis failed:', e.message);
+      if (el) el.innerHTML = '<div class="empty" style="padding:40px;color:var(--r)">Failed to load revenue analysis data. Please try again.</div>';
+      return;
     }
     const d = _fpRevData;
     let html = `<div class="kpi" style="flex-wrap:nowrap">
@@ -1538,8 +1373,9 @@
     try {
       _fpExpData = await API.getExpenseTrend({ month: _filters.month, brand: _filters.brand === 'All' ? null : _filters.brand });
     } catch (e) {
-      console.warn('getExpenseTrend failed, using mock:', e.message);
-      _fpExpData = _mockFpExp();
+      console.warn('getExpenseTrend failed:', e.message);
+      if (el) el.innerHTML = '<div class="empty" style="padding:40px;color:var(--r)">Failed to load expense trend data. Please try again.</div>';
+      return;
     }
     const d = _fpExpData;
     const momChg = d.prev_total ? (((d.total - d.prev_total) / d.prev_total) * 100).toFixed(0) : '0';
@@ -1571,58 +1407,7 @@
     _fpExpData = null; _loadFpExp();
   }
 
-  // ══════════════════════════════════════════
-  // MOCK DATA: E6c Performance
-  // ══════════════════════════════════════════
-  function _mockFpBrand() {
-    return {
-      brands: [
-        { name: 'Cheese', revenue: 312000, gp_pct: 61, col_pct: 41, net: 125000, rev_chg: 5 },
-        { name: 'Flying', revenue: 87000, gp_pct: 43, col_pct: 51, net: -160000, rev_chg: -8 },
-        { name: 'Issho', revenue: 332000, gp_pct: 73, col_pct: 28, net: 312000, rev_chg: 12 },
-        { name: 'Mango', revenue: 605000, gp_pct: 72, col_pct: 35, net: -57000, rev_chg: 3 },
-        { name: 'Redwork', revenue: 231000, gp_pct: 58, col_pct: 38, net: 18000, rev_chg: 0 },
-        { name: 'SPG', revenue: 197000, gp_pct: 82, col_pct: 15, net: 27000, rev_chg: 2 },
-      ],
-      totals: { revenue: 1764000, gp_pct: 65, col_pct: 33, net: 264000 },
-    };
-  }
-
-  function _mockFpBudget() {
-    return {
-      actual_rev: 604695, budget_rev: 580000,
-      rows: [
-        { category: 'Revenue', budget: 580000, actual: 604695 },
-        { category: 'COGS', budget: 174000, actual: 170675 },
-        { category: 'Wages', budget: 174000, actual: 214162 },
-        { category: 'Rent', budget: 67000, actual: 67449 },
-      ],
-    };
-  }
-
-  function _mockFpRev() {
-    return {
-      total: 604695, instore: 342000, delivery: 156000, other: 106695,
-      rows: [
-        { channel: 'Eftpos 1+2', amount: 457189, prev: 450853 },
-        { channel: 'Cash', amount: 118285, prev: 99461 },
-        { channel: 'UberEats', amount: 19576, prev: 25140 },
-        { channel: 'Easi', amount: 8360, prev: 23842 },
-      ],
-    };
-  }
-
-  function _mockFpExp() {
-    return {
-      total: 147000, prev_total: 131000, revenue: 604695,
-      rows: [
-        { category: 'Rent', amount: 67449, prev: 67095 },
-        { category: 'Wages', amount: 214162, prev: 213740 },
-        { category: 'Utilities', amount: 4355, prev: 4191 },
-        { category: 'Admin & Office', amount: 46217, prev: 42424 },
-      ],
-    };
-  }
+  // (Mock data functions for E6c Performance removed — all screens use live API data)
 
   // ══════════════════════════════════════════
   // dashboard: CFO BRIEF (E6d)
@@ -1650,8 +1435,9 @@
         brand: _filters.brand === 'All' ? null : _filters.brand,
       });
     } catch (e) {
-      console.warn('getCfoDashboard failed, using mock:', e.message);
-      _dashData = _mockDashboard();
+      console.warn('getCfoDashboard failed:', e.message);
+      if (el) el.innerHTML = '<div class="empty" style="padding:40px;color:var(--r)">Failed to load dashboard data. Please try again.</div>';
+      return;
     }
 
     const d = _dashData;
@@ -1662,7 +1448,7 @@
     (d.brands || []).forEach(b => {
       const dotColor = b.net >= 0 ? 'var(--g)' : 'var(--r)';
       const borderColor = b.net >= 0 ? 'var(--g)' : (b.rev_chg < -5 ? 'var(--r)' : 'var(--o)');
-      h += `<div class="card" style="flex:1;margin:0;border-top:3px solid ${borderColor};padding:10px 12px;cursor:pointer" onclick="App.go('rp_pnl_brand')">
+      h += `<div class="card" style="flex:1;margin:0;border-top:3px solid ${borderColor};padding:10px 12px;cursor:pointer" onclick="App.go('tx_log')">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-size:11px;font-weight:700">${esc(b.name)}</span><span style="width:8px;height:8px;border-radius:50%;background:${dotColor}"></span></div>
         <div style="font-size:16px;font-weight:800">${_fmK(b.revenue)}</div>
         <div style="font-size:9px;color:var(--t3)">Revenue · ${b.rev_chg >= 0 ? '▲' : '▼'} ${Math.abs(b.rev_chg || 0).toFixed(1)}%</div>
@@ -1685,9 +1471,12 @@
 
     // Cash Position
     const cp = d.cash_position || {};
-    h += `<div class="card" style="margin:0"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-size:11px;font-weight:700">Cash Position</span><a class="lk" onclick="App.go('ac_hub')">Banking Hub →</a></div>
-      <div style="font-size:24px;font-weight:800;margin-bottom:6px">${fm(cp.total || 0, 0)}</div>
-      <div style="font-size:10px;color:var(--t2)">${esc(cp.breakdown || '')}</div></div>`;
+    const cpTotal = cp.total || 0;
+    const pnlRev = (d.pnl_snapshot || {}).revenue || 0;
+    const cashWarning = (cpTotal === 0 && pnlRev > 0) ? '<div style="font-size:var(--fs-xxs);color:var(--o);margin-top:4px">\u26a0\ufe0f Cash position may not reflect all transactions. <a class="lk" style="font-size:var(--fs-xxs)" onclick="App.go(\'rc_bank\')">Reconcile \u2192</a></div>' : '';
+    h += `<div class="card" style="margin:0"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-size:11px;font-weight:700">Cash Position</span><a class="lk" onclick="App.go('rc_bank')">Bank Reconcile \u2192</a></div>
+      <div style="font-size:24px;font-weight:800;margin-bottom:6px">${fm(cpTotal, 0)}</div>
+      <div style="font-size:10px;color:var(--t2)">${esc(cp.breakdown || '')}</div>${cashWarning}</div>`;
 
     // P&L Snapshot
     const pnl = d.pnl_snapshot || {};
@@ -1762,37 +1551,7 @@
     _loadDashboard();
   }
 
-  function _mockDashboard() {
-    return {
-      brands: [
-        { name: 'Mango Coco', revenue: 86200, rev_chg: 3.1, net: 5010, net_pct: 5.8 },
-        { name: 'Flying Tigress', revenue: 52800, rev_chg: 1.8, net: 2350, net_pct: 4.5 },
-        { name: 'Issho Cafe', revenue: 38400, rev_chg: -2.4, net: 120, net_pct: 0.3 },
-        { name: 'Red Wok', revenue: 22100, rev_chg: 8.5, net: 1460, net_pct: 6.6 },
-        { name: 'Cheese Culture', revenue: 11500, rev_chg: -12.3, net: -470, net_pct: -4.1 },
-      ],
-      indicators: [
-        { label: 'SD Bridge: 9/12 synced', color: 'var(--g)', bg: 'var(--gbg)' },
-        { label: '5 pending · 1 needs fix', color: 'var(--o)', bg: 'var(--obg)' },
-        { label: 'BAS due: 28 Apr', color: 'var(--t3)', bg: '' },
-        { label: 'Loan: 15 Apr $2,083', color: 'var(--o)', bg: 'var(--obg)' },
-      ],
-      cash_position: { total: 66297, breakdown: 'Mango $42K · FT $18K · CBA $5K · Cash $1K' },
-      pnl_snapshot: { revenue: 211000, rev_chg: 4.6, gp_pct: 32.4, ebitda: 10600, net: 9470 },
-      ap: { total: 24580, overdue: 560, note: 'B&E Foods $257 · 4 days overdue' },
-      reconciliation: { days_done: '10/12', unmatched: 3858, note: 'FT: 2 transactions unmatched' },
-      loans: { outstanding: 120000, interco: 24100, next_repayment: '15 Apr · $2,083' },
-      tax: { gst: 6426, super: 17012, payg: 19218 },
-      actions: [
-        { priority: 'High', text: 'Chase B&E invoice — $257 overdue 4 days' },
-        { priority: 'Med', text: 'Reconcile FT bank — 2 unmatched ($3,858)' },
-        { priority: 'Med', text: 'ANZ Loan repayment due 15 Apr — $2,083' },
-        { priority: 'Med', text: 'SD Bridge — fix 1 missing category' },
-        { priority: 'Low', text: 'Review Cheese Culture — revenue ▼12.3%, net loss' },
-        { priority: 'Low', text: 'Settle FT → MC intercompany $23.9K' },
-      ],
-    };
-  }
+  // (Mock dashboard data removed — uses live API data)
 
   // ══════════════════════════════════════════
   // REGISTER ROUTES

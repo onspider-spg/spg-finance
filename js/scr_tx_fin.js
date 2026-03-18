@@ -575,6 +575,7 @@ let _sdFilter = 'all'; // 'all', 'pending', 'synced'
 let _sdMonth = new Date().toISOString().substring(0, 7); // '2026-03'
 let _sdChecked = new Set();
 let _sdBrandFilter = ''; // brand name filter
+let _sdRows = []; // cached rows for brand extraction
 
 function renderTxSdBridge() {
   _sdChecked = new Set();
@@ -587,7 +588,7 @@ function renderTxSdBridge() {
           <button class="btn bo" style="padding:6px 16px;font-size:12px" onclick="ScrTx._sdSetFilter('pending',this)">Pending</button>
           <button class="btn bo" style="padding:6px 16px;font-size:12px" onclick="ScrTx._sdSetFilter('synced',this)">Done</button>
         </div>
-        <div><div class="fl-l">Brand</div><select class="fl" id="sd_brand" onchange="ScrTx._sdSetBrandFilter()" style="width:140px">${_brandFilterOpts()}</select></div>
+        <div><div class="fl-l">Brand</div><select class="fl" id="sd_brand" onchange="ScrTx._sdSetBrandFilter()" style="width:140px"><option value="">All Brands</option></select></div>
         <div style="flex:1"></div>
       </div>
       <div class="kpi" id="sd_kpi">
@@ -610,7 +611,18 @@ async function _loadSdBridge() {
   try {
     const result = await API.getSdPending({ month: _sdMonth });
     const rows = result.rows || [];
+    _sdRows = rows; // cache for brand extraction
     const kpi = result.kpi || {};
+
+    // Build brand dropdown from actual bridge data
+    const brandSet = new Set();
+    rows.forEach(r => { const b = r.paying_entity || r.store || ''; if (b) brandSet.add(b); });
+    const brandSel = document.getElementById('sd_brand');
+    if (brandSel) {
+      const prev = brandSel.value;
+      brandSel.innerHTML = '<option value="">All Brands</option>' +
+        [...brandSet].sort().map(b => `<option${b === prev ? ' selected' : ''}>${App.esc(b)}</option>`).join('');
+    }
 
     // Render KPI
     const kpiEl = document.getElementById('sd_kpi');

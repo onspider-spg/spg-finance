@@ -1,4 +1,4 @@
-/** Version 1.9 | 16 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 2.0 | 19 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_tx_fin.js
@@ -381,30 +381,42 @@ function renderTxBillDetail() {
   const b = detail.bill;
   const li = detail.lineItems || [];
   const alloc = detail.allocation || 'self';
-  const DS = 'disabled style="background:var(--bg2);color:var(--t1);border-color:var(--bd2);-webkit-text-fill-color:var(--t1);opacity:1"';
+  // Filled-field style: light purple bg to indicate data is present
+  const FB = 'background:#f3f0ff;border-color:#d8d0f0;color:var(--t1);-webkit-text-fill-color:var(--t1);opacity:1';
+  const DS = `disabled style="${FB}"`;
 
   const subtotal = li.reduce((s, l) => s + (Number(l.amount) || 0), 0);
   const tax = li.reduce((s, l) => s + (Number(l.gst) || 0), 0);
   const total = subtotal + tax;
   const paid = total - (Number(b.balance) || 0);
 
-  // Line items rows — real inputs, disabled
-  const liRows = li.length > 0 ? li.map(l =>
-    `<tr>
-      <td style="padding:0;border:1px solid #e5e7eb"><input ${DS} value="${esc(l.desc || l.description || '')}" style="width:100%;padding:8px 10px;border:none;font-size:var(--fs-body);background:var(--bg2);-webkit-text-fill-color:var(--t1)"></td>
-      <td style="padding:0;border:1px solid #e5e7eb"><input ${DS} value="${esc(l.category || l.category_display || '')}" style="width:100%;padding:8px 10px;border:none;font-size:var(--fs-body);background:var(--bg2);-webkit-text-fill-color:var(--t1)"></td>
-      <td style="padding:0;border:1px solid #e5e7eb"><input ${DS} value="${fm(l.amount)}" style="width:100%;padding:8px 10px;border:none;text-align:right;font-size:var(--fs-body);font-weight:500;background:var(--bg2);-webkit-text-fill-color:var(--t1)"></td>
-      <td style="padding:0;border:1px solid #e5e7eb;background:var(--bg2)"><input ${DS} value="${fm(l.gst)}" style="width:100%;padding:8px 10px;border:none;text-align:right;font-size:var(--fs-body);background:var(--bg2);color:var(--t3);-webkit-text-fill-color:var(--t3)"></td>
-      <td style="padding:0;border:1px solid #e5e7eb"><input ${DS} value="${esc(l.tax_code || 'FRE')}" style="width:100%;padding:8px 10px;border:none;font-size:var(--fs-body);background:var(--bg2);-webkit-text-fill-color:var(--t1)"></td>
-    </tr>`
-  ).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--t3);padding:16px">No line items</td></tr>';
+  const isOB = alloc === 'ob' || alloc === 'on_behalf';
+
+  // Line items rows — match create bill table layout with disabled light purple fields
+  const liRows = li.length > 0 ? li.map(l => {
+    const ownerCol = isOB ? `<td style="padding:0;border:1px solid #e5e7eb"><input disabled style="width:100%;padding:8px 10px;border:none;font-size:var(--fs-body);${FB}" value="${esc(l.cost_owner || '')}"></td>` : '';
+    return `<tr>`
+      + ownerCol
+      + `<td style="padding:0;border:1px solid #e5e7eb"><input disabled style="width:100%;padding:8px 10px;border:none;font-size:var(--fs-body);${FB}" value="${esc(l.desc || l.description || '')}"></td>`
+      + `<td style="padding:0;border:1px solid #e5e7eb"><input disabled style="width:100%;padding:8px 10px;border:none;font-size:var(--fs-body);${FB}" value="${esc(l.category || l.category_display || '')}"></td>`
+      + `<td style="padding:0;border:1px solid #e5e7eb"><input disabled style="width:100%;padding:8px 10px;border:none;text-align:right;font-size:var(--fs-body);font-weight:500;${FB}" value="${fm(l.amount)}"></td>`
+      + `<td style="padding:0;border:1px solid #e5e7eb"><input disabled style="width:100%;padding:8px 10px;border:none;text-align:right;font-size:var(--fs-body);background:#faf9fe;border-color:#d8d0f0;color:var(--t3);-webkit-text-fill-color:var(--t3);opacity:1" value="${fm(l.gst)}"></td>`
+      + `<td style="padding:0;border:1px solid #e5e7eb"><input disabled style="width:100%;padding:8px 10px;border:none;font-size:var(--fs-body);${FB}" value="${esc(l.tax_code || 'FRE')}"></td>`
+      + `</tr>`;
+  }).join('') : `<tr><td colspan="${isOB ? 6 : 5}" style="text-align:center;color:var(--t3);padding:16px">No line items</td></tr>`;
+
+  // Column headers — match create bill exactly
+  const ownerTh = isOB ? '<th style="text-align:left;padding:8px;font-weight:600;font-size:var(--fs-sm);width:14%">Cost Owner</th>' : '';
+  const descW = isOB ? '22%' : '30%';
+  const catW = isOB ? '22%' : '26%';
+  const amtW = isOB ? '16%' : '18%';
 
   return {
     tb: `<div class="tb"><button class="bg" onclick="App.go('tx_bill')">← Bills</button><div class="tb-t">Bill Detail — ${esc(b.bill_no)}</div><div style="flex:1"></div>${sb(b.status)}</div>`,
     ct: `<div style="max-width:860px;margin:0 auto">
-      <!-- Main detail card — same layout as Create Bill -->
+      <!-- Main form card — identical layout to Create Bill -->
       <div class="card">
-        <!-- 2-column header fields (disabled inputs) -->
+        <!-- 2-column header fields -->
         <div style="display:flex;gap:30px">
           <!-- Left column -->
           <div style="width:300px">
@@ -413,12 +425,12 @@ function renderTxBillDetail() {
               <input class="inp" ${DS} value="Expense / Bill" style="width:280px">
             </div>
             <div class="fg">
-              <label class="lb">Brand</label>
+              <label class="lb">Brand *</label>
               <input class="inp" ${DS} value="${esc(b.paying_entity || b.brand || '—')}" style="width:280px">
             </div>
             <div class="fg">
-              <label class="lb">Supplier</label>
-              <input class="inp" ${DS} value="${esc(b.supplier_name || '—')}" style="width:280px;font-weight:600">
+              <label class="lb">Supplier *</label>
+              <input class="inp" ${DS} value="${esc(b.supplier_name || '—')}" style="width:280px">
             </div>
             <div class="fg">
               <label class="lb">Supplier Invoice Number</label>
@@ -428,39 +440,54 @@ function renderTxBillDetail() {
 
           <!-- Right column -->
           <div style="flex:1">
-            <div style="display:flex;align-items:center;margin-bottom:10px;justify-content:flex-end;gap:10px">
-              <span class="lb" style="margin:0">Bill Number</span>
-              <input class="inp" ${DS} value="${esc(b.bill_no)}" style="width:180px;font-weight:600">
+            <div style="display:flex;align-items:flex-start;margin-bottom:10px;justify-content:flex-end;gap:10px">
+              <span class="lb" style="padding-top:8px;margin:0">Bill Number *</span>
+              <div style="width:180px">
+                <input class="inp" ${DS} value="${esc(b.bill_no)}" style="font-weight:600">
+              </div>
             </div>
             <div style="display:flex;align-items:center;margin-bottom:10px;justify-content:flex-end;gap:10px">
-              <span class="lb" style="margin:0">Issue Date</span>
-              <input class="inp" type="date" ${DS} value="${b.date || ''}" style="width:180px">
+              <span class="lb" style="margin:0">Issue Date *</span>
+              <input class="inp" ${DS} value="${b.date ? new Date(b.date + 'T00:00:00').toLocaleDateString('en-AU') : ''}" style="width:180px">
             </div>
             <div style="display:flex;align-items:center;margin-bottom:10px;justify-content:flex-end;gap:10px">
-              <span class="lb" style="margin:0">Due Date</span>
-              <input class="inp" type="date" ${DS} value="${b.due_date || ''}" style="width:180px">
+              <span class="lb" style="margin:0">Due Date *</span>
+              <input class="inp" ${DS} value="${b.due_date ? new Date(b.due_date + 'T00:00:00').toLocaleDateString('en-AU') : ''}" style="width:180px">
             </div>
             <div style="display:flex;align-items:center;margin-bottom:10px;justify-content:flex-end;gap:10px">
-              <span class="lb" style="margin:0">Accrual Month</span>
-              <input class="inp" type="month" ${DS} value="${b.date ? b.date.substring(0, 7) : ''}" style="width:180px">
+              <span class="lb" style="margin:0">Accrual Month <span title="เดือนที่ต้องการบันทึกค่าใช้จ่ายนี้ในบัญชี" style="cursor:help;color:var(--b)">ℹ️</span></span>
+              <input class="inp" ${DS} value="${b.date ? (() => { const d = new Date(b.date + 'T00:00:00'); return d.toLocaleString('en-US', { month: 'long' }) + '  ' + d.getFullYear(); })() : ''}" style="width:180px">
             </div>
           </div>
         </div>
 
-        <!-- Allocation divider -->
-        <div style="display:flex;align-items:center;margin:12px 0">
-          <hr style="border:none;border-top:1px solid #eee;flex:1;margin:0">
-          <div style="padding:0 8px;font-size:var(--fs-xs);color:var(--t4)">Allocation: ${esc(alloc)}</div>
+        <!-- Tax mode (read-only) -->
+        <div style="display:flex;gap:12px;margin:10px 0;font-size:var(--fs-sm);align-items:center">
+          <span style="color:var(--t3)">Amounts are</span>
+          <label style="cursor:default"><input type="radio" name="bd_taxmode" checked disabled style="accent-color:var(--acc)"> Tax exclusive</label>
+          <label style="cursor:default"><input type="radio" name="bd_taxmode" disabled style="accent-color:var(--acc)"> Tax inclusive</label>
         </div>
 
-        <!-- Line Items Table (disabled inputs) -->
+        <!-- Allocation Layout divider — show current mode like Create Bill -->
+        <div style="position:relative;margin:12px 0 0">
+          <div style="display:flex;align-items:center;gap:0">
+            <hr style="border:none;border-top:1px solid #eee;flex:1;margin:0">
+            <div style="padding:0 8px;display:flex;align-items:center;gap:4px;flex-shrink:0">
+              <span style="font-size:var(--fs-xs);color:var(--t4)">Allocation Layout</span>
+              <span style="font-size:var(--fs-xs);padding:2px 8px;border-radius:4px;background:var(--acc2);color:var(--acc);font-weight:600">${isOB ? 'On Behalf / Split' : 'Self'}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Line Items Table -->
         <table style="width:100%;border-collapse:collapse;font-size:var(--fs-body);margin-top:10px">
           <thead><tr>
-            <th style="text-align:left;padding:8px;font-weight:600;font-size:var(--fs-sm);width:30%">Description</th>
-            <th style="text-align:left;padding:8px;font-weight:600;font-size:var(--fs-sm);width:26%">Category</th>
-            <th style="text-align:left;padding:8px;font-weight:600;font-size:var(--fs-sm);width:18%">Amount ($)</th>
+            ${ownerTh}
+            <th style="text-align:left;padding:8px;font-weight:600;font-size:var(--fs-sm);width:${descW}">Description</th>
+            <th style="text-align:left;padding:8px;font-weight:600;font-size:var(--fs-sm);width:${catW}">Category *</th>
+            <th style="text-align:left;padding:8px;font-weight:600;font-size:var(--fs-sm);width:${amtW}">Amount ($) *</th>
             <th style="text-align:left;padding:8px;font-weight:600;font-size:var(--fs-sm);width:10%">GST</th>
-            <th style="text-align:left;padding:8px;font-weight:600;font-size:var(--fs-sm);width:14%">Tax code</th>
+            <th style="text-align:left;padding:8px;font-weight:600;font-size:var(--fs-sm);width:14%">Tax code *</th>
           </tr></thead>
           <tbody>${liRows}</tbody>
         </table>
@@ -468,13 +495,14 @@ function renderTxBillDetail() {
         <!-- Notes + Totals -->
         <div style="display:flex;gap:16px;margin-top:12px">
           <div style="flex:1">
-            ${b.notes ? `<div style="font-size:var(--fs-xs);color:var(--t3);margin-bottom:2px">Notes</div><textarea class="inp" disabled style="width:100%;min-height:50px;resize:none;background:var(--bg2);color:var(--t1);-webkit-text-fill-color:var(--t1);opacity:1;border-color:var(--bd2)">${esc(b.notes)}</textarea>` : ''}
+            <div style="font-size:var(--fs-xs);color:var(--t3);margin-bottom:2px">Notes</div>
+            <textarea class="inp" disabled style="width:100%;min-height:60px;resize:none;${FB};border:1px solid #d8d0f0;border-radius:var(--rd);padding:8px;font-family:inherit;font-size:var(--fs-body)">${esc(b.notes || '')}</textarea>
           </div>
           <div style="width:240px;text-align:right;font-size:var(--fs-body)">
-            <div style="display:flex;justify-content:flex-end;gap:16px;padding:4px 0"><b>Subtotal</b><b>${fm(subtotal)}</b></div>
+            <div style="display:flex;justify-content:flex-end;gap:16px;padding:4px 0"><b>Total Amount ex GST</b><b>${fm(subtotal)}</b></div>
             <div style="display:flex;justify-content:flex-end;gap:16px;padding:4px 0;color:var(--t2)">Tax <span>${fm(tax)}</span></div>
             <div style="display:flex;justify-content:flex-end;gap:16px;padding:4px 0"><b>Total</b><b>${fm(total)}</b></div>
-            <div style="display:flex;justify-content:flex-end;gap:16px;padding:4px 0;color:var(--t2)">Amount paid <span>${fm(paid)}</span></div>
+            <div style="display:flex;justify-content:flex-end;gap:16px;padding:4px 0">Amount paid <span style="display:inline-block;width:70px;text-align:right;padding:3px 6px;border:1px solid #d8d0f0;border-radius:4px;font-size:var(--fs-body);background:#f3f0ff">${fm(paid)}</span></div>
             <div style="display:flex;justify-content:flex-end;gap:16px;padding:6px 0;font-weight:700;color:${b.status === 'Closed' ? 'var(--g)' : 'var(--r)'}">Balance due <span>${b.status === 'Closed' ? fm(0) : fm(b.balance)}</span></div>
           </div>
         </div>
@@ -484,10 +512,21 @@ function renderTxBillDetail() {
       <div style="display:flex;align-items:center;gap:6px;padding:8px 0">
         <button class="btn bo">View PDF</button>
         <button class="btn bo">Print</button>
-        <button class="btn bo" style="color:var(--r);border-color:var(--r)" onclick="ScrTx._voidBill('${esc(b.id || '')}')">Void</button>
+        <button class="btn bo" style="color:var(--r);border-color:var(--r)" onclick="ScrTx._voidBill('${esc(b.id || '')}')">Cancel</button>
         <div style="flex:1"></div>
         <button class="btn bo" onclick="App.go('tx_bill')">Back to Bills</button>
         <button class="bs">Record Payment</button>
+      </div>
+
+      <!-- Attachments — same as Create Bill -->
+      <div style="border:1.5px dashed #ddd;border-radius:10px;padding:16px;margin-top:6px">
+        <div style="font-size:var(--fs-body);font-weight:600;margin-bottom:8px">More information</div>
+        <div style="background:#333;color:#fff;padding:8px 10px;border-radius:8px 8px 0 0;font-size:var(--fs-body);font-weight:600">Attachments</div>
+        <div style="border:1.5px dashed #ddd;border-top:none;border-radius:0 0 8px 8px;padding:16px;text-align:center">
+          ${(detail.attachments && detail.attachments.length > 0)
+            ? detail.attachments.map(a => `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;padding:4px 8px;background:var(--bg3);border-radius:4px;font-size:var(--fs-sm);text-align:left"><span>📄</span><span style="flex:1">${esc(typeof a === 'string' ? a : a.name || a.filename || 'file')}</span><a class="lk" style="font-size:var(--fs-xs)">View</a></div>`).join('')
+            : '<div style="font-size:var(--fs-sm);color:var(--t3)">No attachments</div>'}
+        </div>
       </div>
     </div>`,
   };
@@ -550,19 +589,19 @@ function _goBillDetail(billId) {
   _openBillDetail(billId);
 }
 
-/** Void/Reverse a bill (issue #7) */
+/** Cancel/Reverse a bill */
 function _voidBill(billId) {
   App.showDialog({
-    title: 'Void Transaction',
-    message: 'This will reverse this transaction and create a credit entry. This cannot be undone.',
-    confirmText: 'Void',
+    title: 'Cancel Bill',
+    message: 'This will cancel this bill and create a reversal entry. This cannot be undone.',
+    confirmText: 'Cancel Bill',
     onConfirm: async () => {
       try {
         await API.call('fin_void_bill', { bill_id: billId });
-        App.toast('Transaction voided');
+        App.toast('Bill cancelled');
         App.go('tx_log');
       } catch (e) {
-        App.toast(e.message || 'Void failed');
+        App.toast(e.message || 'Cancel failed');
       }
     },
   });

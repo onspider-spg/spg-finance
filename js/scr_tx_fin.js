@@ -1,4 +1,4 @@
-/** Version 2.0 | 19 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 2.1 | 20 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_tx_fin.js
@@ -411,121 +411,190 @@ function renderTxBillDetail() {
   const catW = isOB ? '22%' : '26%';
   const amtW = isOB ? '16%' : '18%';
 
-  return {
-    tb: `<div class="tb"><button class="bg" onclick="App.go('tx_bill')">← Bills</button><div class="tb-t">Bill Detail — ${esc(b.bill_no)}</div><div style="flex:1"></div>${sb(b.status)}</div>`,
-    ct: `<div style="max-width:860px;margin:0 auto">
-      <!-- Main form card — identical layout to Create Bill -->
-      <div class="card">
-        <!-- 2-column header fields -->
-        <div style="display:flex;gap:30px">
-          <!-- Left column -->
-          <div style="width:300px">
-            <div class="fg">
-              <label class="lb">Transaction Type</label>
-              <input class="inp" ${DS} value="Expense / Bill" style="width:280px">
-            </div>
-            <div class="fg">
-              <label class="lb">Brand *</label>
-              <input class="inp" ${DS} value="${esc(b.paying_entity || b.brand || '—')}" style="width:280px">
-            </div>
-            <div class="fg">
-              <label class="lb">Supplier *</label>
-              <input class="inp" ${DS} value="${esc(b.supplier_name || '—')}" style="width:280px">
-            </div>
-            <div class="fg">
-              <label class="lb">Supplier Invoice Number</label>
-              <input class="inp" ${DS} value="${esc(b.inv_no || '—')}" style="width:280px">
-            </div>
-          </div>
+  // Attachment helpers
+  const atts = detail.attachments || [];
+  const hasAtt = atts.length > 0;
+  const firstImg = hasAtt ? (typeof atts[0] === 'string' ? atts[0] : atts[0].file_url || atts[0].url || '') : '';
+  const isImg = (u) => /\.(jpg|jpeg|png|gif|webp)$/i.test(u);
 
-          <!-- Right column -->
-          <div style="flex:1">
-            <div style="display:flex;align-items:flex-start;margin-bottom:10px;justify-content:flex-end;gap:10px">
-              <span class="lb" style="padding-top:8px;margin:0">Bill Number *</span>
-              <div style="width:180px">
-                <input class="inp" ${DS} value="${esc(b.bill_no)}" style="font-weight:600">
+  // Activity history
+  const payments = detail.payments || [];
+  const createdDate = b.created_at ? new Date(b.created_at).toLocaleDateString('en-AU') : (b.date ? new Date(b.date + 'T00:00:00').toLocaleDateString('en-AU') : '');
+  const activityRows = [
+    ...payments.map(p => `<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid #f0f0f0">
+      <span style="color:var(--g);font-size:16px">$</span>
+      <div style="flex:1">
+        <div style="font-size:var(--fs-sm);color:var(--g);font-weight:600">Bill payment recorded</div>
+        <div style="font-size:var(--fs-xs);color:var(--t3);margin-top:2px">${esc(p.reference || '')} &middot; Payment recorded &middot; ${fm(p.amount)}</div>
+      </div>
+      <div style="font-size:var(--fs-xs);color:var(--t3)">${p.payment_date ? new Date(p.payment_date + 'T00:00:00').toLocaleDateString('en-AU') : ''}</div>
+    </div>`),
+    `<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 0">
+      <span style="font-size:14px">📄</span>
+      <div style="flex:1;font-size:var(--fs-sm);color:var(--t2)">Bill created</div>
+      <div style="font-size:var(--fs-xs);color:var(--t3)">${createdDate}</div>
+    </div>`,
+  ].join('');
+
+  return {
+    tb: `<div class="tb"><button class="bg" onclick="App.go('tx_bill')">← Bills</button><div class="tb-t">Bill ${esc(b.bill_no)}</div><div style="flex:1"></div>${sb(b.status)}</div>`,
+    ct: `<div style="max-width:1100px;margin:0 auto">
+      <!-- Quick links -->
+      <div style="display:flex;gap:12px;margin-bottom:10px;font-size:var(--fs-sm)">
+        ${hasAtt ? '<a class="lk" onclick="document.getElementById(\'bd_att\').scrollIntoView({behavior:\'smooth\'})">📎 Attachments (' + atts.length + ')</a>' : ''}
+        <a class="lk" onclick="document.getElementById('bd_activity').scrollIntoView({behavior:'smooth'})">🕐 Activity history</a>
+        <a class="lk" style="color:var(--g)" onclick="document.getElementById('bd_actions').scrollIntoView({behavior:'smooth'})">$ Record payment</a>
+      </div>
+
+      <!-- ═══ SPLIT VIEW: Source doc (left) + Form (right) ═══ -->
+      <div style="display:flex;gap:16px;align-items:flex-start">
+
+        <!-- LEFT: Source document -->
+        <div style="width:420px;flex-shrink:0">
+          <div class="card" style="padding:0;overflow:hidden">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid #eee">
+              <span style="font-size:var(--fs-sm);font-weight:600">Source document uploaded</span>
+              <div style="display:flex;gap:4px">
+                ${firstImg ? `<button class="bg" style="font-size:12px;padding:2px 6px" title="Open full size" onclick="window.open('${esc(firstImg)}','_blank')">🔍</button>` : ''}
+                ${firstImg ? `<a href="${esc(firstImg)}" download class="bg" style="font-size:12px;padding:2px 6px;text-decoration:none" title="Download">⬇</a>` : ''}
               </div>
             </div>
-            <div style="display:flex;align-items:center;margin-bottom:10px;justify-content:flex-end;gap:10px">
-              <span class="lb" style="margin:0">Issue Date *</span>
-              <input class="inp" ${DS} value="${b.date ? new Date(b.date + 'T00:00:00').toLocaleDateString('en-AU') : ''}" style="width:180px">
-            </div>
-            <div style="display:flex;align-items:center;margin-bottom:10px;justify-content:flex-end;gap:10px">
-              <span class="lb" style="margin:0">Due Date *</span>
-              <input class="inp" ${DS} value="${b.due_date ? new Date(b.due_date + 'T00:00:00').toLocaleDateString('en-AU') : ''}" style="width:180px">
-            </div>
-            <div style="display:flex;align-items:center;margin-bottom:10px;justify-content:flex-end;gap:10px">
-              <span class="lb" style="margin:0">Accrual Month <span title="เดือนที่ต้องการบันทึกค่าใช้จ่ายนี้ในบัญชี" style="cursor:help;color:var(--b)">ℹ️</span></span>
-              <input class="inp" ${DS} value="${b.date ? (() => { const d = new Date(b.date + 'T00:00:00'); return d.toLocaleString('en-US', { month: 'long' }) + '  ' + d.getFullYear(); })() : ''}" style="width:180px">
-            </div>
+            ${firstImg && isImg(firstImg)
+              ? `<div style="padding:8px;background:#fafafa"><img src="${esc(firstImg)}" style="width:100%;border-radius:6px;cursor:pointer" onclick="window.open('${esc(firstImg)}','_blank')" alt="Invoice"></div>`
+              : firstImg
+                ? `<div style="padding:20px;text-align:center"><a href="${esc(firstImg)}" target="_blank" class="lk" style="font-size:var(--fs-sm)">📄 Open document</a></div>`
+                : '<div style="padding:40px;text-align:center;color:var(--t4);font-size:var(--fs-sm)">No source document</div>'
+            }
+            ${atts.length > 1 ? `<div style="padding:8px;border-top:1px solid #eee;font-size:var(--fs-xs);color:var(--t3)">+${atts.length - 1} more attachment${atts.length > 2 ? 's' : ''}</div>` : ''}
           </div>
         </div>
 
-        <!-- Tax mode (read-only) -->
-        <div style="display:flex;gap:12px;margin:10px 0;font-size:var(--fs-sm);align-items:center">
-          <span style="color:var(--t3)">Amounts are</span>
-          <label style="cursor:default"><input type="radio" name="bd_taxmode" checked disabled style="accent-color:var(--acc)"> Tax exclusive</label>
-          <label style="cursor:default"><input type="radio" name="bd_taxmode" disabled style="accent-color:var(--acc)"> Tax inclusive</label>
-        </div>
-
-        <!-- Allocation Layout divider — show current mode like Create Bill -->
-        <div style="position:relative;margin:12px 0 0">
-          <div style="display:flex;align-items:center;gap:0">
-            <hr style="border:none;border-top:1px solid #eee;flex:1;margin:0">
-            <div style="padding:0 8px;display:flex;align-items:center;gap:4px;flex-shrink:0">
-              <span style="font-size:var(--fs-xs);color:var(--t4)">Allocation Layout</span>
-              <span style="font-size:var(--fs-xs);padding:2px 8px;border-radius:4px;background:var(--acc2);color:var(--acc);font-weight:600">${isOB ? 'On Behalf / Split' : 'Self'}</span>
+        <!-- RIGHT: Form fields -->
+        <div style="flex:1;min-width:0">
+          <!-- Header fields -->
+          <div class="card" style="padding:14px 16px">
+            <div class="fg" style="margin-bottom:8px">
+              <label class="lb">Supplier *</label>
+              <input class="inp" ${DS} value="${esc(b.supplier_name || '—')}">
             </div>
-          </div>
-        </div>
+            <div class="fg" style="margin-bottom:8px">
+              <label class="lb">Bill Number</label>
+              <input class="inp" ${DS} value="${esc(b.bill_no)}" style="font-weight:600">
+            </div>
+            <div class="fg" style="margin-bottom:8px">
+              <label class="lb">Supplier Invoice Number</label>
+              <input class="inp" ${DS} value="${esc(b.inv_no || '—')}">
+            </div>
+            <div style="display:flex;gap:10px;margin-bottom:8px">
+              <div class="fg" style="flex:1"><label class="lb">Issue Date *</label><input class="inp" ${DS} value="${b.date ? new Date(b.date + 'T00:00:00').toLocaleDateString('en-AU') : ''}"></div>
+              <div class="fg" style="flex:1"><label class="lb">Due Date *</label><input class="inp" ${DS} value="${b.due_date ? new Date(b.due_date + 'T00:00:00').toLocaleDateString('en-AU') : ''}"></div>
+            </div>
+            <div style="display:flex;gap:10px;margin-bottom:8px">
+              <div class="fg" style="flex:1"><label class="lb">Brand *</label><input class="inp" ${DS} value="${esc(b.paying_entity || b.brand || '—')}"></div>
+              <div class="fg" style="flex:1"><label class="lb">Accrual Month</label><input class="inp" ${DS} value="${b.date ? (() => { const d = new Date(b.date + 'T00:00:00'); return d.toLocaleString('en-US', { month: 'long' }) + ' ' + d.getFullYear(); })() : ''}"></div>
+            </div>
 
-        <!-- Line Items Table -->
-        <table style="width:100%;border-collapse:collapse;font-size:var(--fs-body);margin-top:10px">
-          <thead><tr>
-            ${ownerTh}
-            <th style="text-align:left;padding:8px;font-weight:600;font-size:var(--fs-sm);width:${descW}">Description</th>
-            <th style="text-align:left;padding:8px;font-weight:600;font-size:var(--fs-sm);width:${catW}">Category *</th>
-            <th style="text-align:left;padding:8px;font-weight:600;font-size:var(--fs-sm);width:${amtW}">Amount ($) *</th>
-            <th style="text-align:left;padding:8px;font-weight:600;font-size:var(--fs-sm);width:10%">GST</th>
-            <th style="text-align:left;padding:8px;font-weight:600;font-size:var(--fs-sm);width:14%">Tax code *</th>
-          </tr></thead>
-          <tbody>${liRows}</tbody>
-        </table>
+            <!-- Tax mode -->
+            <div style="display:flex;gap:12px;margin:6px 0;font-size:var(--fs-sm);align-items:center">
+              <span style="color:var(--t3)">Amounts are</span>
+              <label style="cursor:default"><input type="radio" name="bd_taxmode" checked disabled style="accent-color:var(--acc)"> Tax exclusive</label>
+              <label style="cursor:default"><input type="radio" name="bd_taxmode" disabled style="accent-color:var(--acc)"> Tax inclusive</label>
+            </div>
 
-        <!-- Notes + Totals -->
-        <div style="display:flex;gap:16px;margin-top:12px">
-          <div style="flex:1">
-            <div style="font-size:var(--fs-xs);color:var(--t3);margin-bottom:2px">Notes</div>
-            <textarea class="inp" disabled style="width:100%;min-height:60px;resize:none;${FB};border:1px solid #d8d0f0;border-radius:var(--rd);padding:8px;font-family:inherit;font-size:var(--fs-body)">${esc(b.notes || '')}</textarea>
-          </div>
-          <div style="width:240px;text-align:right;font-size:var(--fs-body)">
-            <div style="display:flex;justify-content:flex-end;gap:16px;padding:4px 0"><b>Total Amount ex GST</b><b>${fm(subtotal)}</b></div>
-            <div style="display:flex;justify-content:flex-end;gap:16px;padding:4px 0;color:var(--t2)">Tax <span>${fm(tax)}</span></div>
-            <div style="display:flex;justify-content:flex-end;gap:16px;padding:4px 0"><b>Total</b><b>${fm(total)}</b></div>
-            <div style="display:flex;justify-content:flex-end;gap:16px;padding:4px 0">Amount paid <span style="display:inline-block;width:70px;text-align:right;padding:3px 6px;border:1px solid #d8d0f0;border-radius:4px;font-size:var(--fs-body);background:#f3f0ff">${fm(paid)}</span></div>
-            <div style="display:flex;justify-content:flex-end;gap:16px;padding:6px 0;font-weight:700;color:${b.status === 'Closed' ? 'var(--g)' : 'var(--r)'}">Balance due <span>${b.status === 'Closed' ? fm(0) : fm(b.balance)}</span></div>
+            <!-- Allocation Layout -->
+            <div style="display:flex;align-items:center;gap:0;margin:8px 0 0">
+              <hr style="border:none;border-top:1px solid #eee;flex:1;margin:0">
+              <div style="padding:0 8px;display:flex;align-items:center;gap:4px">
+                <span style="font-size:var(--fs-xs);color:var(--t4)">Allocation Layout</span>
+                <span style="font-size:var(--fs-xs);padding:2px 8px;border-radius:4px;background:var(--acc2);color:var(--acc);font-weight:600">${isOB ? 'On Behalf / Split' : 'Self'}</span>
+              </div>
+            </div>
+
+            <!-- Line Items Table -->
+            <table style="width:100%;border-collapse:collapse;font-size:var(--fs-body);margin-top:8px">
+              <thead><tr>
+                ${ownerTh}
+                <th style="text-align:left;padding:6px;font-weight:600;font-size:var(--fs-xs)">Description</th>
+                <th style="text-align:left;padding:6px;font-weight:600;font-size:var(--fs-xs)">Category *</th>
+                <th style="text-align:right;padding:6px;font-weight:600;font-size:var(--fs-xs)">Amount ($)</th>
+                <th style="text-align:right;padding:6px;font-weight:600;font-size:var(--fs-xs)">GST</th>
+                <th style="text-align:left;padding:6px;font-weight:600;font-size:var(--fs-xs)">Tax code</th>
+              </tr></thead>
+              <tbody>${liRows}</tbody>
+            </table>
+
+            <!-- Notes -->
+            <div style="margin-top:8px">
+              <div style="font-size:var(--fs-xs);color:var(--t3);margin-bottom:2px">Notes</div>
+              <textarea class="inp" disabled style="width:100%;min-height:50px;resize:none;${FB};border:1px solid #d8d0f0;border-radius:var(--rd);padding:6px 8px;font-family:inherit;font-size:var(--fs-sm)">${esc(b.notes || '')}</textarea>
+            </div>
+
+            <!-- Totals -->
+            <div style="text-align:right;font-size:var(--fs-body);margin-top:8px;padding-top:8px;border-top:1px solid #eee">
+              <div style="display:flex;justify-content:flex-end;gap:16px;padding:3px 0"><span>Subtotal</span><b>${fm(subtotal)}</b></div>
+              <div style="display:flex;justify-content:flex-end;gap:16px;padding:3px 0;color:var(--t3)"><span>Tax</span><span>${fm(tax)}</span></div>
+              <div style="display:flex;justify-content:flex-end;gap:16px;padding:3px 0"><b>Total</b><b>${fm(total)}</b></div>
+              <div style="display:flex;justify-content:flex-end;gap:16px;padding:3px 0;color:var(--t3)"><span>Amount paid</span><span>${fm(paid)}</span></div>
+              <div style="display:flex;justify-content:flex-end;gap:16px;padding:5px 0;font-weight:700;font-size:var(--fs-body);color:${b.status === 'Closed' ? 'var(--g)' : 'var(--r)'}"><span>Balance due</span><span>${b.status === 'Closed' ? fm(0) : fm(b.balance)}</span></div>
+            </div>
           </div>
         </div>
       </div>
 
       <!-- Action buttons -->
-      <div style="display:flex;align-items:center;gap:6px;padding:8px 0">
-        <button class="btn bo">View PDF</button>
-        <button class="btn bo">Print</button>
+      <div id="bd_actions" style="display:flex;align-items:center;gap:6px;padding:10px 0;flex-wrap:wrap">
         <button class="btn bo" style="color:var(--r);border-color:var(--r)" onclick="ScrTx._voidBill('${esc(b.id || '')}')">Cancel</button>
+        <button class="btn bo">Record Payment</button>
+        <button class="btn bo">View PDF</button>
+        <button class="btn bo">Save as recurring</button>
         <div style="flex:1"></div>
         <button class="btn bo" onclick="App.go('tx_bill')">Back to Bills</button>
-        <button class="bs">Record Payment</button>
+        <div style="position:relative;display:inline-block">
+          <button class="btn bo" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">Save and... ▾</button>
+          <div style="display:none;position:absolute;bottom:100%;right:0;background:#fff;border:1px solid var(--bd);border-radius:8px;box-shadow:var(--sh2);padding:4px 0;min-width:160px;z-index:20">
+            <div class="sg-item">Save and Create new</div>
+            <div class="sg-item">Save and Duplicate</div>
+          </div>
+        </div>
+        <button class="bs">Save</button>
       </div>
 
-      <!-- Attachments — same as Create Bill -->
-      <div style="border:1.5px dashed #ddd;border-radius:10px;padding:16px;margin-top:6px">
-        <div style="font-size:var(--fs-body);font-weight:600;margin-bottom:8px">More information</div>
-        <div style="background:#333;color:#fff;padding:8px 10px;border-radius:8px 8px 0 0;font-size:var(--fs-body);font-weight:600">Attachments</div>
-        <div style="border:1.5px dashed #ddd;border-top:none;border-radius:0 0 8px 8px;padding:16px;text-align:center">
-          ${(detail.attachments && detail.attachments.length > 0)
-            ? detail.attachments.map(a => `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;padding:4px 8px;background:var(--bg3);border-radius:4px;font-size:var(--fs-sm);text-align:left"><span>📄</span><span style="flex:1">${esc(typeof a === 'string' ? a : a.name || a.filename || 'file')}</span><a class="lk" style="font-size:var(--fs-xs)">View</a></div>`).join('')
-            : '<div style="font-size:var(--fs-sm);color:var(--t3)">No attachments</div>'}
+      <!-- More information section -->
+      <div style="margin-top:6px">
+        <!-- Activity History -->
+        <div id="bd_activity" style="margin-bottom:10px">
+          <div style="background:#333;color:#fff;padding:8px 12px;border-radius:8px 8px 0 0;font-size:var(--fs-sm);font-weight:600;display:flex;align-items:center;gap:8px;cursor:pointer" onclick="const c=this.nextElementSibling;c.style.display=c.style.display==='none'?'block':'none'">
+            Activity history
+            ${payments.length > 0 ? `<span style="font-size:var(--fs-xxs);padding:1px 8px;border-radius:8px;background:var(--gbg);color:var(--g)">Bill payment recorded</span>` : ''}
+            <span style="margin-left:auto;font-size:12px">▾</span>
+          </div>
+          <div style="border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;padding:8px 12px">
+            ${activityRows}
+          </div>
+        </div>
+
+        <!-- Attachments -->
+        <div id="bd_att">
+          <div style="background:#333;color:#fff;padding:8px 12px;border-radius:8px 8px 0 0;font-size:var(--fs-sm);font-weight:600;display:flex;align-items:center;gap:8px;cursor:pointer" onclick="const c=this.nextElementSibling;c.style.display=c.style.display==='none'?'block':'none'">
+            Attachments ${hasAtt ? `<span style="background:var(--acc2);color:var(--acc);font-size:var(--fs-xxs);padding:1px 6px;border-radius:8px">${atts.length}</span>` : ''}
+            <span style="margin-left:auto;font-size:12px">▾</span>
+          </div>
+          <div style="border:1.5px dashed #ddd;border-top:none;border-radius:0 0 8px 8px;padding:12px;text-align:center">
+            ${hasAtt
+              ? atts.map(a => {
+                  const url = typeof a === 'string' ? a : a.file_url || a.url || '';
+                  const name = typeof a === 'string' ? a.split('/').pop() : a.file_name || a.name || 'file';
+                  const size = a.file_size ? (a.file_size / 1024 / 1024).toFixed(2) + ' MB' : '';
+                  return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;padding:6px 10px;background:var(--bg3);border-radius:6px;font-size:var(--fs-sm);text-align:left">
+                    <span>📄</span>
+                    <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(name)}</span>
+                    ${size ? `<span style="font-size:var(--fs-xs);color:var(--t3)">${size}</span>` : ''}
+                    <a href="${esc(url)}" target="_blank" class="lk" style="font-size:var(--fs-xs)">⬇</a>
+                  </div>`;
+                }).join('')
+              : '<div style="padding:8px"><div style="font-size:24px;color:var(--t4);margin-bottom:4px">☁</div>Drag files here to upload, or <a class="lk" style="font-weight:600">browse for files</a><div style="font-size:var(--fs-xs);color:var(--t4);margin-top:4px">PDF, TIFF, JPEG or PNG and below 10MB</div></div>'
+            }
+          </div>
         </div>
       </div>
     </div>`,

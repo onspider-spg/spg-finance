@@ -294,6 +294,9 @@ const App = (() => {
   // NAVIGATION
   // ═══════════════════════════
   async function go(route) {
+    // Close mobile sidebar on navigation
+    const sd = document.getElementById('sidebar');
+    if (sd && sd.classList.contains('sd-mobile-open')) { sd.classList.remove('sd-mobile-open'); const ov = document.getElementById('sd-overlay'); if (ov) ov.remove(); }
     // Lazy load script if needed
     const scriptFile = ROUTE_FILE[route];
     if (scriptFile && !_loadedScripts[scriptFile]) {
@@ -345,6 +348,7 @@ const App = (() => {
     if (!el) return;
     const s = S.session || {};
     el.innerHTML = `
+      <div class="gt-ham" onclick="App._toggleMobileSidebar()">☰</div>
       <div class="gt-logo" onclick="App.go('dashboard')">SPG Finance</div>
       <div class="gt-r">
         <div class="gt-i" title="Refresh" onclick="App._hardRefresh()" style="font-size:14px">↻</div>
@@ -462,6 +466,26 @@ const App = (() => {
     document.body.classList.toggle('sd-collapsed', _sidebarCollapsed);
     const icon = sd.querySelector('.sd-toggle-icon');
     if (icon) icon.textContent = _sidebarCollapsed ? '▸' : '☰';
+  }
+
+  function _toggleMobileSidebar() {
+    const sd = document.getElementById('sidebar');
+    if (!sd) return;
+    const overlay = document.getElementById('sd-overlay');
+    const isOpen = sd.classList.contains('sd-mobile-open');
+    if (isOpen) {
+      sd.classList.remove('sd-mobile-open');
+      if (overlay) overlay.remove();
+    } else {
+      sd.classList.add('sd-mobile-open');
+      // Add overlay backdrop
+      if (!document.getElementById('sd-overlay')) {
+        const ov = document.createElement('div');
+        ov.id = 'sd-overlay';
+        ov.onclick = () => _toggleMobileSidebar();
+        document.body.appendChild(ov);
+      }
+    }
   }
 
   function _highlightNav(route) {
@@ -764,6 +788,7 @@ const App = (() => {
     api,
     registerRoutes,
     _toggleSidebar,
+    _toggleMobileSidebar,
     _hardRefresh,
     NAV,
     skeleton,

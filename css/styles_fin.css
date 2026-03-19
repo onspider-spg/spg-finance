@@ -927,8 +927,38 @@ html, body {
   .tb { padding: 8px 12px; }
 }
 
+/* ── Hamburger: hidden on desktop, visible on mobile ── */
+.gt-ham { display: none; }
+
 @media (max-width: 600px) {
-  .sd { display: none; }
+  /* ── Sidebar: off-screen overlay on mobile ── */
+  .sd {
+    position: fixed; left: -260px; top: 0; bottom: 0; width: 240px !important;
+    min-width: 240px !important; z-index: 1000; transition: left 0.25s ease;
+    box-shadow: none; overflow-y: auto;
+  }
+  .sd.sd-mobile-open {
+    left: 0; box-shadow: 4px 0 20px rgba(0,0,0,0.15);
+  }
+  .sd.sd-mobile-open .sit { display: inline !important; }
+  .sd.sd-mobile-open .sg-head span:not(.sg-ico) { display: inline !important; }
+  .sd.sd-mobile-open .si span:not(.sg-ico) { display: inline !important; }
+  .sd.sd-mobile-open .sf .sit { display: inline !important; }
+  .sd.sd-mobile-open .si { justify-content: flex-start !important; padding: 8px 14px !important; border-left: 3px solid transparent !important; gap: 8px !important; }
+  .sd.sd-mobile-open .sg-head { justify-content: flex-start !important; padding: 8px 14px !important; }
+  .sd.sd-mobile-open .sd-top { display: none; }
+
+  /* ── Overlay backdrop ── */
+  #sd-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 999;
+  }
+
+  /* ── Hamburger button in topbar ── */
+  .gt-ham {
+    display: block; font-size: 20px; cursor: pointer; padding: 0 8px 0 0;
+    color: var(--t1); line-height: 1;
+  }
+
   .ct { padding: 8px; }
 
   /* ── Topbar: tighter on mobile ── */

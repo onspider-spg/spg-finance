@@ -249,7 +249,7 @@ const App = (() => {
     registerRoutes({
       dashboard: {
         render: () => ({
-          tb: '<div class="tb"><div class="tb-t">Dashboard</div><select class="fl" style="width:110px"><option>Mar 2026</option><option>Feb 2026</option><option>Jan 2026</option></select><select class="fl" style="width:130px"><option>All Brands</option><option>Mango Coco</option><option>Flying Tigress</option><option>Issho Cafe</option></select></div>',
+          tb: '<div class="tb"><div class="tb-t">Dashboard</div></div>',
           ct: '<div class="empty" style="padding:60px"><div style="font-size:28px;margin-bottom:8px">◇</div><div style="font-size:15px;font-weight:600;margin-bottom:4px">Dashboard</div><div>Data will appear here once connected</div></div>',
         }),
       },

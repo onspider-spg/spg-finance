@@ -474,6 +474,10 @@ function renderTxBillDetail() {
           <!-- Header fields -->
           <div class="card" style="padding:14px 16px">
             <div class="fg" style="margin-bottom:8px">
+              <label class="lb">Transaction Type</label>
+              <input class="inp" ${DS} value="Expense / Bill">
+            </div>
+            <div class="fg" style="margin-bottom:8px">
               <label class="lb">Supplier *</label>
               <input class="inp" ${DS} value="${esc(b.supplier_name || '—')}">
             </div>

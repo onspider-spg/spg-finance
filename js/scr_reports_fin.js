@@ -1416,9 +1416,7 @@
     if (!_filters.month) _filters.month = _curMonth();
     return {
       tb: '<div class="tb"><div class="tb-t">Financial Dashboard</div>' +
-          '<select class="fl" id="dash_month" onchange="ScrReports._onDashFilter()" style="width:110px">' + _monthOpts(_filters.month) + '</select>' +
-          '<select class="fl" id="dash_brand" onchange="ScrReports._onDashFilter()" style="width:140px">' + _brandOpts(_filters.brand) + '</select>' +
-          '<button class="btn bo" onclick="ScrReports._onDashFilter()" style="padding:5px 10px;font-size:11px">↻ Refresh</button></div>',
+          '<select class="fl" id="dash_month" onchange="ScrReports._onDashFilter()" style="width:110px">' + _monthOpts(_filters.month) + '</select></div>',
       ct: `<div style="max-width:1100px;margin:0 auto">
         <div id="dash_content"><div class="empty" style="padding:40px"><div class="fin-spinner" style="margin:0 auto 8px"></div>Loading CFO Brief...</div></div>
       </div>`,
@@ -1546,7 +1544,6 @@
 
   function _onDashFilter() {
     _filters.month = document.getElementById('dash_month')?.value || _filters.month;
-    _filters.brand = document.getElementById('dash_brand')?.value || 'All';
     _dashData = null;
     _loadDashboard();
   }

@@ -612,21 +612,32 @@ async function _openBillDetail(billId) {
   // Check if already in memory (e.g. just created)
   const mem = App.S._billDetail;
   if (mem && mem.bill && mem.bill.id === billId) {
-    App.go('tx_bill_detail');
+    // Set hash with bill ID for bookmarkable URL
+    App.S.route = 'tx_bill_detail';
+    location.hash = 'tx_bill_detail/' + billId;
+    const result = renderTxBillDetail();
+    const ct = document.getElementById('content');
+    const tb = document.getElementById('toolbar');
+    if (ct) ct.innerHTML = result.ct || '';
+    if (tb) tb.innerHTML = result.tb || '';
     return;
   }
 
-  // Fetch from API
-  App.go('tx_bill_detail'); // show loading skeleton
+  // Fetch from API — show loading skeleton first
+  App.S.route = 'tx_bill_detail';
+  location.hash = 'tx_bill_detail/' + billId;
+  const ct = document.getElementById('content');
+  const tb = document.getElementById('toolbar');
+  if (ct) ct.innerHTML = '<div class="empty" style="padding:40px"><div class="fin-spinner" style="margin:0 auto 8px"></div>Loading bill detail...</div>';
+  if (tb) tb.innerHTML = '<div class="tb"><button class="bg" onclick="App.go(\'tx_bill\')">← Bills</button><div class="tb-t">Bill Detail</div></div>';
+
   try {
     const detail = await API.getBillDetail(billId);
     App.S._billDetail = detail;
     // Re-render now that data is ready
-    const ct = document.getElementById('content');
-    if (ct && App.S.route === 'tx_bill_detail') {
+    if (App.S.route === 'tx_bill_detail') {
       const result = renderTxBillDetail();
-      ct.innerHTML = result.ct || '';
-      const tb = document.getElementById('toolbar');
+      if (ct) ct.innerHTML = result.ct || '';
       if (tb) tb.innerHTML = result.tb || '';
     }
   } catch (e) {

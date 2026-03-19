@@ -255,14 +255,31 @@ const App = (() => {
       },
     });
 
-    // Route from hash or default
+    // Route from hash or default (supports #route/param format)
     const hash = location.hash.replace('#', '') || 'dashboard';
-    go(hash);
+    const [initRoute, initParam] = hash.split('/');
+    if (initRoute === 'tx_bill_detail' && initParam) {
+      go(initRoute);
+      // Defer bill load until script is ready
+      requestAnimationFrame(() => {
+        if (typeof ScrTx !== 'undefined' && ScrTx._goBillDetail) ScrTx._goBillDetail(initParam);
+      });
+    } else {
+      go(initRoute);
+    }
 
     // Listen hash changes
     window.addEventListener('hashchange', () => {
-      const h = location.hash.replace('#', '') || 'dashboard';
-      if (h !== S.route) go(h);
+      const raw = location.hash.replace('#', '') || 'dashboard';
+      const [h, param] = raw.split('/');
+      if (h === 'tx_bill_detail' && param) {
+        if (h !== S.route) go(h);
+        requestAnimationFrame(() => {
+          if (typeof ScrTx !== 'undefined' && ScrTx._goBillDetail) ScrTx._goBillDetail(param);
+        });
+      } else if (h !== S.route) {
+        go(h);
+      }
     });
   }
 

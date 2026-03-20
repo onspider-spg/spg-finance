@@ -238,8 +238,8 @@
         <td style="${textColor}">${esc(b.vendor_name || b.payee || '')}</td>
         <td style="${textColor}">${esc(b.supplier_inv || b.external_ref || '')}</td>
         <td style="text-align:right;${textColor}">${fm(Math.abs(b.balance || 0))}</td>
-        <td style="text-align:right"><input style="width:55px;text-align:right;padding:3px 5px;border:1px solid var(--bd);border-radius:4px;font-size:var(--fs-xs)" value="0.00" data-bill="${b.id}" data-field="discount" onchange="ScrPayment._updateBillsTotal()"></td>
-        <td style="text-align:right;${textColor};font-weight:600"><input style="width:70px;text-align:right;padding:3px 5px;border:1px solid var(--bd);border-radius:4px;font-size:var(--fs-sm);font-weight:600" value="${Math.abs(b.balance || 0).toFixed(2)}" data-bill="${b.id}" data-field="amount" onchange="ScrPayment._updateBillsTotal()"></td>
+        <td style="text-align:right"><input type="number" step="0.01" min="0" style="width:55px;text-align:right;padding:3px 5px;border:1px solid var(--bd);border-radius:4px;font-size:var(--fs-xs)" value="0.00" data-bill="${b.id}" data-field="discount" onchange="ScrPayment._updateBillsTotal()"></td>
+        <td style="text-align:right;${textColor};font-weight:600"><input type="number" step="0.01" min="0" style="width:70px;text-align:right;padding:3px 5px;border:1px solid var(--bd);border-radius:4px;font-size:var(--fs-sm);font-weight:600" value="${Math.abs(b.balance || 0).toFixed(2)}" data-bill="${b.id}" data-field="amount" onchange="ScrPayment._updateBillsTotal()"></td>
       </tr>`;
     }).join('');
 
@@ -334,6 +334,7 @@
 
     if (!ref) return App.toast('Reference is required');
     if (!date) return App.toast('Date is required');
+    if (!bankId) return App.toast('Bank account is required');
     if (_pySelected.size === 0) return App.toast('Select at least one bill');
 
     // Build allocations

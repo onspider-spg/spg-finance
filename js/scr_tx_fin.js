@@ -279,7 +279,7 @@ async function _loadMoreBills() {
     const result = await API.getBills({ page: _billPage });
     const tbody = document.getElementById('bill_tbody');
     const lmEl = document.getElementById('txbill_lm');
-    if (tbody) tbody.innerHTML = _billRows(result.rows);
+    if (tbody) tbody.innerHTML += _billRows(result.rows);
     if (lmEl && !result.hasMore) lmEl.style.display = 'none';
   } catch (e) {
     App.toast('Load more failed: ' + e.message);
@@ -726,7 +726,7 @@ function renderTxSdBridge() {
         <div class="kpi-c" style="background:#fff"><div class="kpi-v" style="color:var(--t4)">—</div><div class="kpi-l">Pending items</div></div>
       </div>
       <div id="sd_cards"><div style="text-align:center;padding:30px;color:var(--t3)"><div class="fin-spinner" style="margin:0 auto 8px"></div>Loading SD Bridge...</div></div>
-      <div id="sd_actions" style="display:none;display:flex;align-items:center;padding:10px 0;gap:8px">
+      <div id="sd_actions" style="display:none;align-items:center;padding:10px 0;gap:8px">
         <button class="btn bo" style="padding:5px 12px;font-size:11px" onclick="ScrTx._sdSelectAll()">Select All Pending</button>
         <button class="bg" style="font-size:11px" onclick="ScrTx._sdDeselectAll()">Deselect All</button>
         <div style="flex:1;font-size:var(--fs-xs);color:var(--t3)" id="sd_sel_count">0 selected</div>

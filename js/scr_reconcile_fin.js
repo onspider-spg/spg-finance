@@ -302,7 +302,9 @@
     const noticeRow = tbody.querySelector('tr:first-child td[colspan]');
     const noticeHtml = noticeRow ? noticeRow.parentElement.outerHTML : '';
 
-    tbody.innerHTML = noticeHtml + rows.map(r => `<tr>
+    const isW = _stmtFormat === 'westpac';
+    const colSpan = isW ? 7 : 5;
+    tbody.innerHTML = noticeHtml + rows.map(r => isW ? `<tr>
       <td style="font-size:var(--fs-xxs);color:var(--t3);font-family:monospace">${esc(r.bank_account || '')}</td>
       <td style="white-space:nowrap">${_fmtDate(r.date)}</td>
       <td style="font-size:var(--fs-xxs);max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.description)}">${esc(r.description)}</td>
@@ -310,10 +312,16 @@
       <td style="text-align:right${r.credit > 0 ? ';color:var(--g)' : ''}">${r.credit > 0 ? fm(r.credit) : ''}</td>
       <td style="text-align:right;font-weight:600">${fm(r.balance)}</td>
       <td><span style="font-size:var(--fs-xxs);padding:1px 6px;border-radius:8px;background:var(--bg2);color:var(--t3)">${esc(r.bank_category || '')}</span></td>
+    </tr>` : `<tr>
+      <td style="white-space:nowrap">${_fmtDate(r.date)}</td>
+      <td style="font-size:var(--fs-xxs);max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.description)}">${esc(r.description)}</td>
+      <td style="text-align:right${r.debit > 0 ? ';color:var(--r)' : ''}">${r.debit > 0 ? fm(r.debit) : ''}</td>
+      <td style="text-align:right${r.credit > 0 ? ';color:var(--g)' : ''}">${r.credit > 0 ? fm(r.credit) : ''}</td>
+      <td style="text-align:right;font-weight:600">${fm(r.balance)}</td>
     </tr>`).join('');
 
     if (filtered.length > 20) {
-      tbody.innerHTML += `<tr><td colspan="7" style="text-align:center;color:var(--t3);font-size:var(--fs-xs)">... and ${filtered.length - 20} more rows</td></tr>`;
+      tbody.innerHTML += `<tr><td colspan="${colSpan}" style="text-align:center;color:var(--t3);font-size:var(--fs-xs)">... and ${filtered.length - 20} more rows</td></tr>`;
     }
 
     // Restore filter selection
@@ -482,6 +490,7 @@
     try {
       App.showLoader();
       const bankId = document.getElementById('cr_account')?.value || '';
+      if (!bankId) { App.hideLoader(); return; }
       const data = await API.call('fin_get_cash_recon', { bank_account_id: bankId });
       _cashData = data;
       _renderCashBanner();
@@ -737,8 +746,8 @@
       const match = _rcMatches.find(m => m.statement_line_id === line.id);
       const borderColor = isMatched ? 'var(--g)' : 'var(--o)';
       const bgColor = isMatched ? 'rgba(5,150,105,.03)' : 'rgba(217,119,6,.04)';
-      const amount = (line.debit || 0) > 0 ? -(line.debit) : (line.credit || 0);
-      const amtColor = amount >= 0 ? 'var(--g)' : '';
+      const amount = (line.credit || 0) > 0 ? (line.credit) : -(line.debit || 0);
+      const amtColor = amount >= 0 ? 'var(--g)' : 'var(--r)';
 
       // Left side — Bank statement
       const leftHtml = `<div style="border:1.5px solid ${borderColor};background:${bgColor};border-radius:var(--rd);padding:10px">
@@ -767,7 +776,7 @@
             : '<span style="font-size:var(--fs-xxs);color:#fff;background:var(--t3);padding:1px 6px;border-radius:3px">Manual</span>';
 
         const confirmBtn = match.match_status !== 'confirmed'
-          ? ` <button class="bs" style="padding:3px 10px;font-size:var(--fs-xxs)" onclick="ScrReconcile._confirmMatch('${match.id}')">Confirm</button>`
+          ? ` <button class="bs" style="padding:3px 10px;font-size:var(--fs-xxs)" onclick="ScrReconcile._confirmMatch('${esc(match.id)}')">Confirm</button>`
           : '';
 
         rightHtml = `<div style="border:1.5px solid ${borderColor};background:${bgColor};border-radius:var(--rd);padding:10px">

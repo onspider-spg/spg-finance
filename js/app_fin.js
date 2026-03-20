@@ -95,11 +95,6 @@ const App = (() => {
       { id: 'rc_cash', label: 'Cash Collection' },
       { id: 'rc_stmt', label: 'Statement Upload' },
     ]},
-    { id: 'review', icon: '⊘', label: 'Review Monitor', type: 'group', items: [
-      { id: 'rv_pending', label: 'Pending Tracker' },
-      { id: 'rv_recurring', label: 'Recurring Transactions' },
-      { id: 'rv_expected', label: 'Expected Invoices' },
-    ]},
     { id: 'payment', icon: '$', label: 'Payment', type: 'group', items: [
       { id: 'py_record', label: 'Record Payment' },
       { id: 'py_history', label: 'Payment History' },
@@ -123,6 +118,11 @@ const App = (() => {
       { id: 'ac_coa', label: 'Categories (COA)' },
       { id: 'ac_linked', label: 'Linked Categories' },
       { id: 'ac_tax', label: 'Tax Codes' },
+    ]},
+    { id: 'review', icon: '⊘', label: 'Review Monitor', type: 'group', items: [
+      { id: 'rv_pending', label: 'Pending Tracker' },
+      { id: 'rv_recurring', label: 'Recurring Transactions' },
+      { id: 'rv_expected', label: 'Expected Invoices' },
     ]},
     { id: 'reports', icon: '▤', label: 'Reports', type: 'group', items: [
       { id: 'rp_dash', label: 'Financial Dashboard' },

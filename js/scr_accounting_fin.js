@@ -904,7 +904,6 @@
     const tabs = [
       { id: 'mapping', label: 'Bank Mapping' },
       { id: 'channels', label: 'Bank Channel' },
-      { id: 'settings', label: 'SD Bridge Settings' },
     ];
     return '<div style="display:flex;gap:0;border-bottom:1px solid var(--bd);margin-bottom:16px">'
       + tabs.map(t => `<div class="tab${t.id === active ? ' a' : ''}" onclick="ScrAccounting._bmSetTab('${t.id}')">${esc(t.label)}</div>`).join('')
@@ -930,12 +929,7 @@
   async function _bmLoad() {
     const tabsEl = document.getElementById('bm_tabs');
     if (tabsEl) tabsEl.innerHTML = _bmTabs(_bmTab);
-
-    if (_bmTab === 'settings') {
-      await _bmLoadSettings();
-    } else {
-      await _bmLoadMapping();
-    }
+    await _bmLoadMapping();
   }
 
   async function _bmLoadMapping() {
@@ -954,11 +948,9 @@
     const d = _bmData;
     if (!d) return;
     const stores = d.stores || {};
-    const banks = d.bankAccounts || [];
+    const storeBanks = d.storeBanks || {};
+    const storeNames = d.storeNames || {};
     const stats = d.stats || {};
-
-    let bankOpts = '<option value="">— Select bank account —</option>';
-    banks.forEach(b => { bankOpts += `<option value="${b.id}">${esc(b.account_label)}</option>`; });
 
     // Stats bar
     let html = `<div style="display:flex;gap:24px;margin-bottom:16px;font-size:var(--fs-sm);color:var(--t2);align-items:center">
@@ -975,19 +967,24 @@
 
     storeIds.forEach((sid, idx) => {
       const channels = stores[sid] || [];
+      const myBanks = storeBanks[sid] || [];
+      const storeName = storeNames[sid] || sid;
       const mappedCount = channels.filter(c => c.is_mapped).length;
       const allMapped = mappedCount === channels.length;
       const statusBadge = allMapped ? '<span class="sts sts-c">All mapped</span>' : `<span class="sts sts-p">${channels.length - mappedCount} unmapped</span>`;
       const open = idx === 0 ? '' : ' style="display:none"';
 
-      html += `<div style="border:1px solid var(--bd);border-radius:8px;margin-bottom:12px;overflow:hidden">
+      html += `<div style="border:1px solid var(--bd);border-radius:8px;margin-bottom:12px;overflow:hidden;background:#fff">
         <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--bg2);cursor:pointer" onclick="var b=document.getElementById('bm_s_${idx}');b.style.display=b.style.display==='none'?'':'none'">
           <span style="font-size:var(--fs-xs);color:var(--t3)">▾</span>
-          <span style="font-size:var(--fs-body);font-weight:600;flex:1">${esc(sid)}</span>
+          <span style="font-size:var(--fs-body);font-weight:600">${esc(storeName)}</span>
+          <span style="font-size:var(--fs-xxs);color:var(--t3);background:var(--bg3);padding:2px 8px;border-radius:3px">${esc(sid)}</span>
+          <span style="flex:1"></span>
           <span style="font-size:var(--fs-xs);color:var(--t3)">${channels.length} mappings</span>
           ${statusBadge}
         </div>
         <div id="bm_s_${idx}"${open}>
+          ${myBanks.length > 0 ? `<div style="padding:8px 16px;font-size:var(--fs-xxs);color:var(--t3);background:#fafafa;border-bottom:1px solid var(--bd2)">Bank accounts: ${myBanks.map(b => '<b>' + esc(b.account_label) + '</b>').join(', ')}</div>` : `<div style="padding:8px 16px;font-size:var(--fs-xxs);color:var(--o);background:var(--obg);border-bottom:1px solid var(--bd2)">No bank accounts found for this store</div>`}
           <table class="tbl" style="font-size:var(--fs-sm)"><thead><tr><th style="width:4%">#</th><th style="width:22%">Channel</th><th style="width:9%">Type</th><th style="width:8%">Dir</th><th style="width:30%">Bank Account</th><th style="width:18%">Category</th><th style="width:6%"></th></tr></thead><tbody>`;
 
       channels.forEach((c, ci) => {
@@ -996,9 +993,9 @@
         const warn = c.is_mapped ? '' : 'style="background:rgba(217,119,6,.04)"';
         const dot = c.is_mapped ? 'background:var(--g)' : 'background:var(--o)';
 
-        // Bank select with current value
+        // Bank select — only show banks belonging to this store
         let selectHtml = '<option value="">— Select —</option>';
-        banks.forEach(b => { selectHtml += `<option value="${b.id}" ${b.id === c.bank_account_id ? 'selected' : ''}>${esc(b.account_label)}</option>`; });
+        myBanks.forEach(b => { selectHtml += `<option value="${b.id}" ${b.id === c.bank_account_id ? 'selected' : ''}>${esc(b.account_label)}</option>`; });
 
         html += `<tr ${warn}>
           <td style="color:var(--t4)">${ci + 1}</td>
@@ -1022,29 +1019,51 @@
     const d = _bmData;
     if (!d) return;
     const stores = d.stores || {};
-    const banks = d.bankAccounts || [];
+    const storeBanks = d.storeBanks || {};
+    const storeNames = d.storeNames || {};
 
-    // Aggregate: which bank account → how many channels
+    // Aggregate: which bank account → how many channels (per store)
     const bankCount = {};
-    Object.values(stores).forEach((channels) => {
+    Object.entries(stores).forEach(([sid, channels]) => {
       (channels).forEach(c => {
         if (c.bank_account_id) {
-          if (!bankCount[c.bank_account_id]) bankCount[c.bank_account_id] = { label: '', count: 0 };
-          bankCount[c.bank_account_id].count++;
+          if (!bankCount[c.bank_account_id]) bankCount[c.bank_account_id] = 0;
+          bankCount[c.bank_account_id]++;
         }
       });
     });
-    banks.forEach(b => { if (bankCount[b.id]) bankCount[b.id].label = b.account_label; });
 
-    let html = `<div style="font-size:var(--fs-xs);color:var(--t3);margin-bottom:14px">Overview of all bank accounts used in SD Bridge mapping, and how many channels are assigned to each.</div>
-      <table class="tbl" id="bm_ch_tbl"><thead><tr>${App.sth('Account Name','acct','bm_ch_tbl')}${App.sth('Bank','bank','bm_ch_tbl')}${App.sth('Type','type','bm_ch_tbl')}${App.sth('Channels','channels','bm_ch_tbl')}</tr></thead><tbody>`;
+    let html = `<div style="font-size:var(--fs-xs);color:var(--t3);margin-bottom:14px">Overview of bank accounts per brand/store, and how many channels are mapped to each.</div>`;
 
-    banks.forEach(b => {
-      const cnt = bankCount[b.id]?.count || 0;
-      html += `<tr><td style="font-weight:600">${esc(b.account_label)}</td><td>${esc(b.bank_name || '—')}</td><td>${esc(b.account_type || 'Bank')}</td><td style="font-weight:500;color:var(--acc)">${cnt}</td></tr>`;
+    // Group banks by store
+    const storeIds = Object.keys(storeBanks).filter(sid => (storeBanks[sid] || []).length > 0);
+    if (storeIds.length === 0) {
+      html += '<div class="empty" style="padding:40px">No bank accounts found.</div>';
+      el.innerHTML = html;
+      return;
+    }
+
+    storeIds.forEach(sid => {
+      const myBanks = storeBanks[sid] || [];
+      const storeName = storeNames[sid] || sid;
+
+      html += `<div style="border:1px solid var(--bd);border-radius:8px;margin-bottom:12px;overflow:hidden;background:#fff">
+        <div style="padding:10px 16px;background:var(--bg2);font-weight:600;font-size:var(--fs-sm);display:flex;align-items:center;gap:8px">
+          ${esc(storeName)}
+          <span style="font-size:var(--fs-xxs);color:var(--t3);background:var(--bg3);padding:2px 8px;border-radius:3px">${esc(sid)}</span>
+        </div>
+        <table class="tbl" style="font-size:var(--fs-sm);margin:0"><thead><tr><th>Account Name</th><th>Bank</th><th>Type</th><th style="text-align:right">Channels</th></tr></thead><tbody>`;
+
+      myBanks.forEach(b => {
+        const cnt = bankCount[b.id] || 0;
+        const cntColor = cnt > 0 ? 'color:var(--g);font-weight:600' : 'color:var(--o)';
+        html += `<tr style="background:#fff"><td style="font-weight:600">${esc(b.account_label)}</td><td>${esc(b.bank_name || '—')}</td><td>${esc(b.account_type || 'Bank')}</td><td style="text-align:right;${cntColor}">${cnt}</td></tr>`;
+      });
+
+      html += '</tbody></table></div>';
     });
 
-    html += '</tbody></table><div style="font-size:var(--fs-xxs);color:var(--t3);margin-top:12px">To add or edit bank accounts, go to Accounting → Categories (COA).</div>';
+    html += '<div style="font-size:var(--fs-xxs);color:var(--t3);margin-top:12px">To add or edit bank accounts, go to Accounting → Categories (COA).</div>';
     el.innerHTML = html;
   }
 
@@ -1106,21 +1125,12 @@
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
 
     try {
-      if (_bmTab === 'settings') {
-        // Collect toggle states
-        const toggles = [];
-        document.querySelectorAll('[data-bridge-id]').forEach(input => {
-          toggles.push({ bridge_id: input.dataset.bridgeId, is_enabled: input.checked });
-        });
-        await API.call('fin_save_bridge_settings', { settings: toggles });
-      } else {
-        // Collect bank mapping selections
-        const mappings = [];
-        document.querySelectorAll('[data-map-id]').forEach(sel => {
-          mappings.push({ id: sel.dataset.mapId, bank_account_id: sel.value || null });
-        });
-        if (mappings.length > 0) await API.call('fin_save_bank_mapping', { mappings });
-      }
+      // Collect bank mapping selections
+      const mappings = [];
+      document.querySelectorAll('[data-map-id]').forEach(sel => {
+        mappings.push({ id: sel.dataset.mapId, bank_account_id: sel.value || null });
+      });
+      if (mappings.length > 0) await API.call('fin_save_bank_mapping', { mappings });
       App.toast('Saved');
       if (btn) { btn.style.background = ''; btn.textContent = 'Save Changes'; }
       _bmLoad(); // refresh

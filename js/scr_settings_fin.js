@@ -17,6 +17,7 @@
       { id: 'st_alert', label: 'Alert Rules' },
       { id: 'st_perm', label: 'Permissions' },
       { id: 'st_audit', label: 'Audit Log' },
+      { id: 'st_bridge', label: 'SD Bridge' },
     ];
     return '<div style="display:flex;gap:0;border-bottom:1px solid var(--bd2);margin-bottom:12px">'
       + tabs.map(t =>
@@ -208,12 +209,97 @@
   }
 
   // ══════════════════════════════════════════
+  // S55. SD BRIDGE SETTINGS (moved from Bank Mapping)
+  // ══════════════════════════════════════════
+  let _bridgeSettings = [];
+  let _bridgeSaving = false;
+
+  function renderBridgeSettings() {
+    return {
+      tb: '<div class="tb"><div class="tb-t">Settings</div><button class="bs" id="st_bridge_save" onclick="ScrSettings._saveBridge()">Save Changes</button></div>',
+      ct: `<div style="max-width:900px;margin:0 auto">${settingsTabs('st_bridge')}<div id="st_bridge_content"><div style="text-align:center;padding:40px;color:var(--t3)"><div class="fin-spinner" style="margin:0 auto 8px"></div>Loading...</div></div></div>`,
+    };
+  }
+
+  async function _loadBridge() {
+    const el = document.getElementById('st_bridge_content');
+    if (!el) return;
+    try {
+      const result = await API.call('fin_get_bridge_settings', {});
+      _bridgeSettings = result.settings || [];
+      _renderBridge(el);
+    } catch (e) {
+      el.innerHTML = `<div style="padding:20px;color:var(--r)">Error: ${esc(e.message)}</div>`;
+    }
+  }
+
+  function _renderBridge(el) {
+    const settingLabels = {
+      revenue_cash: { title: 'In-store Cash', desc: 'Auto-create sale transaction when SD records cash revenue' },
+      revenue_card: { title: 'Card channels', desc: 'Eftpos, Prepaid, Union Pay' },
+      revenue_platform: { title: 'Platform payouts', desc: 'UberEats, Easi, Hungry Panda, DoorDash' },
+      expense_cash: { title: 'Expenses (Cash paid)', desc: 'Auto-create bill when SD records a cash expense' },
+      invoice_paid: { title: 'Invoices (Paid)', desc: 'Auto-create bill for paid invoices from SD' },
+      invoice_unpaid: { title: 'Invoices (Unpaid)', desc: 'Create as Awaiting Payment in Finance' },
+    };
+
+    const rev = _bridgeSettings.filter(s => s.data_type && s.data_type.startsWith('revenue'));
+    const exp = _bridgeSettings.filter(s => s.data_type && !s.data_type.startsWith('revenue'));
+
+    function settingRow(s) {
+      const info = settingLabels[s.data_type] || { title: s.data_type, desc: '' };
+      const checked = s.is_enabled ? 'checked' : '';
+      return `<div style="display:flex;align-items:center;padding:12px 16px;border-bottom:1px solid var(--bd2);gap:12px">
+        <div style="flex:1"><div style="font-size:var(--fs-sm);font-weight:600">${esc(info.title)}</div><div style="font-size:var(--fs-xxs);color:var(--t3)">${esc(info.desc)}</div></div>
+        <label class="br-tgl"><input type="checkbox" ${checked} data-bridge-id="${s.bridge_id}" onchange="ScrSettings._bridgeMarkDirty()"><span class="br-sl"></span></label>
+      </div>`;
+    }
+
+    let html = `<div style="font-size:var(--fs-xs);color:var(--t3);margin-bottom:14px">Control which data types sync automatically from Sale Daily to Finance.</div>`;
+    if (rev.length > 0) {
+      html += `<div style="font-size:var(--fs-sm);font-weight:700;margin-bottom:8px">Revenue Auto-sync</div><div style="border:1px solid var(--bd);border-radius:8px;margin-bottom:16px;background:#fff">${rev.map(settingRow).join('')}</div>`;
+    }
+    if (exp.length > 0) {
+      html += `<div style="font-size:var(--fs-sm);font-weight:700;margin-bottom:8px">Expense Auto-sync</div><div style="border:1px solid var(--bd);border-radius:8px;margin-bottom:16px;background:#fff">${exp.map(settingRow).join('')}</div>`;
+    }
+    html += `<div style="font-size:var(--fs-xxs);color:var(--t3);padding:8px 12px;background:var(--bg2);border-radius:8px">Expense auto-sync is currently off. It is recommended that ACC reviews expenses before syncing.</div>`;
+    el.innerHTML = html;
+  }
+
+  function _bridgeMarkDirty() {
+    const btn = document.getElementById('st_bridge_save');
+    if (btn) { btn.style.background = 'var(--acc)'; btn.textContent = 'Save Changes \u25cf'; }
+  }
+
+  async function _saveBridge() {
+    if (_bridgeSaving) return;
+    const btn = document.getElementById('st_bridge_save');
+    _bridgeSaving = true;
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+    try {
+      const toggles = [];
+      document.querySelectorAll('[data-bridge-id]').forEach(input => {
+        toggles.push({ bridge_id: input.dataset.bridgeId, is_enabled: input.checked });
+      });
+      await API.call('fin_save_bridge_settings', { settings: toggles });
+      App.toast('Saved');
+      if (btn) { btn.style.background = ''; btn.textContent = 'Save Changes'; }
+    } catch (e) {
+      App.toast(e.message || 'Save failed');
+    } finally {
+      _bridgeSaving = false;
+      if (btn) { btn.disabled = false; }
+    }
+  }
+
+  // ══════════════════════════════════════════
   // REGISTER ROUTES
   // ══════════════════════════════════════════
   App.registerRoutes({
-    st_alert: { render: renderAlertRules },
-    st_perm:  { render: renderPermissions },
-    st_audit: { render: renderAuditLog },
+    st_alert:  { render: renderAlertRules },
+    st_perm:   { render: renderPermissions },
+    st_audit:  { render: renderAuditLog },
+    st_bridge: { render: renderBridgeSettings, onLoad: _loadBridge },
   });
 
   // ══════════════════════════════════════════
@@ -223,6 +309,8 @@
     _addAlert,
     _addUser,
     _exportAudit,
+    _saveBridge,
+    _bridgeMarkDirty,
   };
 
 })();

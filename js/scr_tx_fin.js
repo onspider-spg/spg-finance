@@ -1,4 +1,4 @@
-/** Version 2.1 | 20 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
+/** Version 2.2 | 20 MAR 2026 | Siam Palette Group | Created 12 MAR 2026 */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_tx_fin.js
@@ -127,7 +127,10 @@ function _saleRows(rows) {
   if (!rows || rows.length === 0) {
     return '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--t3)">No sales found</td></tr>';
   }
-  return rows.map(r => `<tr><td>${_fmtDate(r.date)}</td><td>${esc(r.brand)}</td><td>${esc(r.channel || r.desc || '')}</td><td style="text-align:right;color:var(--g)">+${fm(r.amount)}</td><td style="text-align:right">${fm(r.gst || 0)}</td><td>${sb(r.status)}</td></tr>`).join('');
+  return rows.map(r => {
+    const saleId = r.id || '';
+    return `<tr onclick="ScrTx._openSaleDetail('${esc(saleId)}')" style="cursor:pointer"><td>${_fmtDate(r.date)}</td><td>${esc(r.brand)}</td><td>${esc(r.channel || r.desc || '')}</td><td style="text-align:right;color:var(--g)">+${fm(r.amount)}</td><td style="text-align:right">${fm(r.gst || 0)}</td><td>${sb(r.status)}</td></tr>`;
+  }).join('');
 }
 
 function renderTxSale() {
@@ -393,15 +396,16 @@ function renderTxBillDetail() {
   const isOB = alloc === 'ob' || alloc === 'on_behalf';
 
   // Line items rows — match create bill table layout with disabled light purple fields
-  const liRows = li.length > 0 ? li.map(l => {
-    const ownerCol = isOB ? `<td style="padding:0;border:1px solid #e5e7eb"><input disabled style="width:100%;padding:8px 10px;border:none;font-size:var(--fs-body);${FB}" value="${esc(l.cost_owner || '')}"></td>` : '';
+  const LIS = 'width:100%;padding:8px 10px;border:none;font-size:var(--fs-body)';
+  const liRows = li.length > 0 ? li.map((l, idx) => {
+    const ownerCol = isOB ? `<td style="padding:0;border:1px solid #e5e7eb"><input style="${LIS}" value="${esc(l.cost_owner || '')}" data-li="${idx}" data-field="cost_owner"></td>` : '';
     return `<tr>`
       + ownerCol
-      + `<td style="padding:0;border:1px solid #e5e7eb"><input disabled style="width:100%;padding:8px 10px;border:none;font-size:var(--fs-body);${FB}" value="${esc(l.desc || l.description || '')}"></td>`
-      + `<td style="padding:0;border:1px solid #e5e7eb"><input disabled style="width:100%;padding:8px 10px;border:none;font-size:var(--fs-body);${FB}" value="${esc(l.category || l.category_display || '')}"></td>`
-      + `<td style="padding:0;border:1px solid #e5e7eb"><input disabled style="width:100%;padding:8px 10px;border:none;text-align:right;font-size:var(--fs-body);font-weight:500;${FB}" value="${fm(l.amount)}"></td>`
-      + `<td style="padding:0;border:1px solid #e5e7eb"><input disabled style="width:100%;padding:8px 10px;border:none;text-align:right;font-size:var(--fs-body);background:#faf9fe;border-color:#d8d0f0;color:var(--t3);-webkit-text-fill-color:var(--t3);opacity:1" value="${fm(l.gst)}"></td>`
-      + `<td style="padding:0;border:1px solid #e5e7eb"><input disabled style="width:100%;padding:8px 10px;border:none;font-size:var(--fs-body);${FB}" value="${esc(l.tax_code || 'FRE')}"></td>`
+      + `<td style="padding:0;border:1px solid #e5e7eb"><input style="${LIS}" value="${esc(l.desc || l.description || '')}" data-li="${idx}" data-field="desc"></td>`
+      + `<td style="padding:0;border:1px solid #e5e7eb"><input style="${LIS}" value="${esc(l.category || l.category_display || '')}" data-li="${idx}" data-field="category"></td>`
+      + `<td style="padding:0;border:1px solid #e5e7eb"><input style="${LIS};text-align:right;font-weight:500" value="${fm(l.amount)}" data-li="${idx}" data-field="amount"></td>`
+      + `<td style="padding:0;border:1px solid #e5e7eb"><input style="${LIS};text-align:right;color:var(--t3)" value="${fm(l.gst)}" data-li="${idx}" data-field="gst"></td>`
+      + `<td style="padding:0;border:1px solid #e5e7eb"><input style="${LIS}" value="${esc(l.tax_code || 'FRE')}" data-li="${idx}" data-field="tax_code"></td>`
       + `</tr>`;
   }).join('') : `<tr><td colspan="${isOB ? 6 : 5}" style="text-align:center;color:var(--t3);padding:16px">No line items</td></tr>`;
 
@@ -487,22 +491,22 @@ function renderTxBillDetail() {
             </div>
             <div class="fg" style="margin-bottom:8px">
               <label class="lb">Supplier Invoice Number</label>
-              <input class="inp" ${DS} value="${esc(b.inv_no || '—')}">
+              <input class="inp" id="bd_inv_no" value="${esc(b.inv_no || '')}">
             </div>
             <div style="display:flex;gap:10px;margin-bottom:8px">
-              <div class="fg" style="flex:1"><label class="lb">Issue Date *</label><input class="inp" ${DS} value="${b.date ? new Date(b.date + 'T00:00:00').toLocaleDateString('en-AU') : ''}"></div>
-              <div class="fg" style="flex:1"><label class="lb">Due Date *</label><input class="inp" ${DS} value="${b.due_date ? new Date(b.due_date + 'T00:00:00').toLocaleDateString('en-AU') : ''}"></div>
+              <div class="fg" style="flex:1"><label class="lb">Issue Date *</label><input class="inp" id="bd_issue_date" type="date" value="${b.date || ''}"></div>
+              <div class="fg" style="flex:1"><label class="lb">Due Date *</label><input class="inp" id="bd_due_date" type="date" value="${b.due_date || ''}"></div>
             </div>
             <div style="display:flex;gap:10px;margin-bottom:8px">
-              <div class="fg" style="flex:1"><label class="lb">Brand *</label><input class="inp" ${DS} value="${esc(b.paying_entity || b.brand || '—')}"></div>
-              <div class="fg" style="flex:1"><label class="lb">Accrual Month</label><input class="inp" ${DS} value="${b.date ? (() => { const d = new Date(b.date + 'T00:00:00'); return d.toLocaleString('en-US', { month: 'long' }) + ' ' + d.getFullYear(); })() : ''}"></div>
+              <div class="fg" style="flex:1"><label class="lb">Brand *</label><select class="inp" id="bd_brand">${App.brandOpts(b.paying_entity || b.brand || '')}</select></div>
+              <div class="fg" style="flex:1"><label class="lb">Accrual Month</label><input class="inp" id="bd_accrual" type="month" value="${b.date ? b.date.substring(0, 7) : ''}"></div>
             </div>
 
             <!-- Tax mode -->
             <div style="display:flex;gap:12px;margin:6px 0;font-size:var(--fs-sm);align-items:center">
               <span style="color:var(--t3)">Amounts are</span>
-              <label style="cursor:default"><input type="radio" name="bd_taxmode" checked disabled style="accent-color:var(--acc)"> Tax exclusive</label>
-              <label style="cursor:default"><input type="radio" name="bd_taxmode" disabled style="accent-color:var(--acc)"> Tax inclusive</label>
+              <label style="cursor:pointer"><input type="radio" name="bd_taxmode" value="exclusive" ${b.tax_inclusive ? '' : 'checked'} style="accent-color:var(--acc)"> Tax exclusive</label>
+              <label style="cursor:pointer"><input type="radio" name="bd_taxmode" value="inclusive" ${b.tax_inclusive ? 'checked' : ''} style="accent-color:var(--acc)"> Tax inclusive</label>
             </div>
 
             <!-- Allocation Layout -->
@@ -530,7 +534,7 @@ function renderTxBillDetail() {
             <!-- Notes -->
             <div style="margin-top:8px">
               <div style="font-size:var(--fs-xs);color:var(--t3);margin-bottom:2px">Notes</div>
-              <textarea class="inp" disabled style="width:100%;min-height:50px;resize:none;${FB};border:1px solid #d8d0f0;border-radius:var(--rd);padding:6px 8px;font-family:inherit;font-size:var(--fs-sm)">${esc(b.notes || '')}</textarea>
+              <textarea class="inp" id="bd_notes" style="width:100%;min-height:50px;resize:vertical;border:1px solid #d8d0f0;border-radius:var(--rd);padding:6px 8px;font-family:inherit;font-size:var(--fs-sm)">${esc(b.notes || '')}</textarea>
             </div>
 
             <!-- Totals -->
@@ -545,12 +549,22 @@ function renderTxBillDetail() {
         </div>
       </div>
 
-      <!-- Action buttons -->
+      <!-- Action buttons (MYOB-style) -->
       <div id="bd_actions" style="display:flex;align-items:center;gap:6px;padding:10px 0;flex-wrap:wrap">
-        ${b.status !== 'Closed' && b.status !== 'Cancelled' ? `<button class="btn bo" style="color:var(--r);border-color:var(--r)" onclick="ScrTx._voidBill('${esc(b.id || '')}')">Cancel</button>` : ''}
-        ${b.status !== 'Closed' && b.status !== 'Cancelled' ? `<button class="btn bo" style="color:var(--g);border-color:var(--g)" onclick="ScrTx._recordPaymentFromBill('${esc(b.id || '')}')">$ Record Payment</button>` : ''}
+        ${b.status !== 'Closed' && b.status !== 'Cancelled' ? `<button class="btn bo" style="color:var(--r);border-color:var(--r)" onclick="ScrTx._deleteBill('${esc(b.id || '')}')">Delete</button>` : ''}
+        ${b.status !== 'Closed' && b.status !== 'Cancelled' ? `<button class="btn bo" style="color:var(--g);border-color:var(--g)" onclick="ScrTx._recordPaymentFromBill('${esc(b.id || '')}')">Record Payment</button>` : ''}
+        ${firstImg ? `<button class="btn bo" onclick="window.open('${esc(firstImg)}','_blank')">View PDF</button>` : ''}
+        <button class="btn bo" onclick="ScrTx._saveAsRecurring('${esc(b.id || '')}')">Save as Recurring</button>
         <div style="flex:1"></div>
-        <button class="btn bo" onclick="App.go('tx_bill')">Back to Bills</button>
+        <button class="btn bo" onclick="App.go('tx_bill')">Cancel</button>
+        <div style="position:relative;display:inline-block">
+          <button class="btn bo" onclick="ScrTx._toggleSaveMenu()">Save and... ▾</button>
+          <div id="bd_save_menu" style="display:none;position:absolute;bottom:100%;right:0;background:#fff;border:1px solid var(--bd);border-radius:var(--rd);box-shadow:0 2px 8px rgba(0,0,0,.1);min-width:160px;z-index:10">
+            <button class="bg" style="width:100%;text-align:left;padding:8px 12px;font-size:var(--fs-sm)" onclick="ScrTx._saveBill('new')">Save & Create New</button>
+            <button class="bg" style="width:100%;text-align:left;padding:8px 12px;font-size:var(--fs-sm)" onclick="ScrTx._saveBill('duplicate')">Save & Duplicate</button>
+          </div>
+        </div>
+        <button class="bs" onclick="ScrTx._saveBill()">Save</button>
       </div>
 
       <!-- More information section -->
@@ -663,22 +677,113 @@ function _goBillDetail(billId) {
   _openBillDetail(billId);
 }
 
-/** Cancel/Reverse a bill */
-function _voidBill(billId) {
+/** Delete a bill — replaces old void/cancel */
+function _deleteBill(billId) {
   App.showDialog({
-    title: 'Cancel Bill',
-    message: 'This will cancel this bill and create a reversal entry. This cannot be undone.',
-    confirmText: 'Cancel Bill',
+    title: 'Delete Bill',
+    message: 'This will permanently delete this bill and create a reversal entry. This cannot be undone.',
+    confirmText: 'Delete Bill',
     onConfirm: async () => {
       try {
-        await API.call('fin_void_bill', { bill_id: billId });
-        App.toast('Bill cancelled');
-        App.go('tx_log');
+        await API.call('fin_delete_bill', { bill_id: billId });
+        App.toast('Bill deleted');
+        App.S._bills = null; // clear cache
+        App.go('tx_bill');
       } catch (e) {
-        App.toast(e.message || 'Cancel failed');
+        App.toast(e.message || 'Delete failed');
       }
     },
   });
+}
+
+/** Save bill — collect form values and update via API */
+async function _saveBill(after) {
+  const detail = App.S._billDetail;
+  if (!detail || !detail.bill) return App.toast('No bill loaded');
+  const b = detail.bill;
+  const el = (id) => document.getElementById(id);
+
+  // Collect header values
+  const data = {
+    bill_id: b.id,
+    inv_no: el('bd_inv_no')?.value || '',
+    issue_date: el('bd_issue_date')?.value || '',
+    due_date: el('bd_due_date')?.value || '',
+    brand: el('bd_brand')?.value || '',
+    accrual_month: el('bd_accrual')?.value || '',
+    tax_inclusive: document.querySelector('input[name="bd_taxmode"][value="inclusive"]')?.checked || false,
+    notes: el('bd_notes')?.value || '',
+  };
+
+  // Collect line items
+  const liInputs = document.querySelectorAll('[data-li][data-field]');
+  const lineItems = {};
+  liInputs.forEach(inp => {
+    const idx = inp.dataset.li;
+    const field = inp.dataset.field;
+    if (!lineItems[idx]) lineItems[idx] = {};
+    let val = inp.value.trim();
+    // Strip currency formatting for amount/gst
+    if (field === 'amount' || field === 'gst') {
+      val = val.replace(/[$,]/g, '');
+    }
+    lineItems[idx][field] = val;
+  });
+  data.line_items = Object.values(lineItems);
+
+  try {
+    App.showLoader();
+    const result = await API.call('fin_update_bill', data);
+    App.toast('Bill saved');
+    App.S._bills = null; // clear list cache
+    App.S._billDetail = null; // clear detail cache
+
+    if (after === 'new') {
+      App.go('cr_bill');
+    } else if (after === 'duplicate') {
+      // Store current data for duplication
+      App.S._duplicateBill = data;
+      App.go('cr_bill');
+    } else {
+      // Reload detail with fresh data
+      _openBillDetail(b.id);
+    }
+  } catch (e) {
+    App.toast('Save failed: ' + (e.message || 'Unknown error'));
+  } finally {
+    App.hideLoader();
+  }
+}
+
+/** Toggle save dropdown menu */
+function _toggleSaveMenu() {
+  const menu = document.getElementById('bd_save_menu');
+  if (!menu) return;
+  const show = menu.style.display === 'none';
+  menu.style.display = show ? 'block' : 'none';
+  // Close on outside click
+  if (show) {
+    const close = (e) => {
+      if (!menu.contains(e.target) && !e.target.closest('#bd_save_more')) {
+        menu.style.display = 'none';
+        document.removeEventListener('click', close);
+      }
+    };
+    setTimeout(() => document.addEventListener('click', close), 0);
+  }
+}
+
+/** Save as recurring — redirect to recurring creation with bill data */
+function _saveAsRecurring(billId) {
+  const detail = App.S._billDetail;
+  if (!detail || !detail.bill) return App.toast('No bill loaded');
+  App.S._recurringFromBill = detail;
+  App.go('cr_recurring');
+}
+
+/** Legacy — kept for backward compat */
+function _voidBill(billId) {
+  _deleteBill(billId);
 }
 
 /** Record Payment from Bill Detail — navigate to py_record with this bill pre-selected */
@@ -695,6 +800,158 @@ function _recordPaymentFromBill(billId) {
     brand: b.paying_entity || b.brand || '',
   };
   App.go('py_record');
+}
+
+// ═══════════════════════════════════════
+// 5b. SALE DETAIL — editable view for individual sale records
+// ═══════════════════════════════════════
+
+function renderTxSaleDetail() {
+  const detail = App.S._saleDetail;
+
+  if (!detail) {
+    return {
+      tb: `<div class="tb"><button class="bg" onclick="App.go('tx_sale')">← Sales</button><div class="tb-t">Sale Detail</div></div>`,
+      ct: '<div class="empty" style="padding:40px"><div class="fin-spinner" style="margin:0 auto 8px"></div>Loading sale detail...</div>',
+    };
+  }
+
+  const r = detail;
+  const refNo = r.ref || r.id || '';
+
+  return {
+    tb: `<div class="tb"><button class="bg" onclick="App.go('tx_sale')">← Sales</button><div class="tb-t">Sale ${esc(refNo)}</div><div style="flex:1"></div>${sb(r.status)}</div>`,
+    ct: `<div style="max-width:800px;margin:0 auto">
+      <div class="card" style="padding:14px 16px">
+        <div class="fg" style="margin-bottom:8px">
+          <label class="lb">Transaction Type</label>
+          <input class="inp" disabled style="background:#f3f0ff;border-color:#d8d0f0;color:var(--t1);-webkit-text-fill-color:var(--t1);opacity:1" value="Income / Sale">
+        </div>
+        <div class="fg" style="margin-bottom:8px">
+          <label class="lb">Reference Number</label>
+          <input class="inp" disabled style="background:#f3f0ff;border-color:#d8d0f0;color:var(--t1);-webkit-text-fill-color:var(--t1);opacity:1" value="${esc(refNo)}">
+        </div>
+        <div style="display:flex;gap:10px;margin-bottom:8px">
+          <div class="fg" style="flex:1"><label class="lb">Sale Date *</label><input class="inp" id="sd_date" type="date" value="${r.date || ''}"></div>
+          <div class="fg" style="flex:1"><label class="lb">Brand *</label><select class="inp" id="sd_brand_f">${App.brandOpts(r.brand || '')}</select></div>
+        </div>
+        <div style="display:flex;gap:10px;margin-bottom:8px">
+          <div class="fg" style="flex:1"><label class="lb">Channel</label><input class="inp" id="sd_channel" value="${esc(r.channel || r.desc || '')}"></div>
+          <div class="fg" style="flex:1"><label class="lb">Status</label><input class="inp" disabled style="background:#f3f0ff;border-color:#d8d0f0;color:var(--t1);-webkit-text-fill-color:var(--t1);opacity:1" value="${esc(r.status || 'Open')}"></div>
+        </div>
+        <div style="display:flex;gap:10px;margin-bottom:8px">
+          <div class="fg" style="flex:1"><label class="lb">Amount ($) *</label><input class="inp" id="sd_amount" type="number" step="0.01" value="${r.amount || 0}"></div>
+          <div class="fg" style="flex:1"><label class="lb">GST ($)</label><input class="inp" id="sd_gst" type="number" step="0.01" value="${r.gst || 0}"></div>
+        </div>
+        <div class="fg" style="margin-bottom:8px">
+          <label class="lb">Notes</label>
+          <textarea class="inp" id="sd_notes" style="width:100%;min-height:50px;resize:vertical;border:1px solid #d8d0f0;border-radius:var(--rd);padding:6px 8px;font-family:inherit;font-size:var(--fs-sm)">${esc(r.notes || '')}</textarea>
+        </div>
+
+        <!-- Totals -->
+        <div style="text-align:right;font-size:var(--fs-body);margin-top:8px;padding-top:8px;border-top:1px solid #eee">
+          <div style="display:flex;justify-content:flex-end;gap:16px;padding:3px 0"><span>Amount</span><b style="color:var(--g)">${fm(r.amount)}</b></div>
+          <div style="display:flex;justify-content:flex-end;gap:16px;padding:3px 0;color:var(--t3)"><span>GST</span><span>${fm(r.gst || 0)}</span></div>
+          <div style="display:flex;justify-content:flex-end;gap:16px;padding:3px 0"><b>Total</b><b style="color:var(--g)">${fm((Number(r.amount) || 0) + (Number(r.gst) || 0))}</b></div>
+        </div>
+      </div>
+
+      <!-- Action buttons -->
+      <div style="display:flex;align-items:center;gap:6px;padding:10px 0;flex-wrap:wrap">
+        <button class="btn bo" style="color:var(--r);border-color:var(--r)" onclick="ScrTx._deleteSale('${esc(r.id || '')}')">Delete</button>
+        <div style="flex:1"></div>
+        <button class="btn bo" onclick="App.go('tx_sale')">Cancel</button>
+        <button class="bs" onclick="ScrTx._saveSale()">Save</button>
+      </div>
+    </div>`,
+  };
+}
+
+/** Open sale detail — find in memory or fetch */
+async function _openSaleDetail(saleId) {
+  if (!saleId) return;
+
+  // Try to find in memory
+  const mem = App.S._tx_sale || App.S._tx_log;
+  const found = mem ? mem.find(x => x.id === saleId) : null;
+
+  App.S._saleDetail = found || null;
+  App.S.route = 'tx_sale_detail';
+  location.hash = 'tx_sale_detail/' + saleId;
+
+  const result = renderTxSaleDetail();
+  const ct = document.getElementById('content');
+  const tb = document.getElementById('toolbar');
+  if (ct) { ct.innerHTML = result.ct || ''; ct.scrollTop = 0; }
+  if (tb) tb.innerHTML = result.tb || '';
+
+  // If not found in memory, fetch from API
+  if (!found) {
+    try {
+      const data = await API.call('fin_get_sale_detail', { sale_id: saleId });
+      App.S._saleDetail = data;
+      if (App.S.route === 'tx_sale_detail') {
+        const r2 = renderTxSaleDetail();
+        if (ct) ct.innerHTML = r2.ct || '';
+        if (tb) tb.innerHTML = r2.tb || '';
+      }
+    } catch (e) {
+      App.toast('Error loading sale: ' + e.message);
+    }
+  }
+}
+
+function _goSaleDetail(saleId) {
+  if (!saleId) return;
+  _openSaleDetail(saleId);
+}
+
+/** Save sale — collect form values and update via API */
+async function _saveSale() {
+  const detail = App.S._saleDetail;
+  if (!detail) return App.toast('No sale loaded');
+  const el = (id) => document.getElementById(id);
+
+  const data = {
+    sale_id: detail.id,
+    date: el('sd_date')?.value || '',
+    brand: el('sd_brand_f')?.value || '',
+    channel: el('sd_channel')?.value || '',
+    amount: parseFloat(el('sd_amount')?.value) || 0,
+    gst: parseFloat(el('sd_gst')?.value) || 0,
+    notes: el('sd_notes')?.value || '',
+  };
+
+  try {
+    App.showLoader();
+    await API.call('fin_update_sale', data);
+    App.toast('Sale saved');
+    App.S._tx_sale = null; // clear cache
+    _openSaleDetail(detail.id);
+  } catch (e) {
+    App.toast('Save failed: ' + (e.message || 'Unknown error'));
+  } finally {
+    App.hideLoader();
+  }
+}
+
+/** Delete sale */
+function _deleteSale(saleId) {
+  App.showDialog({
+    title: 'Delete Sale',
+    message: 'This will permanently delete this sale record. This cannot be undone.',
+    confirmText: 'Delete Sale',
+    onConfirm: async () => {
+      try {
+        await API.call('fin_delete_sale', { sale_id: saleId });
+        App.toast('Sale deleted');
+        App.S._tx_sale = null;
+        App.go('tx_sale');
+      } catch (e) {
+        App.toast(e.message || 'Delete failed');
+      }
+    },
+  });
 }
 
 // ═══════════════════════════════════════
@@ -1069,6 +1326,7 @@ App.registerRoutes({
   tx_bill:        { render: renderTxBill, onLoad: _loadBills },
   tx_return:      { render: renderTxReturn, onLoad: _loadReturns },
   tx_bill_detail: { render: renderTxBillDetail },
+  tx_sale_detail: { render: renderTxSaleDetail },
   tx_sd:          { render: renderTxSdBridge, onLoad: _loadSdBridge },
   tx_find:        { render: renderTxFind, onLoad: _loadFind },
 });
@@ -1084,8 +1342,18 @@ window.ScrTx = {
   _openBillDetail,
   _goBillDetail,
   _voidBill,
+  _deleteBill,
+  _saveBill,
+  _toggleSaveMenu,
+  _saveAsRecurring,
   _recordPaymentFromBill,
   _loadMoreBills,
+  // Sale Detail
+  _openSaleDetail,
+  _goSaleDetail,
+  _saveSale,
+  _deleteSale,
+  // SD Bridge
   _sdToggleGroup,
   _sdSetFilter,
   _sdSetBrandFilter,

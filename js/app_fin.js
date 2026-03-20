@@ -59,6 +59,7 @@ const App = (() => {
     _tx_log: null,
     _tx_sale: null,
     _tx_return: null,
+    _saleDetail: null,
     _sdPending: null,
   };
 
@@ -191,7 +192,8 @@ const App = (() => {
     // Transaction screens
     tx_log: 'js/scr_tx_fin.js', tx_sale: 'js/scr_tx_fin.js',
     tx_bill: 'js/scr_tx_fin.js', tx_return: 'js/scr_tx_fin.js',
-    tx_bill_detail: 'js/scr_tx_fin.js', tx_sd: 'js/scr_tx_fin.js',
+    tx_bill_detail: 'js/scr_tx_fin.js', tx_sale_detail: 'js/scr_tx_fin.js',
+    tx_sd: 'js/scr_tx_fin.js',
     tx_find: 'js/scr_tx_fin.js',
     // Settings screens
     st_alert: 'js/scr_settings_fin.js', st_perm: 'js/scr_settings_fin.js',
@@ -260,9 +262,13 @@ const App = (() => {
     const [initRoute, initParam] = hash.split('/');
     if (initRoute === 'tx_bill_detail' && initParam) {
       go(initRoute);
-      // Defer bill load until script is ready
       requestAnimationFrame(() => {
         if (typeof ScrTx !== 'undefined' && ScrTx._goBillDetail) ScrTx._goBillDetail(initParam);
+      });
+    } else if (initRoute === 'tx_sale_detail' && initParam) {
+      go(initRoute);
+      requestAnimationFrame(() => {
+        if (typeof ScrTx !== 'undefined' && ScrTx._goSaleDetail) ScrTx._goSaleDetail(initParam);
       });
     } else {
       go(initRoute);
@@ -276,6 +282,11 @@ const App = (() => {
         if (h !== S.route) go(h);
         requestAnimationFrame(() => {
           if (typeof ScrTx !== 'undefined' && ScrTx._goBillDetail) ScrTx._goBillDetail(param);
+        });
+      } else if (h === 'tx_sale_detail' && param) {
+        if (h !== S.route) go(h);
+        requestAnimationFrame(() => {
+          if (typeof ScrTx !== 'undefined' && ScrTx._goSaleDetail) ScrTx._goSaleDetail(param);
         });
       } else if (h !== S.route) {
         go(h);
@@ -713,6 +724,7 @@ const App = (() => {
     S._tx_log = null;
     S._tx_sale = null;
     S._tx_return = null;
+    S._saleDetail = null;
     S._sdPending = null;
 
     toast('Refreshing...');

@@ -353,6 +353,27 @@ const API = (() => {
   }
 
   // ═══════════════════════════════════════
+  // UPDATE / DELETE BILL
+  // ═══════════════════════════════════════
+
+  /** Update bill → DB */
+  async function updateBill(data) {
+    const res = await _call('fin_update_bill', data);
+    // Clear caches
+    _S()._billDetail = null;
+    _S()._bills = null;
+    return res;
+  }
+
+  /** Delete bill → DB */
+  async function deleteBill(billId) {
+    const res = await _call('fin_delete_bill', { bill_id: billId });
+    _S()._billDetail = null;
+    _S()._bills = null;
+    return res;
+  }
+
+  // ═══════════════════════════════════════
   // SILENT REFRESH
   // ═══════════════════════════════════════
 
@@ -437,6 +458,8 @@ const API = (() => {
     getDebitCredits,
     getDashboard,
     createBill,
+    updateBill,
+    deleteBill,
     createSale,
     createTransfer,
     createDebit,

@@ -166,6 +166,17 @@
     _pySelected = new Set();
     _pySaving = false;
     await _loadUnpaidBills();
+
+    // If navigated from Bill Detail with prefill, pre-select only that bill
+    const prefill = App.S._prefillPayment;
+    if (prefill && prefill.bill_id) {
+      _pySelected = new Set();
+      // Select only the prefilled bill
+      const match = _pyBills.find(b => b.id === prefill.bill_id);
+      if (match) _pySelected.add(match.id);
+      App.S._prefillPayment = null; // clear prefill
+    }
+
     _renderBillsTable();
     _loadNextRef();
   }

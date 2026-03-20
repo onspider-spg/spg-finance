@@ -547,20 +547,10 @@ function renderTxBillDetail() {
 
       <!-- Action buttons -->
       <div id="bd_actions" style="display:flex;align-items:center;gap:6px;padding:10px 0;flex-wrap:wrap">
-        <button class="btn bo" style="color:var(--r);border-color:var(--r)" onclick="ScrTx._voidBill('${esc(b.id || '')}')">Cancel</button>
-        <button class="btn bo">Record Payment</button>
-        <button class="btn bo">View PDF</button>
-        <button class="btn bo">Save as recurring</button>
+        ${b.status !== 'Closed' && b.status !== 'Cancelled' ? `<button class="btn bo" style="color:var(--r);border-color:var(--r)" onclick="ScrTx._voidBill('${esc(b.id || '')}')">Cancel</button>` : ''}
+        ${b.status !== 'Closed' && b.status !== 'Cancelled' ? `<button class="btn bo" style="color:var(--g);border-color:var(--g)" onclick="ScrTx._recordPaymentFromBill('${esc(b.id || '')}')">$ Record Payment</button>` : ''}
         <div style="flex:1"></div>
         <button class="btn bo" onclick="App.go('tx_bill')">Back to Bills</button>
-        <div style="position:relative;display:inline-block">
-          <button class="btn bo" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">Save and... ▾</button>
-          <div style="display:none;position:absolute;bottom:100%;right:0;background:#fff;border:1px solid var(--bd);border-radius:8px;box-shadow:var(--sh2);padding:4px 0;min-width:160px;z-index:20">
-            <div class="sg-item">Save and Create new</div>
-            <div class="sg-item">Save and Duplicate</div>
-          </div>
-        </div>
-        <button class="bs">Save</button>
       </div>
 
       <!-- More information section -->
@@ -691,6 +681,22 @@ function _voidBill(billId) {
   });
 }
 
+/** Record Payment from Bill Detail — navigate to py_record with this bill pre-selected */
+function _recordPaymentFromBill(billId) {
+  const detail = App.S._billDetail;
+  if (!detail || !detail.bill) return App.toast('Bill data not loaded');
+  const b = detail.bill;
+  // Store bill info for py_record to pick up
+  App.S._prefillPayment = {
+    bill_id: b.id,
+    bill_no: b.bill_no,
+    vendor_name: b.supplier_name || b.vendor_name || '',
+    amount: b.balance || 0,
+    brand: b.paying_entity || b.brand || '',
+  };
+  App.go('py_record');
+}
+
 // ═══════════════════════════════════════
 // 6. SD BRIDGE — ★ CONNECTED TO DB
 // ═══════════════════════════════════════
@@ -703,7 +709,7 @@ let _sdRows = []; // cached rows for brand extraction
 function renderTxSdBridge() {
   _sdChecked = new Set();
   return {
-    tb: `<div class="tb"><div class="tb-t">SD Bridge</div><span style="font-size:var(--fs-xs);color:var(--t3)">Sale Daily → Finance sync</span><div style="flex:1"></div><select class="fl" style="width:150px" id="sd_month" onchange="ScrTx._sdChangeMonth()"><option value="${_sdMonth}">${_sdMonth}</option></select><button class="btn bo" onclick="App.go('st_alert')">Settings</button></div>`,
+    tb: `<div class="tb"><div class="tb-t">SD Bridge</div><span style="font-size:var(--fs-xs);color:var(--t3)">Sale Daily → Finance sync</span><div style="flex:1"></div><select class="fl" style="width:150px" id="sd_month" onchange="ScrTx._sdChangeMonth()">${(()=>{let o='',d=new Date();for(let i=0;i<6;i++){let m=new Date(d.getFullYear(),d.getMonth()-i,1),v=m.toISOString().substring(0,7);o+=`<option value="${v}"${v===_sdMonth?' selected':''}>${v}</option>`}return o})()}</select><button class="btn bo" onclick="App.go('st_alert')">Settings</button></div>`,
     ct: `<div style="max-width:1100px;margin:0 auto">
       <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:12px;flex-wrap:wrap">
         <div style="display:flex;gap:3px" id="sd_filter_btns">
@@ -1078,6 +1084,7 @@ window.ScrTx = {
   _openBillDetail,
   _goBillDetail,
   _voidBill,
+  _recordPaymentFromBill,
   _loadMoreBills,
   _sdToggleGroup,
   _sdSetFilter,

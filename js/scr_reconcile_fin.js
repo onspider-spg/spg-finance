@@ -1,4 +1,4 @@
-/** Version 1.1.1 | 16 MAR 2026 | Siam Palette Group */
+/** Version 1.2.0 | 20 MAR 2026 | Siam Palette Group */
 /**
  * ═══════════════════════════════════════════
  * SPG Finance Module — scr_reconcile_fin.js
@@ -45,10 +45,14 @@
       ct: `<div class="card" style="max-width:720px;margin:0 auto">
         <div style="font-size:var(--fs-xs);color:var(--t3);margin-bottom:8px">Upload bank statement to reconcile. Stays on this page after upload.</div>
         <div style="background:var(--bbg);border-radius:var(--rd);padding:8px 12px;font-size:var(--fs-xxs);color:var(--b);margin-bottom:10px;line-height:1.6">
-          <b>Supported formats:</b> CSV, OFX<br>
-          <b>CSV columns:</b> Date, Description, Debit, Credit, Balance (or Date, Description, Amount, Balance)<br>
-          <b>Date format:</b> DD/MM/YYYY or YYYY-MM-DD<br>
-          <a class="lk" style="font-size:var(--fs-xxs)" href="#" onclick="ScrReconcile._downloadTemplate();return false">Download CSV template</a>
+          <b>Supported formats:</b> CSV (Westpac, Generic), OFX<br>
+          <b>Westpac CSV:</b> Bank Account, Date, Narrative, Debit, Credit, Balance, Categories, Serial<br>
+          <b>Generic CSV:</b> Date, Description, Debit, Credit, Balance<br>
+          <b>Date format:</b> DD/MM/YYYY or YYYY-MM-DD &nbsp;|&nbsp; <b>Auto-detect:</b> Westpac format detected by 12-digit account number<br>
+          <select id="st_template_fmt" style="font-size:var(--fs-xxs);padding:1px 4px;border:1px solid var(--b);border-radius:4px">
+            <option value="westpac">Westpac template</option><option value="generic">Generic template</option>
+          </select>
+          <a class="lk" style="font-size:var(--fs-xxs);margin-left:4px" href="#" onclick="ScrReconcile._downloadTemplate();return false">Download</a>
         </div>
         <div class="fg">
           <label class="lb">Bank Account *</label>
@@ -112,28 +116,45 @@
     reader.readAsText(file);
   }
 
+  // Detected CSV format after parsing (used by preview)
+  let _stmtFormat = 'generic'; // 'westpac' | 'generic'
+  let _stmtAccounts = [];      // unique account numbers found in CSV
+
   function _parseCsv(text) {
     const lines = text.trim().split('\n');
     if (lines.length < 2) return [];
 
     // Try to detect header row
     const header = lines[0].toLowerCase();
-    const hasHeader = header.includes('date') || header.includes('description') || header.includes('amount');
+    const hasHeader = header.includes('date') || header.includes('description') || header.includes('amount') || header.includes('narrative');
     const startIdx = hasHeader ? 1 : 0;
 
+    // Detect Westpac format: first data row col[0] is a 12-digit bank account number
+    const firstDataCols = _splitCsvLine(lines[startIdx]);
+    const isWestpac = firstDataCols.length >= 6 && /^\d{12}$/.test(firstDataCols[0].trim());
+    _stmtFormat = isWestpac ? 'westpac' : 'generic';
+
+    const acctSet = new Set();
     const rows = [];
     for (let i = startIdx; i < lines.length; i++) {
       const cols = _splitCsvLine(lines[i]);
       if (cols.length < 3) continue;
 
-      // Try common CSV formats:
-      // Format A: Date, Description, Debit, Credit, Balance
-      // Format B: Date, Description, Amount, Balance
-      // Format C: Date, Amount, Description, Balance
       let date = '', desc = '', debit = 0, credit = 0, balance = 0;
+      let bank_account = '', bank_category = '';
 
-      if (cols.length >= 5) {
-        // Format A: 5+ columns
+      if (isWestpac) {
+        // Westpac 8-col: Bank Account, Date, Narrative, Debit Amount, Credit Amount, Balance, Categories, Serial
+        bank_account = cols[0].trim();
+        date = cols[1].trim();
+        desc = cols[2].trim();
+        debit = Math.abs(parseFloat(cols[3].replace(/[,$"]/g, '')) || 0);
+        credit = Math.abs(parseFloat(cols[4].replace(/[,$"]/g, '')) || 0);
+        balance = parseFloat(cols[5].replace(/[,$"]/g, '')) || 0;
+        bank_category = (cols[6] || '').trim();
+        acctSet.add(bank_account);
+      } else if (cols.length >= 5) {
+        // Format A: Date, Description, Debit, Credit, Balance
         date = cols[0].trim();
         desc = cols[1].trim();
         debit = Math.abs(parseFloat(cols[2].replace(/[,$"]/g, '')) || 0);
@@ -160,9 +181,15 @@
       date = _normalizeDate(date);
       if (!date) continue;
 
-      rows.push({ date, description: desc, debit, credit, balance });
+      const row = { date, description: desc, debit, credit, balance };
+      if (isWestpac) {
+        row.bank_account = bank_account;
+        row.bank_category = bank_category;
+      }
+      rows.push(row);
     }
 
+    _stmtAccounts = [...acctSet];
     return rows;
   }
 
@@ -202,19 +229,96 @@
     previewDiv.style.display = '';
     if (countEl) countEl.textContent = _stmtParsed.length;
 
+    const isW = _stmtFormat === 'westpac';
+    const colSpan = isW ? 7 : 5;
+
+    // Update table header based on format
+    const thead = previewDiv.querySelector('thead tr');
+    if (thead) {
+      thead.innerHTML = isW
+        ? '<th>Account</th><th>Date</th><th>Narrative</th><th style="text-align:right">Debit</th><th style="text-align:right">Credit</th><th style="text-align:right">Balance</th><th>Category</th>'
+        : '<th>Date</th><th>Description</th><th style="text-align:right">Debit</th><th style="text-align:right">Credit</th><th style="text-align:right">Balance</th>';
+    }
+
+    // Show account filter if multiple accounts detected
+    let acctNotice = '';
+    if (isW && _stmtAccounts.length > 1) {
+      acctNotice = `<tr><td colspan="${colSpan}" style="background:var(--obg);color:var(--o);font-size:var(--fs-xxs);padding:6px 10px">
+        Detected ${_stmtAccounts.length} accounts in file: ${_stmtAccounts.map(a => '<b>#' + esc(a) + '</b>').join(', ')}
+        — filter: <select id="st_acct_filter" onchange="ScrReconcile._filterByAccount(this.value)" style="font-size:var(--fs-xxs);padding:1px 4px;border:1px solid var(--o);border-radius:4px">
+          <option value="">All accounts (${_stmtParsed.length} rows)</option>
+          ${_stmtAccounts.map(a => {
+            const cnt = _stmtParsed.filter(r => r.bank_account === a).length;
+            return '<option value="' + esc(a) + '">#' + esc(a) + ' (' + cnt + ' rows)</option>';
+          }).join('')}
+        </select>
+      </td></tr>`;
+    } else if (isW && _stmtAccounts.length === 1) {
+      acctNotice = `<tr><td colspan="${colSpan}" style="background:var(--gbg);color:var(--g);font-size:var(--fs-xxs);padding:6px 10px">
+        Westpac format detected — Account <b>#${esc(_stmtAccounts[0])}</b> — ${_stmtParsed.length} rows
+      </td></tr>`;
+    }
+
     // Show first 20 rows
     const rows = _stmtParsed.slice(0, 20);
-    tbody.innerHTML = rows.map(r => `<tr>
+    tbody.innerHTML = acctNotice + rows.map(r => isW
+      ? `<tr>
+          <td style="font-size:var(--fs-xxs);color:var(--t3);font-family:monospace">${esc(r.bank_account || '')}</td>
+          <td style="white-space:nowrap">${_fmtDate(r.date)}</td>
+          <td style="font-size:var(--fs-xxs);max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.description)}">${esc(r.description)}</td>
+          <td style="text-align:right${r.debit > 0 ? ';color:var(--r)' : ''}">${r.debit > 0 ? fm(r.debit) : ''}</td>
+          <td style="text-align:right${r.credit > 0 ? ';color:var(--g)' : ''}">${r.credit > 0 ? fm(r.credit) : ''}</td>
+          <td style="text-align:right;font-weight:600">${fm(r.balance)}</td>
+          <td><span style="font-size:var(--fs-xxs);padding:1px 6px;border-radius:8px;background:var(--bg2);color:var(--t3)">${esc(r.bank_category || '')}</span></td>
+        </tr>`
+      : `<tr>
+          <td style="white-space:nowrap">${_fmtDate(r.date)}</td>
+          <td>${esc(r.description)}</td>
+          <td style="text-align:right${r.debit > 0 ? ';color:var(--r)' : ''}">${r.debit > 0 ? fm(r.debit) : ''}</td>
+          <td style="text-align:right${r.credit > 0 ? ';color:var(--g)' : ''}">${r.credit > 0 ? fm(r.credit) : ''}</td>
+          <td style="text-align:right;font-weight:600">${fm(r.balance)}</td>
+        </tr>`
+    ).join('');
+
+    if (_stmtParsed.length > 20) {
+      tbody.innerHTML += `<tr><td colspan="${colSpan}" style="text-align:center;color:var(--t3);font-size:var(--fs-xs)">... and ${_stmtParsed.length - 20} more rows</td></tr>`;
+    }
+  }
+
+  // Filter preview by account (Westpac multi-account)
+  let _stmtAccountFilter = '';
+  function _filterByAccount(acct) {
+    _stmtAccountFilter = acct;
+    // Re-render with filtered data
+    const tbody = document.getElementById('st_preview_body');
+    const countEl = document.getElementById('st_row_count');
+    if (!tbody) return;
+
+    const filtered = acct ? _stmtParsed.filter(r => r.bank_account === acct) : _stmtParsed;
+    if (countEl) countEl.textContent = filtered.length;
+
+    const rows = filtered.slice(0, 20);
+    // Keep the account notice row
+    const noticeRow = tbody.querySelector('tr:first-child td[colspan]');
+    const noticeHtml = noticeRow ? noticeRow.parentElement.outerHTML : '';
+
+    tbody.innerHTML = noticeHtml + rows.map(r => `<tr>
+      <td style="font-size:var(--fs-xxs);color:var(--t3);font-family:monospace">${esc(r.bank_account || '')}</td>
       <td style="white-space:nowrap">${_fmtDate(r.date)}</td>
-      <td>${esc(r.description)}</td>
+      <td style="font-size:var(--fs-xxs);max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.description)}">${esc(r.description)}</td>
       <td style="text-align:right${r.debit > 0 ? ';color:var(--r)' : ''}">${r.debit > 0 ? fm(r.debit) : ''}</td>
       <td style="text-align:right${r.credit > 0 ? ';color:var(--g)' : ''}">${r.credit > 0 ? fm(r.credit) : ''}</td>
       <td style="text-align:right;font-weight:600">${fm(r.balance)}</td>
+      <td><span style="font-size:var(--fs-xxs);padding:1px 6px;border-radius:8px;background:var(--bg2);color:var(--t3)">${esc(r.bank_category || '')}</span></td>
     </tr>`).join('');
 
-    if (_stmtParsed.length > 20) {
-      tbody.innerHTML += `<tr><td colspan="5" style="text-align:center;color:var(--t3);font-size:var(--fs-xs)">... and ${_stmtParsed.length - 20} more rows</td></tr>`;
+    if (filtered.length > 20) {
+      tbody.innerHTML += `<tr><td colspan="7" style="text-align:center;color:var(--t3);font-size:var(--fs-xs)">... and ${filtered.length - 20} more rows</td></tr>`;
     }
+
+    // Restore filter selection
+    const sel = document.getElementById('st_acct_filter');
+    if (sel) sel.value = acct;
   }
 
   async function _uploadStatement() {
@@ -223,6 +327,13 @@
 
     const bankId = document.getElementById('st_bank')?.value;
     if (!bankId) return App.toast('Please select a bank account');
+
+    // Filter by selected account if Westpac multi-account
+    let rowsToUpload = _stmtParsed;
+    if (_stmtFormat === 'westpac' && _stmtAccountFilter) {
+      rowsToUpload = _stmtParsed.filter(r => r.bank_account === _stmtAccountFilter);
+    }
+    if (rowsToUpload.length === 0) return App.toast('No rows to upload for selected account');
 
     _stmtUploading = true;
     const btn = document.getElementById('st_upload_btn');
@@ -233,7 +344,8 @@
       const result = await API.call('fin_upload_statement', {
         bank_account_id: bankId,
         source_file: _stmtFile?.name || 'upload.csv',
-        rows: _stmtParsed,
+        rows: rowsToUpload,
+        format: _stmtFormat,
       });
 
       // Show success
@@ -738,8 +850,108 @@
     }
   }
 
+  let _mmLineId = null;
+  let _mmResults = [];
+
   function _manualMatch(lineId) {
-    App.toast('Manual match — coming in next iteration');
+    _mmLineId = lineId;
+    _mmResults = [];
+    const line = _rcStmtLines.find(l => l.id === lineId);
+    if (!line) return;
+    const amount = (line.debit || 0) > 0 ? line.debit : (line.credit || 0);
+
+    // Build modal dialog
+    const overlay = document.createElement('div');
+    overlay.id = 'mm_overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;display:flex;align-items:center;justify-content:center';
+    overlay.innerHTML = `<div style="background:#fff;border-radius:12px;width:600px;max-width:95vw;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,.2)">
+      <div style="padding:14px 16px;border-bottom:1px solid #eee;display:flex;align-items:center;gap:8px">
+        <span style="font-weight:700;font-size:var(--fs-body)">Manual Match</span>
+        <span style="flex:1"></span>
+        <button onclick="document.getElementById('mm_overlay').remove()" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--t3)">&times;</button>
+      </div>
+      <div style="padding:12px 16px;background:var(--bbg);border-bottom:1px solid #eee;font-size:var(--fs-xs)">
+        <b>Statement:</b> ${_fmtDate(line.statement_date)} · ${esc((line.description || '').substring(0, 60))} · <b>${fm(amount)}</b>
+      </div>
+      <div style="padding:12px 16px">
+        <div style="display:flex;gap:6px;margin-bottom:8px">
+          <input class="inp" id="mm_search" placeholder="Search bill #, vendor name..." style="flex:1;font-size:var(--fs-sm)" onkeydown="if(event.key==='Enter')ScrReconcile._mmSearch()">
+          <button class="bs" style="padding:6px 14px;font-size:var(--fs-sm)" onclick="ScrReconcile._mmSearch()">Search</button>
+        </div>
+      </div>
+      <div style="flex:1;overflow:auto;padding:0 16px 12px">
+        <div id="mm_results" style="font-size:var(--fs-sm);color:var(--t3);text-align:center;padding:20px">
+          Search or <a class="lk" onclick="ScrReconcile._mmSearch()">show all transactions</a>
+        </div>
+      </div>
+    </div>`;
+    document.body.appendChild(overlay);
+
+    // Close on overlay click
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+    // Auto-search with amount
+    setTimeout(() => {
+      const inp = document.getElementById('mm_search');
+      if (inp) inp.focus();
+      _mmDoSearch('', amount);
+    }, 100);
+  }
+
+  async function _mmSearch() {
+    const query = document.getElementById('mm_search')?.value || '';
+    const line = _rcStmtLines.find(l => l.id === _mmLineId);
+    const amount = line ? ((line.debit || 0) > 0 ? line.debit : (line.credit || 0)) : 0;
+    await _mmDoSearch(query, amount);
+  }
+
+  async function _mmDoSearch(query, amount) {
+    const el = document.getElementById('mm_results');
+    if (!el) return;
+    el.innerHTML = '<div style="padding:12px;color:var(--t3)">Searching...</div>';
+
+    try {
+      const data = await API.call('fin_search_tx_for_match', { query, amount, limit: 30 });
+      _mmResults = data.transactions || [];
+      if (_mmResults.length === 0) {
+        el.innerHTML = '<div style="padding:20px;color:var(--t3)">No transactions found</div>';
+        return;
+      }
+      el.innerHTML = `<table class="tbl" style="font-size:var(--fs-xs)"><thead><tr>
+        <th>Bill #</th><th>Vendor</th><th>Date</th><th style="text-align:right">Amount</th><th style="text-align:right">Balance</th><th>Status</th><th></th>
+      </tr></thead><tbody>${_mmResults.map(t => {
+        const amtDiff = Math.abs((t.total_amount || 0) - amount);
+        const exactMatch = amtDiff < 0.01;
+        return `<tr${exactMatch ? ' style="background:var(--gbg)"' : ''}>
+          <td style="font-weight:600">${esc(t.bill_no || '')}</td>
+          <td>${esc(t.vendor_name || '')}</td>
+          <td>${_fmtDate(t.issue_date)}</td>
+          <td style="text-align:right">${fm(t.total_amount || 0)}</td>
+          <td style="text-align:right;font-weight:600">${fm(t.balance_due || 0)}</td>
+          <td><span class="sts sts-${t.status === 'Open' ? 'o' : t.status === 'Closed' ? 'c' : 'r'}" style="font-size:var(--fs-xxs)">${esc(t.status || '')}</span></td>
+          <td><button class="bs" style="padding:3px 10px;font-size:var(--fs-xxs)" onclick="ScrReconcile._mmSelect('${t.id}')">Match</button></td>
+        </tr>`;
+      }).join('')}</tbody></table>`;
+    } catch (e) {
+      el.innerHTML = `<div style="padding:20px;color:var(--r)">Error: ${esc(e.message)}</div>`;
+    }
+  }
+
+  async function _mmSelect(txId) {
+    if (!_mmLineId || !txId) return;
+    try {
+      App.showLoader();
+      await API.call('fin_manual_match', { statement_line_id: _mmLineId, transaction_id: txId });
+      // Close dialog
+      document.getElementById('mm_overlay')?.remove();
+      // Refresh recon data
+      await onLoadBankRecon();
+      App.toast('Matched successfully');
+    } catch (e) {
+      App.toast('Error: ' + e.message, 2000);
+    } finally {
+      App.hideLoader();
+    }
   }
 
   function _createAndMatch(lineId) {
@@ -750,12 +962,24 @@
   }
 
   function _downloadTemplate() {
-    const csv = 'Date,Description,Debit,Credit,Balance\n17/03/2026,Example transaction,100.00,,5000.00\n18/03/2026,Another transaction,,50.00,5050.00';
+    const fmt = document.getElementById('st_template_fmt')?.value || 'generic';
+    let csv, filename;
+    if (fmt === 'westpac') {
+      csv = 'Bank Account,Date,Narrative,Debit Amount,Credit Amount,Balance,Categories,Serial\n'
+        + '032135835976,19/03/2026,"MERCHANT SETTLEMENT 0970001 ISSHO CAFE PTY LTD  0001  HAYMARKET",,8286.65,47109.45,DEP,\n'
+        + '032135835976,18/03/2026,"WITHDRAWAL ONLINE MULTI 1548656 PYMT EP000236 P PAYMENT",10793.20,,36106.92,PAYMENT,\n'
+        + '032135835941,18/03/2026,"DEBIT CARD PURCHASE COLES 0710 SYDNEY       AUS Card No. ~007002",90.00,,3984.20,PAYMENT,\n'
+        + '032135835976,18/03/2026,"DEPOSIT UBER B.V.        STORE ID 241220ISS",,361.24,53424.91,DEP,';
+      filename = 'westpac_statement_template.csv';
+    } else {
+      csv = 'Date,Description,Debit,Credit,Balance\n17/03/2026,Example transaction,100.00,,5000.00\n18/03/2026,Another transaction,,50.00,5050.00';
+      filename = 'bank_statement_template.csv';
+    }
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'bank_statement_template.csv';
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -785,8 +1009,11 @@
     _runAutoMatch,
     _confirmMatch,
     _manualMatch,
+    _mmSearch,
+    _mmSelect,
     _createAndMatch,
     _downloadTemplate,
+    _filterByAccount,
   };
 
 })();

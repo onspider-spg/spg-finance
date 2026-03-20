@@ -72,21 +72,49 @@ function renderTxLog() {
 
   return {
     tb: `<div class="tb"><div class="tb-t">Transaction Log</div><button class="bs" onclick="App.go('rc_bank')">Reconcile</button></div>`,
-    ct: `<div style="${TW}"><div class="card"><div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:6px"><div><div class="fl-l">Type</div><select class="fl" id="log_type" onchange="ScrTx._filterLog()" style="width:100px"><option value="">All</option><option value="Income">Income</option><option value="Expense">Expense</option><option value="Transfer">Transfer</option></select></div><div><div class="fl-l">Brand</div><select class="fl" id="log_brand" onchange="ScrTx._filterLog()" style="width:120px">${_brandFilterOpts()}</select></div><div><div class="fl-l">Status</div><select class="fl" id="log_status" onchange="ScrTx._filterLog()" style="width:80px"><option value="">All</option><option value="Paid">Paid</option><option value="Unpaid">Unpaid</option></select></div><div><div class="fl-l">Date from</div><input class="fl" id="log_from" type="date" value="${dr.from}" onchange="ScrTx._filterLog()" style="width:130px"></div><div><div class="fl-l">Date to</div><input class="fl" id="log_to" type="date" value="${dr.to}" onchange="ScrTx._filterLog()" style="width:130px"></div><div><div class="fl-l">Search</div><input class="fl" id="log_search" placeholder="" oninput="ScrTx._filterLog()" style="width:100px"></div><div style="flex:1"></div><button class="bg" style="color:var(--acc)" onclick="ScrTx._resetLog()">Reset</button></div></div><div class="card" style="padding:0"><table class="tbl" id="tbl_log"><thead><tr>${sth('Date', 'date', 'tbl_log')}${sth('Ref no', 'ref', 'tbl_log')}${sth('Type', 'type', 'tbl_log')}${sth('Description', 'desc', 'tbl_log')}${sth('Brand', 'brand', 'tbl_log')}${sth('Contact', 'contact', 'tbl_log')}${sthR('Amount ($)', 'amount', 'tbl_log')}${sth('Reconcile', 'recon', 'tbl_log')}</tr></thead><tbody id="log_tbody">${rows}</tbody></table></div><div id="txlog_lm" style="text-align:center;padding:10px;display:none"><button class="btn bo" style="font-size:var(--fs-sm)">Load more</button></div></div>`,
+    ct: `<div style="${TW}"><div class="card"><div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:6px"><div><div class="fl-l">Type</div><select class="fl" id="log_type" onchange="ScrTx._filterLog()" style="width:100px"><option value="">All</option><option value="Income">Income</option><option value="Expense">Expense</option><option value="Transfer">Transfer</option></select></div><div><div class="fl-l">Brand</div><select class="fl" id="log_brand" onchange="ScrTx._filterLog()" style="width:120px">${_brandFilterOpts()}</select></div><div><div class="fl-l">Status</div><select class="fl" id="log_status" onchange="ScrTx._filterLog()" style="width:80px"><option value="">All</option><option value="Paid">Paid</option><option value="Unpaid">Unpaid</option></select></div><div><div class="fl-l">Date from</div><input class="fl" id="log_from" type="date" value="${dr.from}" onchange="ScrTx._filterLog()" style="width:130px"></div><div><div class="fl-l">Date to</div><input class="fl" id="log_to" type="date" value="${dr.to}" onchange="ScrTx._filterLog()" style="width:130px"></div><div><div class="fl-l">Search</div><input class="fl" id="log_search" placeholder="" oninput="ScrTx._filterLog()" style="width:100px"></div><div style="flex:1"></div><button class="bg" style="color:var(--acc)" onclick="ScrTx._resetLog()">Reset</button></div></div><div class="card" style="padding:0"><table class="tbl" id="tbl_log"><thead><tr>${sth('Date', 'date', 'tbl_log')}${sth('Ref no', 'ref', 'tbl_log')}${sth('Type', 'type', 'tbl_log')}${sth('Description', 'desc', 'tbl_log')}${sth('Brand', 'brand', 'tbl_log')}${sth('Contact', 'contact', 'tbl_log')}${sthR('Amount ($)', 'amount', 'tbl_log')}${sth('Reconcile', 'recon', 'tbl_log')}</tr></thead><tbody id="log_tbody">${rows}</tbody></table></div><div id="txlog_lm" style="text-align:center;padding:10px;display:none"><button class="btn bo" style="font-size:var(--fs-sm)" onclick="ScrTx._loadMoreLog()">Load more</button></div></div>`,
   };
 }
 
+let _logPage = 1;
 async function _loadLog(filters) {
   const f = filters || { type: 'all', page: 1 };
   if (!f.type) f.type = 'all';
   if (!f.page) f.page = 1;
+  _logPage = f.page;
   try {
     const result = await API.getTransactions(f);
     const tbody = document.getElementById('log_tbody');
+    const lmEl = document.getElementById('txlog_lm');
     if (tbody) tbody.innerHTML = _logRows(result.rows);
+    if (lmEl) lmEl.style.display = result.hasMore ? 'block' : 'none';
   } catch (e) {
     const tbody = document.getElementById('log_tbody');
     if (tbody) tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--r)">Error: ${esc(e.message)}</td></tr>`;
+  }
+}
+
+async function _loadMoreLog() {
+  _logPage++;
+  const f = { type: 'all', page: _logPage };
+  const type = document.getElementById('log_type')?.value;
+  const brand = document.getElementById('log_brand')?.value;
+  const from = document.getElementById('log_from')?.value;
+  const to = document.getElementById('log_to')?.value;
+  const search = document.getElementById('log_search')?.value?.trim();
+  if (type) f.sub_type = type;
+  if (brand) f.brand = brand;
+  if (from) f.date_from = from;
+  if (to) f.date_to = to;
+  if (search) f.search = search;
+  try {
+    const result = await API.getTransactions(f);
+    const tbody = document.getElementById('log_tbody');
+    const lmEl = document.getElementById('txlog_lm');
+    if (tbody) tbody.innerHTML += _logRows(result.rows);
+    if (lmEl && !result.hasMore) lmEl.style.display = 'none';
+  } catch (e) {
+    App.toast('Load more failed: ' + e.message);
   }
 }
 
@@ -142,26 +170,52 @@ function renderTxSale() {
 
   return {
     tb: `<div class="tb"><div class="tb-t">Sales</div><button class="bs" onclick="App.go('cr_sale')">+ Record Sale</button></div>`,
-    ct: `<div style="${TW}"><div class="card"><div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:6px"><div><div class="fl-l">Brand</div><select class="fl" id="sale_brand" onchange="ScrTx._filterSales()" style="width:120px">${_brandFilterOpts()}</select></div><div><div class="fl-l">Channel</div><select class="fl" id="sale_channel" onchange="ScrTx._filterSales()" style="width:100px">${_channelFilterOpts()}</select></div><div><div class="fl-l">Date from</div><input class="fl" id="sale_from" type="date" value="${dr.from}" onchange="ScrTx._filterSales()" style="width:130px"></div><div><div class="fl-l">Date to</div><input class="fl" id="sale_to" type="date" value="${dr.to}" onchange="ScrTx._filterSales()" style="width:130px"></div><div style="flex:1"></div><button class="bg" style="color:var(--acc)" onclick="ScrTx._resetSales()">Reset</button></div><div id="sale_total" style="text-align:right;font-size:var(--fs-sm);color:var(--t2)">Total Revenue <b style="color:var(--g)">${fm(total)}</b></div></div><div class="card" style="padding:0"><table class="tbl" id="tbl_sale"><thead><tr>${sth('Date', 'date', 'tbl_sale')}${sth('Brand', 'brand', 'tbl_sale')}${sth('Channel', 'channel', 'tbl_sale')}${sthR('Amount ($)', 'amount', 'tbl_sale')}${sthR('GST', 'gst', 'tbl_sale')}${sth('Status', 'status', 'tbl_sale')}</tr></thead><tbody id="sale_tbody">${rows}</tbody></table></div><div id="txsale_lm" style="text-align:center;padding:10px;display:none"><button class="btn bo" style="font-size:var(--fs-sm)">Load more</button></div></div>`,
+    ct: `<div style="${TW}"><div class="card"><div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:6px"><div><div class="fl-l">Brand</div><select class="fl" id="sale_brand" onchange="ScrTx._filterSales()" style="width:120px">${_brandFilterOpts()}</select></div><div><div class="fl-l">Channel</div><select class="fl" id="sale_channel" onchange="ScrTx._filterSales()" style="width:100px">${_channelFilterOpts()}</select></div><div><div class="fl-l">Date from</div><input class="fl" id="sale_from" type="date" value="${dr.from}" onchange="ScrTx._filterSales()" style="width:130px"></div><div><div class="fl-l">Date to</div><input class="fl" id="sale_to" type="date" value="${dr.to}" onchange="ScrTx._filterSales()" style="width:130px"></div><div style="flex:1"></div><button class="bg" style="color:var(--acc)" onclick="ScrTx._resetSales()">Reset</button></div><div id="sale_total" style="text-align:right;font-size:var(--fs-sm);color:var(--t2)">Total Revenue <b style="color:var(--g)">${fm(total)}</b></div></div><div class="card" style="padding:0"><table class="tbl" id="tbl_sale"><thead><tr>${sth('Date', 'date', 'tbl_sale')}${sth('Brand', 'brand', 'tbl_sale')}${sth('Channel', 'channel', 'tbl_sale')}${sthR('Amount ($)', 'amount', 'tbl_sale')}${sthR('GST', 'gst', 'tbl_sale')}${sth('Status', 'status', 'tbl_sale')}</tr></thead><tbody id="sale_tbody">${rows}</tbody></table></div><div id="txsale_lm" style="text-align:center;padding:10px;display:none"><button class="btn bo" style="font-size:var(--fs-sm)" onclick="ScrTx._loadMoreSales()">Load more</button></div></div>`,
   };
 }
 
+let _salePage = 1;
 async function _loadSales(filters) {
   const f = filters || { type: 'sale', page: 1 };
   if (!f.type) f.type = 'sale';
   if (!f.page) f.page = 1;
+  _salePage = f.page;
   try {
     const result = await API.getTransactions(f);
     const tbody = document.getElementById('sale_tbody');
     const totalEl = document.getElementById('sale_total');
+    const lmEl = document.getElementById('txsale_lm');
     if (tbody) tbody.innerHTML = _saleRows(result.rows);
     if (totalEl && result.rows) {
       const total = result.rows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
       totalEl.innerHTML = `Total Revenue <b style="color:var(--g)">${fm(total)}</b>`;
     }
+    if (lmEl) lmEl.style.display = result.hasMore ? 'block' : 'none';
   } catch (e) {
     const tbody = document.getElementById('sale_tbody');
     if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--r)">Error: ${esc(e.message)}</td></tr>`;
+  }
+}
+
+async function _loadMoreSales() {
+  _salePage++;
+  const f = { type: 'sale', page: _salePage };
+  const brand = document.getElementById('sale_brand')?.value;
+  const channel = document.getElementById('sale_channel')?.value;
+  const from = document.getElementById('sale_from')?.value;
+  const to = document.getElementById('sale_to')?.value;
+  if (brand) f.brand = brand;
+  if (channel) f.channel = channel;
+  if (from) f.date_from = from;
+  if (to) f.date_to = to;
+  try {
+    const result = await API.getTransactions(f);
+    const tbody = document.getElementById('sale_tbody');
+    const lmEl = document.getElementById('txsale_lm');
+    if (tbody) tbody.innerHTML += _saleRows(result.rows);
+    if (lmEl && !result.hasMore) lmEl.style.display = 'none';
+  } catch (e) {
+    App.toast('Load more failed: ' + e.message);
   }
 }
 
@@ -221,7 +275,7 @@ function renderTxBill() {
 
   return {
     tb: `<div class="tb"><div class="tb-t">Bills</div><button class="btn bo">⊕ Record supplier payment</button><button class="btn bo" onclick="App.go('cr_import')">Import</button><button class="bs" onclick="App.go('cr_bill')">Create bill</button></div>`,
-    ct: `<div style="${TW}"><div class="card"><div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:6px"><div><div class="fl-l">Status</div><select class="fl" id="bill_status" onchange="ScrTx._filterBills()" style="width:75px"><option value="">All</option><option value="Open">Open</option><option value="Overdue">Overdue</option><option value="Closed">Closed</option><option value="Debit">Debit</option></select></div><div><div class="fl-l">Supplier</div><select class="fl" id="bill_supplier" onchange="ScrTx._filterBills()" style="width:140px">${_supplierFilterOpts()}</select></div><div><div class="fl-l">Brand</div><select class="fl" id="bill_brand" onchange="ScrTx._filterBills()" style="width:110px">${_brandFilterOpts()}</select></div><div><div class="fl-l">Issue from</div><input class="fl" id="bill_from" type="date" value="${dr.from}" onchange="ScrTx._filterBills()" style="width:130px"></div><div><div class="fl-l">Issue to</div><input class="fl" id="bill_to" type="date" value="${dr.to}" onchange="ScrTx._filterBills()" style="width:130px"></div><div><div class="fl-l">Search</div><input class="fl" id="bill_search" placeholder="" oninput="ScrTx._filterBills()" style="width:100px"></div><div style="flex:1"></div><button class="bg" style="color:var(--acc)" onclick="ScrTx._resetBills()">Reset</button></div><div id="bill_summary">${summary}</div></div><div class="card" style="padding:0"><table class="tbl" id="tbl_bill"><thead><tr>${sth('Issue date', 'date', 'tbl_bill')}${sth('Bill no', 'bill', 'tbl_bill')}${sth('Supplier', 'supplier', 'tbl_bill')}${sth('Inv no', 'inv', 'tbl_bill')}${sthR('Amount ($)', 'amount', 'tbl_bill')}${sthR('Balance due', 'balance', 'tbl_bill')}${sth('Due date', 'due', 'tbl_bill')}<th>File</th>${sth('Status', 'status', 'tbl_bill')}</tr></thead><tbody id="bill_tbody">${rows}</tbody></table></div><div id="txbill_lm" style="text-align:center;padding:10px;display:none"><button class="btn bo" style="font-size:var(--fs-sm)" onclick="ScrTx._loadMoreBills()">Load more</button></div></div>`,
+    ct: `<div style="${TW}"><div class="card"><div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:6px"><div><div class="fl-l">Status</div><select class="fl" id="bill_status" onchange="ScrTx._filterBills()" style="width:75px"><option value="">All</option><option value="Open">Open</option><option value="Overdue">Overdue</option><option value="Closed">Closed</option><option value="Debit">Debit</option></select></div><div><div class="fl-l">Supplier</div><select class="fl" id="bill_supplier" onchange="ScrTx._filterBills()" style="width:140px">${_supplierFilterOpts()}</select></div><div><div class="fl-l">Brand</div><select class="fl" id="bill_brand" onchange="ScrTx._filterBills()" style="width:110px">${_brandFilterOpts()}</select></div><div><div class="fl-l">Issue from</div><input class="fl" id="bill_from" type="date" value="${dr.from}" onchange="ScrTx._filterBills()" style="width:130px"></div><div><div class="fl-l">Issue to</div><input class="fl" id="bill_to" type="date" value="${dr.to}" onchange="ScrTx._filterBills()" style="width:130px"></div><div><div class="fl-l">Search</div><input class="fl" id="bill_search" placeholder="" oninput="ScrTx._filterBills()" style="width:100px"></div><div style="flex:1"></div><button class="bg" style="color:var(--acc)" onclick="ScrTx._resetBills()">Reset</button></div><div id="bill_summary">${summary}</div></div><div class="card" style="padding:0"><table class="tbl" id="tbl_bill"><thead><tr>${sth('Issue date', 'date', 'tbl_bill')}${sth('Bill no', 'bill', 'tbl_bill')}${sth('Supplier', 'supplier', 'tbl_bill')}${sth('Inv no', 'inv', 'tbl_bill')}${sthR('Amount ($)', 'amount', 'tbl_bill')}${sthR('Balance due', 'balance', 'tbl_bill')}${sth('Due date', 'due', 'tbl_bill')}${sth('File', 'file', 'tbl_bill')}${sth('Status', 'status', 'tbl_bill')}</tr></thead><tbody id="bill_tbody">${rows}</tbody></table></div><div id="txbill_lm" style="text-align:center;padding:10px;display:none"><button class="btn bo" style="font-size:var(--fs-sm)" onclick="ScrTx._loadMoreBills()">Load more</button></div></div>`,
   };
 }
 
@@ -311,26 +365,50 @@ function renderTxReturn() {
 
   return {
     tb: `<div class="tb"><div class="tb-t">Purchase Returns and Debits</div><button class="bs" onclick="App.go('cr_debit')">Create debit note</button></div>`,
-    ct: `<div style="${TW}"><div class="card"><div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:6px"><div><div class="fl-l">Supplier</div><select class="fl" id="ret_supplier" onchange="ScrTx._filterReturns()" style="width:160px">${_supplierFilterOpts()}</select></div><div><div class="fl-l">Brand</div><select class="fl" id="ret_brand" onchange="ScrTx._filterReturns()" style="width:140px">${_brandFilterOpts()}</select></div><div><div class="fl-l">Search</div><input class="fl" id="ret_search" placeholder="Search..." oninput="ScrTx._filterReturns()" style="width:140px"></div><div style="flex:1"></div><button class="bg" style="color:var(--acc)" onclick="ScrTx._resetReturns()">Reset</button></div><div id="ret_total" style="text-align:right;font-size:var(--fs-sm);color:var(--t2)">Total debit: <b>${fm(tA)}</b></div></div><div class="card" style="padding:0"><table class="tbl" id="tbl_ret"><thead><tr>${sth('Date', 'date', 'tbl_ret')}${sth('Bill no', 'bill', 'tbl_ret')}${sth('Supplier', 'supplier', 'tbl_ret')}${sth('Inv no', 'inv', 'tbl_ret')}<th>Notes</th>${sthR('Amount ($)', 'amount', 'tbl_ret')}<th style="text-align:right">Balance</th><th>Status</th><th>Refund</th><th>Apply</th></tr></thead><tbody id="ret_tbody">${rows}</tbody></table></div><div id="txret_lm" style="text-align:center;padding:10px;display:none"><button class="btn bo" style="font-size:var(--fs-sm)">Load more</button></div><div id="debit_detail" style="display:none"></div></div>`,
+    ct: `<div style="${TW}"><div class="card"><div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:6px"><div><div class="fl-l">Supplier</div><select class="fl" id="ret_supplier" onchange="ScrTx._filterReturns()" style="width:160px">${_supplierFilterOpts()}</select></div><div><div class="fl-l">Brand</div><select class="fl" id="ret_brand" onchange="ScrTx._filterReturns()" style="width:140px">${_brandFilterOpts()}</select></div><div><div class="fl-l">Search</div><input class="fl" id="ret_search" placeholder="Search..." oninput="ScrTx._filterReturns()" style="width:140px"></div><div style="flex:1"></div><button class="bg" style="color:var(--acc)" onclick="ScrTx._resetReturns()">Reset</button></div><div id="ret_total" style="text-align:right;font-size:var(--fs-sm);color:var(--t2)">Total debit: <b>${fm(tA)}</b></div></div><div class="card" style="padding:0"><table class="tbl" id="tbl_ret"><thead><tr>${sth('Date', 'date', 'tbl_ret')}${sth('Bill no', 'bill', 'tbl_ret')}${sth('Supplier', 'supplier', 'tbl_ret')}${sth('Inv no', 'inv', 'tbl_ret')}${sth('Notes', 'notes', 'tbl_ret')}${sthR('Amount ($)', 'amount', 'tbl_ret')}${sthR('Balance', 'balance', 'tbl_ret')}${sth('Status', 'status', 'tbl_ret')}${sth('Refund', 'refund', 'tbl_ret')}${sth('Apply', 'apply', 'tbl_ret')}</tr></thead><tbody id="ret_tbody">${rows}</tbody></table></div><div id="txret_lm" style="text-align:center;padding:10px;display:none"><button class="btn bo" style="font-size:var(--fs-sm)" onclick="ScrTx._loadMoreReturns()">Load more</button></div><div id="debit_detail" style="display:none"></div></div>`,
   };
 }
 
+let _retPage = 1;
 async function _loadReturns(filters) {
   const f = filters || { type: 'return', page: 1 };
   if (!f.type) f.type = 'return';
   if (!f.page) f.page = 1;
+  _retPage = f.page;
   try {
     const result = await API.getTransactions(f);
     const tbody = document.getElementById('ret_tbody');
     const totalEl = document.getElementById('ret_total');
+    const lmEl = document.getElementById('txret_lm');
     if (tbody) tbody.innerHTML = _returnRows(result.rows);
     if (totalEl && result.rows) {
       const tA = result.rows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
       totalEl.innerHTML = `Total debit: <b>${fm(tA)}</b>`;
     }
+    if (lmEl) lmEl.style.display = result.hasMore ? 'block' : 'none';
   } catch (e) {
     const tbody = document.getElementById('ret_tbody');
     if (tbody) tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--r)">Error: ${esc(e.message)}</td></tr>`;
+  }
+}
+
+async function _loadMoreReturns() {
+  _retPage++;
+  const f = { type: 'return', page: _retPage };
+  const supplier = document.getElementById('ret_supplier')?.value;
+  const brand = document.getElementById('ret_brand')?.value;
+  const search = document.getElementById('ret_search')?.value?.trim();
+  if (supplier) f.supplier_id = supplier;
+  if (brand) f.brand = brand;
+  if (search) f.search = search;
+  try {
+    const result = await API.getTransactions(f);
+    const tbody = document.getElementById('ret_tbody');
+    const lmEl = document.getElementById('txret_lm');
+    if (tbody) tbody.innerHTML += _returnRows(result.rows);
+    if (lmEl && !result.hasMore) lmEl.style.display = 'none';
+  } catch (e) {
+    App.toast('Load more failed: ' + e.message);
   }
 }
 
@@ -1363,15 +1441,18 @@ window.ScrTx = {
   _sdSelectAll,
   _sdDeselectAll,
   _sdSelectGroup,
-  // Filter + Reset (Task 1)
+  // Filter + Reset + Load More
   _filterLog,
   _resetLog,
+  _loadMoreLog,
   _filterSales,
   _resetSales,
+  _loadMoreSales,
   _filterBills,
   _resetBills,
   _filterReturns,
   _resetReturns,
+  _loadMoreReturns,
 };
 
 })();

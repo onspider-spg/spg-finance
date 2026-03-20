@@ -676,8 +676,10 @@ const App = (() => {
       if (!arrow) return;
       if (th.getAttribute('data-key') === key) {
         arrow.textContent = asc ? '▲' : '▼';
+        arrow.style.opacity = '1';
       } else {
-        arrow.textContent = '';
+        arrow.textContent = '⇅';
+        arrow.style.opacity = '.3';
       }
     });
   }
@@ -691,7 +693,7 @@ const App = (() => {
    */
   function sth(label, key, tid, ns) {
     const handler = ns ? `${ns}._sort('${tid}','${key}')` : `App.sortTable('${tid}','${key}')`;
-    return `<th data-key="${key}" style="cursor:pointer" onclick="${handler}">${esc(label)} <span class="s"></span></th>`;
+    return `<th data-key="${key}" style="cursor:pointer" onclick="${handler}">${esc(label)} <span class="s" style="opacity:.3">⇅</span></th>`;
   }
 
   /**
@@ -699,7 +701,7 @@ const App = (() => {
    */
   function sthR(label, key, tid, ns) {
     const handler = ns ? `${ns}._sort('${tid}','${key}')` : `App.sortTable('${tid}','${key}')`;
-    return `<th data-key="${key}" style="text-align:right;cursor:pointer" onclick="${handler}">${esc(label)} <span class="s"></span></th>`;
+    return `<th data-key="${key}" style="text-align:right;cursor:pointer" onclick="${handler}">${esc(label)} <span class="s" style="opacity:.3">⇅</span></th>`;
   }
 
   /** API call — delegates to API module */
